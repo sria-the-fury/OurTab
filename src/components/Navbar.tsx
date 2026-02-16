@@ -10,7 +10,7 @@ import Link from 'next/link';
 export default function Navbar() {
 
     return (
-        <Box sx={{ flexGrow: 1 }}>
+        <Box sx={{ flexGrow: 1, position: 'sticky', top: 0, zIndex: 1100 }}>
             <AppBar position="static" className="glass-nav" sx={{ background: 'transparent', boxShadow: 'none', backdropFilter: 'blur(10px)' }}>
                 <Toolbar>
                     <Link href="/" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'black', textDecoration: 'none', width: '100%' }}>
