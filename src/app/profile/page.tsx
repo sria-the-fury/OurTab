@@ -173,32 +173,24 @@ export default function Profile() {
                                     required
                                     sx={{ mb: 2 }}
                                 />
+                                <TextField
+                                    select
+                                    label="Default Currency"
+                                    value={currency}
+                                    onChange={handleCurrencyChange}
+                                    fullWidth
+                                    variant="outlined"
+                                    sx={{ mb: 2 }}
+                                >
+                                    <MenuItem value="USD">Dollar ($)</MenuItem>
+                                    <MenuItem value="EUR">Euro (€)</MenuItem>
+                                    <MenuItem value="BDT">Bangladeshi Taka (৳)</MenuItem>
+                                </TextField>
                                 <Button type="submit" variant="contained" disabled={loading}>
                                     Create Group
                                 </Button>
                             </form>
                             {message && <Typography color="primary" sx={{ mt: 2 }}>{message}</Typography>}
-                        </Paper>
-                    )}
-
-                    {!hasGroup && (
-                        <Paper className="glass" sx={{ p: 3, mt: 3, background: 'transparent', boxShadow: 'none' }}>
-                            <Typography variant="h6" gutterBottom>Settings</Typography>
-                            <Typography variant="body2" color="text.secondary" paragraph>
-                                Currency settings are managed via your Group. Create a group to set a detailed currency preference.
-                            </Typography>
-                            <TextField
-                                select
-                                label="Default Currency (Pre-Group)"
-                                value={currency}
-                                onChange={handleCurrencyChange}
-                                fullWidth
-                                variant="outlined"
-                            >
-                                <MenuItem value="USD">Dollar ($)</MenuItem>
-                                <MenuItem value="EUR">Euro (€)</MenuItem>
-                                <MenuItem value="BDT">Bangladeshi Taka (৳)</MenuItem>
-                            </TextField>
                         </Paper>
                     )}
                 </Box>
