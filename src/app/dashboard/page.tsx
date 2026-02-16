@@ -260,7 +260,7 @@ export default function Dashboard() {
                 </Grid>
 
                 {/* Settlements Widget */}
-                {group && expenses.length > 0 && (
+                {group && expenses.length > 0 && group.members && group.members.length > 1 && (
                     <Box sx={{ mt: 4 }}>
                         <Typography variant="h6" gutterBottom>Settlements (Who owes whom)</Typography>
                         <Grid container spacing={2}>
