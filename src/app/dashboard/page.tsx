@@ -10,8 +10,13 @@ import Grid from '@mui/material/Grid';
 import Button from '@mui/material/Button';
 import AddIcon from '@mui/icons-material/Add';
 import AttachMoneyIcon from '@mui/icons-material/AttachMoney';
+import EuroIcon from '@mui/icons-material/Euro';
+import CurrencyExchangeIcon from '@mui/icons-material/CurrencyExchange';
 import GroupIcon from '@mui/icons-material/Group';
 import ShoppingCartIcon from '@mui/icons-material/ShoppingCart';
+import ArrowBackIosIcon from '@mui/icons-material/ArrowBackIos';
+import ArrowForwardIosIcon from '@mui/icons-material/ArrowForwardIos';
+import IconButton from '@mui/material/IconButton';
 import { useAuth } from '@/components/AuthContext';
 import { useRouter } from 'next/navigation';
 import Loader from '@/components/Loader';
@@ -57,7 +62,15 @@ export default function Dashboard() {
 
 
 
-    // Moved Loader check to AFTER all hooks
+    const [selectedDate, setSelectedDate] = useState(new Date());
+
+    const currencyIcons: { [key: string]: any } = {
+        'USD': AttachMoneyIcon,
+        'EUR': EuroIcon,
+        'BDT': CurrencyExchangeIcon // Using generic exchange icon for Taka as specific might not exist or use text
+    };
+
+    const CurrencyIcon = currencyIcons[currency] || AttachMoneyIcon;
 
 
 
@@ -105,6 +118,31 @@ export default function Dashboard() {
             fetchMyGroup();
         }
     }, [user, loading, router]);
+
+    const handlePreviousMonth = () => {
+        const newDate = new Date(selectedDate);
+        newDate.setMonth(newDate.getMonth() - 1);
+        setSelectedDate(newDate);
+    };
+
+    const handleNextMonth = () => {
+        const newDate = new Date(selectedDate);
+        newDate.setMonth(newDate.getMonth() + 1);
+        setSelectedDate(newDate);
+    };
+
+    // Filter expenses for selected month
+    const filteredExpenses = expenses.filter(expense => {
+        const expenseDate = new Date(expense.date);
+        return expenseDate.getMonth() === selectedDate.getMonth() &&
+            expenseDate.getFullYear() === selectedDate.getFullYear();
+    });
+
+    // Calculate totals based on filtered expenses
+    const totalFilteredExpenses = filteredExpenses.reduce((sum, exp) => sum + exp.amount, 0);
+    const myFilteredExpenses = filteredExpenses
+        .filter(exp => exp.userId === user?.email)
+        .reduce((sum, exp) => sum + exp.amount, 0);
 
     const handleAddMember = async () => {
         if (!newMemberEmail || !group) return;
@@ -155,6 +193,19 @@ export default function Dashboard() {
                     </Button>
                 </Box>
 
+                {/* Month Navigation */}
+                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', mb: 3 }}>
+                    <IconButton onClick={handlePreviousMonth}>
+                        <ArrowBackIosIcon />
+                    </IconButton>
+                    <Typography variant="h6" sx={{ mx: 2, minWidth: 150, textAlign: 'center' }}>
+                        {selectedDate.toLocaleString('default', { month: 'long', year: 'numeric' })}
+                    </Typography>
+                    <IconButton onClick={handleNextMonth} disabled={selectedDate.getMonth() === new Date().getMonth() && selectedDate.getFullYear() === new Date().getFullYear()}>
+                        <ArrowForwardIosIcon />
+                    </IconButton>
+                </Box>
+
                 <Grid container spacing={3}>
                     {/* Total Cost Widget */}
                     <Grid size={{ xs: 12, md: 4 }}>
@@ -169,16 +220,16 @@ export default function Dashboard() {
                             color: 'white'
                         }}>
                             <Box sx={{ position: 'absolute', top: -10, right: -10, opacity: 0.2 }}>
-                                <AttachMoneyIcon sx={{ fontSize: 100 }} />
+                                <CurrencyIcon sx={{ fontSize: 100 }} />
                             </Box>
                             <Typography component="h2" variant="h6" gutterBottom sx={{ opacity: 0.9 }}>
                                 Total Expenses
                             </Typography>
                             <Typography component="p" variant="h3" sx={{ fontWeight: 'bold', mb: 1 }}>
-                                {displayCurrency}{totalExpenses.toFixed(2)}
+                                {displayCurrency}{totalFilteredExpenses.toFixed(2)}
                             </Typography>
                             <Typography sx={{ opacity: 0.8 }}>
-                                Current Month
+                                {selectedDate.toLocaleString('default', { month: 'long' })}
                             </Typography>
                         </Paper>
                     </Grid>
@@ -199,7 +250,7 @@ export default function Dashboard() {
                                 My Expenses
                             </Typography>
                             <Typography component="p" variant="h3" sx={{ fontWeight: 'bold', color: '#333' }}>
-                                {displayCurrency}{myExpenses.toFixed(2)}
+                                {displayCurrency}{myFilteredExpenses.toFixed(2)}
                             </Typography>
                         </Paper>
                     </Grid>
@@ -259,8 +310,17 @@ export default function Dashboard() {
                     </Grid>
                 </Grid>
 
-                {/* Settlements Widget */}
-                {group && expenses.length > 0 && group.members && group.members.length > 1 && (
+                {/* Settlements Widget - KEEP AS IS (Usually settles all time, or maybe just this month? 
+                    settlements are usually running totals, but for now let's keep it simple and maybe warn user it's all time 
+                    OR filter it too? 
+                    Actually, settlements should probably be ALL time to be correct mathematically for "owing". 
+                    If we filter by month, it just shows who paid what THIS month, not who owes who overall. 
+                    Let's use filteredExpenses for settlements to show "Monthly Logic" as requested, 
+                    OR keep it global. 
+                    User asked for "previous months expenses". 
+                    I'll use filteredExpenses so it shows the settlement status FOR THAT MONTH.
+                */}
+                {group && filteredExpenses.length > 0 && group.members && group.members.length > 1 && (
                     <Box sx={{ mt: 4 }}>
                         <Typography variant="h6" gutterBottom>Settlements (Who owes whom)</Typography>
                         <Grid container spacing={2}>
@@ -273,7 +333,7 @@ export default function Dashboard() {
                                 members.forEach(m => memberBalances[m.email] = 0);
 
                                 // Calculate total spent by each person
-                                expenses.forEach(exp => {
+                                filteredExpenses.forEach(exp => {
                                     if (memberBalances[exp.userId] !== undefined) {
                                         memberBalances[exp.userId] += exp.amount;
                                     } else {
@@ -386,12 +446,12 @@ export default function Dashboard() {
                 )}
 
                 <Box sx={{ mt: 4 }}>
-                    <Typography variant="h6" gutterBottom>Recent Expenses</Typography>
-                    {expenses.length === 0 ? (
+                    <Typography variant="h6" gutterBottom>Expenses for {selectedDate.toLocaleString('default', { month: 'long' })}</Typography>
+                    {filteredExpenses.length === 0 ? (
                         <Typography color="text.secondary">No expenses found.</Typography>
                     ) : (
                         <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                            {expenses.slice(0, 10).map((expense) => {
+                            {filteredExpenses.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()).map((expense) => {
                                 const member = group?.members?.find(m => m.email === expense.userId);
                                 const memberName = member?.name || expense.userId.split('@')[0];
                                 const expenseDate = new Date(expense.date).toLocaleString('en-GB', {
