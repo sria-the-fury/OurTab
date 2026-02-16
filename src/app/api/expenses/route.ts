@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/firebase';
-import { collection, addDoc, query, where, getDocs, orderBy } from 'firebase/firestore';
+import { collection, addDoc, query, where, getDocs, orderBy, doc, getDoc, writeBatch } from 'firebase/firestore';
 
 export async function POST(request: Request) {
     try {
@@ -20,9 +20,42 @@ export async function POST(request: Request) {
             date: new Date().toISOString()
         };
 
-        const docRef = await addDoc(collection(db, 'expenses'), expenseData);
+        // 1. Fetch group to get members
+        const groupRef = doc(db, 'groups', groupId);
+        const docSnap = await getDoc(groupRef);
 
-        return NextResponse.json({ id: docRef.id, ...expenseData });
+        let membersToNotify: string[] = [];
+        if (docSnap.exists()) {
+            const groupData = docSnap.data();
+            if (groupData.members) {
+                // Filter out the sender
+                membersToNotify = groupData.members
+                    .map((m: any) => m.email)
+                    .filter((email: string) => email !== userId);
+            }
+        }
+
+        const expenseRef = await addDoc(collection(db, 'expenses'), expenseData);
+
+        // 2. Create notifications
+        const notificationsRef = collection(db, 'notifications');
+        const batch = writeBatch(db); // Need to import writeBatch
+
+        membersToNotify.forEach(recipientId => {
+            const newNotifRef = doc(notificationsRef); // Auto-ID
+            batch.set(newNotifRef, {
+                recipientId,
+                message: `${userId.split('@')[0]} added an expense: ${description}`,
+                expenseId: expenseRef.id,
+                read: false,
+                createdAt: new Date().toISOString(),
+                type: 'expense_added'
+            });
+        });
+
+        await batch.commit();
+
+        return NextResponse.json({ id: expenseRef.id, ...expenseData });
     } catch (error) {
         console.error('Error creating expense:', error);
         return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
