@@ -9,6 +9,7 @@ import Button from '@mui/material/Button';
 import TextField from '@mui/material/TextField';
 import MenuItem from '@mui/material/MenuItem';
 import { useAuth } from '@/components/AuthContext';
+import { useToast } from '@/components/ToastContext';
 import { useState, useEffect } from 'react';
 import BottomNav from '@/components/BottomNav';
 import Loader from '@/components/Loader';
@@ -25,7 +26,6 @@ export default function Profile() {
     const { user, logout, currency, updateCurrency, loading: authLoading } = useAuth();
     const [groupName, setGroupName] = useState('');
     const [loading, setLoading] = useState(false);
-    const [message, setMessage] = useState('');
     const [hasGroup, setHasGroup] = useState(false);
     const [groupDetails, setGroupDetails] = useState<Group | null>(null);
 
@@ -69,6 +69,7 @@ export default function Profile() {
         fetchUserData();
     }, [user]);
 
+    const { showToast } = useToast();
     const handleCurrencyChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
         const newCurrency = e.target.value;
         await updateCurrency(newCurrency);
@@ -89,16 +90,16 @@ export default function Profile() {
             });
 
             if (res.ok) {
-                setMessage('Group created successfully!');
+                showToast('Group created successfully!', 'success');
                 setHasGroup(true);
                 // Also ensure our global currency state matches what we just set
                 updateCurrency(currency);
             } else {
-                setMessage('Failed to create group');
+                showToast('Failed to create group', 'error');
             }
         } catch (err) {
             console.error(err);
-            setMessage('Error creating group');
+            showToast('Error creating group', 'error');
         }
         setLoading(false);
     };
@@ -117,17 +118,17 @@ export default function Profile() {
                 });
 
                 if (res.ok) {
-                    setMessage('Group deleted successfully');
+                    showToast('Group deleted successfully', 'success');
                     setHasGroup(false);
                     setGroupDetails(null);
                     updateCurrency('USD'); // Reset to default or keep user pref? Let's keep it safe.
                 } else {
-                    setMessage('Failed to delete group');
+                    showToast('Failed to delete group', 'error');
                 }
             }
         } catch (error) {
             console.error("Delete failed", error);
-            setMessage('Error deleting group');
+            showToast('Error deleting group', 'error');
         }
         setLoading(false);
     };
@@ -190,7 +191,6 @@ export default function Profile() {
                                     Create Group
                                 </Button>
                             </form>
-                            {message && <Typography color="primary" sx={{ mt: 2 }}>{message}</Typography>}
                         </Paper>
                     )}
                 </Box>

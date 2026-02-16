@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/firebase';
-import { collection, addDoc, query, where, getDocs, orderBy, doc, getDoc, writeBatch } from 'firebase/firestore';
+import { collection, addDoc, query, where, getDocs, orderBy, doc, getDoc, writeBatch, deleteDoc, updateDoc } from 'firebase/firestore';
 
 export async function POST(request: Request) {
     try {
@@ -20,40 +20,7 @@ export async function POST(request: Request) {
             date: new Date().toISOString()
         };
 
-        // 1. Fetch group to get members
-        const groupRef = doc(db, 'groups', groupId);
-        const docSnap = await getDoc(groupRef);
-
-        let membersToNotify: string[] = [];
-        if (docSnap.exists()) {
-            const groupData = docSnap.data();
-            if (groupData.members) {
-                // Filter out the sender
-                membersToNotify = groupData.members
-                    .map((m: any) => m.email)
-                    .filter((email: string) => email !== userId);
-            }
-        }
-
         const expenseRef = await addDoc(collection(db, 'expenses'), expenseData);
-
-        // 2. Create notifications
-        const notificationsRef = collection(db, 'notifications');
-        const batch = writeBatch(db); // Need to import writeBatch
-
-        membersToNotify.forEach(recipientId => {
-            const newNotifRef = doc(notificationsRef); // Auto-ID
-            batch.set(newNotifRef, {
-                recipientId,
-                message: `${userId.split('@')[0]} added an expense: ${description}`,
-                expenseId: expenseRef.id,
-                read: false,
-                createdAt: new Date().toISOString(),
-                type: 'expense_added'
-            });
-        });
-
-        await batch.commit();
 
         return NextResponse.json({ id: expenseRef.id, ...expenseData });
     } catch (error) {
@@ -85,5 +52,92 @@ export async function GET(request: Request) {
     } catch (error) {
         console.error('Error fetching expenses:', error);
         return NextResponse.json({ error: 'Error fetching' }, { status: 500 });
+    }
+}
+
+export async function DELETE(request: Request) {
+    try {
+        const { searchParams } = new URL(request.url);
+        const id = searchParams.get('id');
+        const userId = searchParams.get('userId');
+
+        if (!id || !userId) {
+            return NextResponse.json({ error: 'Missing id or userId' }, { status: 400 });
+        }
+
+        const expenseRef = doc(db, 'expenses', id);
+        const expenseSnap = await getDoc(expenseRef);
+
+        if (!expenseSnap.exists()) {
+            return NextResponse.json({ error: 'Expense not found' }, { status: 404 });
+        }
+
+        const expenseData = expenseSnap.data();
+
+        // 1. Verify ownership
+        if (expenseData.userId !== userId) {
+            return NextResponse.json({ error: 'Unauthorized' }, { status: 403 });
+        }
+
+        // 2. Verify time constraints (48 hours)
+        const createdDate = new Date(expenseData.date);
+        const now = new Date();
+        const diffInHours = (now.getTime() - createdDate.getTime()) / (1000 * 60 * 60);
+
+        if (diffInHours > 48) {
+            return NextResponse.json({ error: 'Cannot delete expense older than 48 hours' }, { status: 403 });
+        }
+
+        await deleteDoc(expenseRef);
+
+        return NextResponse.json({ success: true });
+    } catch (error) {
+        console.error('Error deleting expense:', error);
+        return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
+    }
+}
+
+export async function PATCH(request: Request) {
+    try {
+        const body = await request.json();
+        const { id, userId, amount, description } = body;
+
+        if (!id || !userId) {
+            return NextResponse.json({ error: 'Missing id or userId' }, { status: 400 });
+        }
+
+        const expenseRef = doc(db, 'expenses', id);
+        const expenseSnap = await getDoc(expenseRef);
+
+        if (!expenseSnap.exists()) {
+            return NextResponse.json({ error: 'Expense not found' }, { status: 404 });
+        }
+
+        const expenseData = expenseSnap.data();
+
+        // 1. Verify ownership
+        if (expenseData.userId !== userId) {
+            return NextResponse.json({ error: 'Unauthorized' }, { status: 403 });
+        }
+
+        // 2. Verify time constraints
+        const createdDate = new Date(expenseData.date);
+        const now = new Date();
+        const diffInHours = (now.getTime() - createdDate.getTime()) / (1000 * 60 * 60);
+
+        if (diffInHours > 48) {
+            return NextResponse.json({ error: 'Cannot edit expense older than 48 hours' }, { status: 403 });
+        }
+
+        const updates: any = {};
+        if (amount) updates.amount = parseFloat(amount);
+        if (description) updates.description = description;
+
+        await updateDoc(expenseRef, updates);
+
+        return NextResponse.json({ success: true, ...updates });
+    } catch (error) {
+        console.error('Error updating expense:', error);
+        return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
     }
 }

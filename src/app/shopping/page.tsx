@@ -40,6 +40,7 @@ export default function Shopping() {
 
     const [loading, setLoading] = useState(false);
     const [message, setMessage] = useState<{ type: 'success' | 'error' | '', text: string }>({ type: '', text: '' });
+    // const { showToast } = useToast();
 
     // Add item to list
     const handleAddItem = (e: React.FormEvent) => {
@@ -118,7 +119,7 @@ export default function Shopping() {
             const itemsBreakdown = items.map(item => `${item.name} ${getCurrencySymbol()}${item.price.toFixed(2)}`).join(', ');
             const description = note
                 ? `${note} (Items: ${itemsBreakdown})`
-                : `Groceries: ${itemsBreakdown}`;
+                : itemsBreakdown;
 
             console.log('Creating expense with data:', {
                 amount: total,

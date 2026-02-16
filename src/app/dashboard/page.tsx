@@ -19,6 +19,7 @@ import ArrowForwardIosIcon from '@mui/icons-material/ArrowForwardIos';
 import IconButton from '@mui/material/IconButton';
 import { useAuth } from '@/components/AuthContext';
 import { useRouter } from 'next/navigation';
+import { useToast } from '@/components/ToastContext';
 import Loader from '@/components/Loader';
 import BottomNav from '@/components/BottomNav';
 import Chip from '@mui/material/Chip';
@@ -29,6 +30,8 @@ import DialogContent from '@mui/material/DialogContent';
 import DialogTitle from '@mui/material/DialogTitle';
 import TextField from '@mui/material/TextField';
 import PersonAddIcon from '@mui/icons-material/PersonAdd';
+import EditIcon from '@mui/icons-material/Edit';
+import DeleteIcon from '@mui/icons-material/Delete';
 
 interface Group {
     id: string;
@@ -76,9 +79,105 @@ export default function Dashboard() {
 
     const displayCurrency = currencySymbols[currency] || '$';
 
+    const { showToast } = useToast();
     const [openAddMember, setOpenAddMember] = useState(false);
     const [newMemberEmail, setNewMemberEmail] = useState('');
-    const [addMemberStatus, setAddMemberStatus] = useState<{ type: 'success' | 'error' | '', msg: string }>({ type: '', msg: '' });
+
+    const [openEditExpense, setOpenEditExpense] = useState(false);
+    const [editingExpenseId, setEditingExpenseId] = useState<string | null>(null);
+    const [editAmount, setEditAmount] = useState('');
+    const [editDescription, setEditDescription] = useState('');
+
+    const handleOpenEdit = (expense: Expense) => {
+        setEditingExpenseId(expense.id);
+        setEditAmount(expense.amount.toString());
+        setEditDescription(expense.description);
+        setOpenEditExpense(true);
+    };
+
+    const handleSaveEdit = async () => {
+        if (!editingExpenseId || !user) return;
+
+        try {
+            const res = await fetch('/api/expenses', {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    id: editingExpenseId,
+                    userId: user.email,
+                    amount: editAmount,
+                    description: editDescription
+                })
+            });
+
+            if (res.ok) {
+                // Update local state
+                setExpenses(prev => prev.map(exp =>
+                    exp.id === editingExpenseId
+                        ? { ...exp, amount: parseFloat(editAmount), description: editDescription }
+                        : exp
+                ));
+                setOpenEditExpense(false);
+                showToast('Expense updated successfully!', 'success');
+            } else {
+                showToast('Failed to update expense. It might be older than 48 hours.', 'error');
+            }
+        } catch (error) {
+            console.error('Failed to update expense', error);
+            showToast('Error updating expense', 'error');
+        }
+    };
+
+    const handleDeleteExpense = async (id: string) => {
+        if (!user || !confirm('Are you sure you want to delete this expense?')) return;
+
+        try {
+            const res = await fetch(`/api/expenses?id=${id}&userId=${user.email}`, {
+                method: 'DELETE'
+            });
+
+            if (res.ok) {
+                setExpenses(prev => prev.filter(exp => exp.id !== id));
+                showToast('Expense deleted successfully!', 'success');
+            } else {
+                showToast('Failed to delete expense. It might be older than 48 hours.', 'error');
+            }
+        } catch (error) {
+            console.error('Failed to delete expense', error);
+            showToast('Error deleting expense', 'error');
+        }
+    };
+
+    const handleAddMember = async () => {
+        if (!newMemberEmail || !group) return;
+
+        try {
+            const res = await fetch('/api/groups/add-member', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ email: newMemberEmail, groupId: group.id })
+            });
+
+            const data = await res.json();
+
+            if (res.ok) {
+                showToast('Member added successfully!', 'success');
+                setNewMemberEmail('');
+                // Optimized: just add member to local state if possible, or trigger re-fetch. Similar fetch logic.
+                // For now fast fix:
+                const groupRes = await fetch(`/api/groups/my-group?email=${user?.email}`);
+                if (groupRes.ok) {
+                    const groupData = await groupRes.json();
+                    setGroup(groupData);
+                }
+                setOpenAddMember(false);
+            } else {
+                showToast(data.error || 'Failed to add member', 'error');
+            }
+        } catch (error) {
+            showToast('Error adding member', 'error');
+        }
+    };
 
 
 
@@ -144,37 +243,7 @@ export default function Dashboard() {
         .filter(exp => exp.userId === user?.email)
         .reduce((sum, exp) => sum + exp.amount, 0);
 
-    const handleAddMember = async () => {
-        if (!newMemberEmail || !group) return;
-        setAddMemberStatus({ type: '', msg: '' });
 
-        try {
-            const res = await fetch('/api/groups/add-member', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ email: newMemberEmail, groupId: group.id })
-            });
-
-            const data = await res.json();
-
-            if (res.ok) {
-                setAddMemberStatus({ type: 'success', msg: 'Member added!' });
-                setNewMemberEmail('');
-                // Optimized: just add member to local state if possible, or trigger re-fetch. Similar fetch logic.
-                // For now fast fix:
-                const groupRes = await fetch(`/api/groups/my-group?email=${user?.email}`);
-                if (groupRes.ok) {
-                    const groupData = await groupRes.json();
-                    setGroup(groupData);
-                }
-                setTimeout(() => setOpenAddMember(false), 1500);
-            } else {
-                setAddMemberStatus({ type: 'error', msg: data.error || 'Failed to add member' });
-            }
-        } catch (error) {
-            setAddMemberStatus({ type: 'error', msg: 'Error adding member' });
-        }
-    };
 
     if (loading) {
         return <Loader />;
@@ -454,7 +523,8 @@ export default function Dashboard() {
                             {filteredExpenses.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()).map((expense) => {
                                 const member = group?.members?.find(m => m.email === expense.userId);
                                 const memberName = member?.name || expense.userId.split('@')[0];
-                                const expenseDate = new Date(expense.date).toLocaleString('en-GB', {
+                                const expenseDate = new Date(expense.date);
+                                const expenseDateStr = expenseDate.toLocaleString('en-GB', {
                                     day: 'numeric',
                                     month: 'short',
                                     year: 'numeric',
@@ -463,20 +533,37 @@ export default function Dashboard() {
                                     hour12: false
                                 });
 
+                                // Check if current user is owner and within 48 hours
+                                const isOwner = user?.email === expense.userId;
+                                const now = new Date();
+                                const diffInHours = (now.getTime() - expenseDate.getTime()) / (1000 * 60 * 60);
+                                const canEdit = isOwner && diffInHours <= 48;
+
                                 return (
                                     <Paper key={expense.id} className="glass" sx={{ p: 2, background: 'transparent' }}>
                                         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                                             <Box>
                                                 <Typography variant="body1" sx={{ fontWeight: 600 }}>
-                                                    {expense.description}
+                                                    Groceries - {expense.description}
                                                 </Typography>
                                                 <Typography variant="caption" color="text.secondary">
-                                                    {memberName} • {expenseDate}
+                                                    {memberName} • {expenseDateStr}
                                                 </Typography>
                                             </Box>
-                                            <Typography variant="h6" color="primary" sx={{ fontWeight: 'bold' }}>
-                                                {displayCurrency}{expense.amount.toFixed(2)}
-                                            </Typography>
+                                            <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                                                <Typography variant="h6" color="primary" sx={{ fontWeight: 'bold', mr: 2 }}>
+                                                    {displayCurrency}{expense.amount.toFixed(2)}
+                                                </Typography>
+                                                {canEdit && (
+                                                    <IconButton
+                                                        size="small"
+                                                        color="error"
+                                                        onClick={() => handleDeleteExpense(expense.id)}
+                                                    >
+                                                        <DeleteIcon fontSize="small" />
+                                                    </IconButton>
+                                                )}
+                                            </Box>
                                         </Box>
                                     </Paper>
                                 );
@@ -490,6 +577,7 @@ export default function Dashboard() {
                 <BottomNav />
             </Box>
 
+            {/* Add Member Dialog */}
             <Dialog open={openAddMember} onClose={() => setOpenAddMember(false)}>
                 <DialogTitle>Add New Member</DialogTitle>
                 <DialogContent>
@@ -503,16 +591,44 @@ export default function Dashboard() {
                         variant="outlined"
                         value={newMemberEmail}
                         onChange={(e) => setNewMemberEmail(e.target.value)}
-                        error={addMemberStatus.type === 'error'}
-                        helperText={addMemberStatus.msg}
                     />
-                    {addMemberStatus.type === 'success' && (
-                        <Typography color="success.main" variant="body2" sx={{ mt: 1 }}>{addMemberStatus.msg}</Typography>
-                    )}
                 </DialogContent>
                 <DialogActions>
                     <Button onClick={() => setOpenAddMember(false)}>Cancel</Button>
                     <Button onClick={handleAddMember} disabled={!newMemberEmail}>Add</Button>
+                </DialogActions>
+            </Dialog>
+
+            {/* Edit Expense Dialog */}
+            <Dialog open={openEditExpense} onClose={() => setOpenEditExpense(false)}>
+                <DialogTitle>Edit Expense</DialogTitle>
+                <DialogContent>
+                    <TextField
+                        autoFocus
+                        margin="dense"
+                        id="description"
+                        label="Description"
+                        type="text"
+                        fullWidth
+                        variant="outlined"
+                        value={editDescription}
+                        onChange={(e) => setEditDescription(e.target.value)}
+                        sx={{ mb: 2 }}
+                    />
+                    <TextField
+                        margin="dense"
+                        id="amount"
+                        label="Amount"
+                        type="number"
+                        fullWidth
+                        variant="outlined"
+                        value={editAmount}
+                        onChange={(e) => setEditAmount(e.target.value)}
+                    />
+                </DialogContent>
+                <DialogActions>
+                    <Button onClick={() => setOpenEditExpense(false)}>Cancel</Button>
+                    <Button onClick={handleSaveEdit} variant="contained" color="primary">Save</Button>
                 </DialogActions>
             </Dialog>
         </main>

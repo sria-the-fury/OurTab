@@ -34,15 +34,13 @@ export default function Home() {
             height: '80vh',
           }}
         >
-          <LocalGroceryStoreIcon sx={{ fontSize: 100, color: 'primary.main', mb: 1 }} />
-          <Typography variant="h2" component="h1" gutterBottom align="center" sx={{ fontWeight: 'bold', mb: 0 }}>
-            OurTab
+          {/* <LocalGroceryStoreIcon sx={{ fontSize: 100, color: 'primary.main', mb: 1 }} /> */}
+          <Box component="img" src="/icon.svg" alt="OurTab Icon" sx={{ width: 120, height: 120, mb: 1, borderRadius: '20px' }} />
+          <Typography variant="h2" component="h1" gutterBottom align="center" sx={{ fontWeight: 'bold', mb: 0, fontFamily: 'var(--font-abril)', letterSpacing: 1 }}>
+            ourtab
           </Typography>
-          <Typography variant="h5" component="h2" gutterBottom align="center" color="text.secondary" sx={{ mt: 2 }}>
-            Grocery Expense Tracker
-          </Typography>
-          <Typography variant="h6" component="p" gutterBottom align="center" color="text.secondary" sx={{ maxWidth: 600, mb: 4 }}>
-            Manage your group expenses with ease.
+          <Typography variant="h6" component="p" gutterBottom align="center" color="text.secondary" sx={{ maxWidth: 600, mb: 4, letterSpacing: 3, textTransform: 'uppercase', fontSize: '0.8rem', fontWeight: 600 }}>
+            MANAGE YOUR GROUP EXPENSES WITH EASE
           </Typography>
 
           <Box sx={{ mt: 4 }}>

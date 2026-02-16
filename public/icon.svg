@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <!-- Background: Dark Navy/Black -->
+  <rect width="512" height="512" rx="100" fill="#1a1a2e" />
+  
+  <!-- Shopping Cart: Light Grey/Silver -->
+  <g transform="translate(56, 56) scale(0.78)">
+    <path d="M149.33,128l29.87,149.33H384l32-149.33H149.33z M170.67,341.33c-11.73,0-21.33,9.6-21.33,21.33s9.6,21.33,21.33,21.33 s21.33-9.6,21.33-21.33S182.4,341.33,170.67,341.33z M341.33,341.33c-11.73,0-21.33,9.6-21.33,21.33s9.6,21.33,21.33,21.33 s21.33-9.6,21.33-21.33S353.07,341.33,341.33,341.33z M128,85.33h-42.67v42.67H112l35.2,176h276.27v-42.67H185.6L169.6,128h267.73 l-49.07,229.33H154.67" fill="#e0e0e0" stroke="#e0e0e0" stroke-width="10"/>
+  </g>
+
+  <!-- Letter T inside the cart -->
+  <text x="50%" y="48%" dominant-baseline="middle" text-anchor="middle" font-family="Arial, sans-serif" font-weight="bold" font-size="160" fill="#e0e0e0">T</text>
+</svg>
