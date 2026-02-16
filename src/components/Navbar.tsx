@@ -42,11 +42,16 @@ export default function Navbar() {
                     const newUnread = data.filter(n => !n.read && !prev.some(p => p.id === n.id));
 
                     newUnread.forEach(n => {
-                        if (Notification.permission === 'granted') {
-                            new Notification('New Expense Alert', {
-                                body: n.message,
-                                icon: '/icon.png'
-                            });
+                        // Check if Notification API is supported and permission granted
+                        if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'granted') {
+                            try {
+                                new Notification('New Expense Alert', {
+                                    body: n.message,
+                                    icon: '/icon.png'
+                                });
+                            } catch (e) {
+                                console.error('Notification error:', e);
+                            }
                         }
                     });
 
@@ -59,10 +64,8 @@ export default function Navbar() {
     };
 
     useEffect(() => {
-        // Request permission on mount
-        if (Notification.permission === 'default') {
-            Notification.requestPermission();
-        }
+        // Removed auto-request for permission to prevent issues on iOS/Chrome
+        // and ensure user gesture compliance.
 
         fetchNotifications(); // Initial fetch
         const interval = setInterval(fetchNotifications, 30000);
@@ -71,6 +74,12 @@ export default function Navbar() {
 
     const handleClick = (event: React.MouseEvent<HTMLElement>) => {
         setAnchorEl(event.currentTarget);
+
+        // Request permission on user interaction if supported
+        if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'default') {
+            Notification.requestPermission().catch(err => console.error('Permission request failed', err));
+        }
+
         // Refresh on open
         fetchNotifications();
     };
@@ -113,8 +122,8 @@ export default function Navbar() {
                             <IconButton
                                 size="large"
                                 aria-label={`show ${unreadCount} new notifications`}
-                                color="inherit"
                                 onClick={handleClick}
+                                sx={{ color: 'black' }}
                             >
                                 <Badge badgeContent={unreadCount} color="error">
                                     <NotificationsIcon />
