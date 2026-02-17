@@ -24,59 +24,14 @@ interface Group {
 }
 
 export default function Profile() {
-    const { user, logout, currency, updateCurrency, loading: authLoading } = useAuth();
+    const { user, logout, currency, updateCurrency, loading: authLoading, dbUser, group, mutateUser, mutateGroup } = useAuth();
     const router = useRouter();
     const [groupName, setGroupName] = useState('');
     const [loading, setLoading] = useState(false);
-    const [hasGroup, setHasGroup] = useState(false);
-    const [groupDetails, setGroupDetails] = useState<Group | null>(null);
 
-    const [fetchingData, setFetchingData] = useState(true);
-
-    useEffect(() => {
-        async function fetchUserData() {
-            if (user?.email) {
-                try {
-                    setFetchingData(true);
-                    console.log('Fetching user data for:', user.email);
-                    const res = await fetch('/api/users', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ email: user.email })
-                    });
-                    if (res.ok) {
-                        const userData = await res.json();
-                        console.log('User data:', userData);
-                        if (userData.groupId) {
-                            console.log('User has groupId:', userData.groupId);
-                            setHasGroup(true);
-                            // Fetch full group details
-                            const groupRes = await fetch(`/api/groups/my-group?email=${user.email}`);
-                            if (groupRes.ok) {
-                                const groupData = await groupRes.json();
-                                console.log('Group data:', groupData);
-                                setGroupDetails(groupData);
-                            } else {
-                                console.error('Failed to fetch group details:', groupRes.status);
-                            }
-                        } else {
-                            console.log('User has no groupId');
-                            setHasGroup(false);
-                        }
-                    } else {
-                        console.error('Failed to fetch user data:', res.status);
-                    }
-                } catch (e) {
-                    console.error('Error fetching user data:', e);
-                } finally {
-                    setFetchingData(false);
-                }
-            } else {
-                setFetchingData(false);
-            }
-        }
-        fetchUserData();
-    }, [user]);
+    // Derived state from cached data
+    const hasGroup = !!dbUser?.groupId;
+    const groupDetails = group;
 
     const { showToast } = useToast();
     const handleCurrencyChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -100,9 +55,9 @@ export default function Profile() {
 
             if (res.ok) {
                 showToast('Group created successfully!', 'success');
-                setHasGroup(true);
-                // Also ensure our global currency state matches what we just set
-                updateCurrency(currency);
+                // Revalidate cache to show new group instantly
+                mutateUser();
+                mutateGroup();
             } else {
                 showToast('Failed to create group', 'error');
             }
@@ -128,9 +83,10 @@ export default function Profile() {
 
                 if (res.ok) {
                     showToast('Group deleted successfully', 'success');
-                    setHasGroup(false);
-                    setGroupDetails(null);
                     updateCurrency('USD'); // Reset to default or keep user pref? Let's keep it safe.
+                    // Revalidate cache
+                    mutateUser();
+                    mutateGroup();
                 } else {
                     showToast('Failed to delete group', 'error');
                 }
@@ -148,7 +104,7 @@ export default function Profile() {
         }
     }, [user, authLoading, router]);
 
-    if (authLoading || fetchingData) return <Loader />;
+    if (authLoading) return <Loader />;
     if (!user) return null;
 
     return (
@@ -176,6 +132,15 @@ export default function Profile() {
                             <Typography variant="body1" color="text.secondary">
                                 <strong>Currency:</strong> {groupDetails.currency || 'Not set'}
                             </Typography>
+                            <Button
+                                variant="text"
+                                color="error"
+                                size="small"
+                                onClick={handleDeleteGroup}
+                                sx={{ mt: 2 }}
+                            >
+                                Delete Group
+                            </Button>
                         </Paper>
                     ) : (
                         <Paper className="glass" sx={{ p: 3, background: 'transparent', boxShadow: 'none' }}>

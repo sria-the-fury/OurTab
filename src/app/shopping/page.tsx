@@ -56,7 +56,7 @@ interface GroupMember {
 }
 
 export default function Shopping() {
-    const { user, currency } = useAuth();
+    const { user, currency, dbUser, group } = useAuth();
     const router = useRouter();
     const { showToast } = useToast();
 
@@ -73,7 +73,9 @@ export default function Shopping() {
     const [loading, setLoading] = useState(false);
 
     // Contributor state
-    const [groupMembers, setGroupMembers] = useState<GroupMember[]>([]);
+    // Use cached group members directly
+    const groupMembers = group?.members || [];
+
     const [contributors, setContributors] = useState<{ [email: string]: number }>({});
     const [selectedContributors, setSelectedContributors] = useState<Set<string>>(new Set());
     const [myContribution, setMyContribution] = useState<number>(0);
@@ -113,26 +115,7 @@ export default function Shopping() {
         }
     };
 
-    // Load group members
-    useEffect(() => {
-        const loadGroupMembers = async () => {
-            if (!user) return;
-
-            try {
-                const groupRes = await fetch(`/api/groups/my-group?email=${user.email}`);
-                if (groupRes.ok) {
-                    const groupData = await groupRes.json();
-                    if (groupData?.members) {
-                        setGroupMembers(groupData.members);
-                    }
-                }
-            } catch (error) {
-                console.error('Failed to load group members:', error);
-            }
-        };
-
-        loadGroupMembers();
-    }, [user]);
+    // Removed useEffect for loading group members - using cached 'group' from useAuth
 
     // Handle contributor selection
     const handleContributorToggle = (email: string) => {
@@ -198,26 +181,16 @@ export default function Shopping() {
         try {
             console.log('Starting expense submission for user:', user.email);
 
-            // 1. Get user from DB to know groupId
-            const userRes = await fetch('/api/users', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ email: user.email })
-            });
-
-            if (!userRes.ok) {
-                console.error('Failed to fetch user data, status:', userRes.status);
-                throw new Error('Failed to fetch user data');
-            }
-
-            const dbUser = await userRes.json();
-            console.log('Fetched user data:', dbUser);
-
-            if (!dbUser.groupId) {
-                console.log('User has no groupId');
-                showToast('You must belong to a group to add expenses.', 'error');
-                setLoading(false);
-                return;
+            // Use cached dbUser
+            if (!dbUser || !dbUser.groupId) {
+                console.log('User has no groupId in cache');
+                // Fallback check or just error?
+                // If cache is consistent, this should be enough.
+                if (!dbUser?.groupId) {
+                    showToast('You must belong to a group to add expenses.', 'error');
+                    setLoading(false);
+                    return;
+                }
             }
 
             // Create description with items breakdown
@@ -225,13 +198,6 @@ export default function Shopping() {
             const description = note
                 ? `${note} (Items: ${itemsBreakdown})`
                 : itemsBreakdown;
-
-            console.log('Creating expense with data:', {
-                amount: total,
-                description,
-                userId: dbUser.id,
-                groupId: dbUser.groupId
-            });
 
             // Prepare contributors array
             const contributorsList: Contributor[] = [];
@@ -255,13 +221,11 @@ export default function Shopping() {
                 body: JSON.stringify({
                     amount: total.toString(),
                     description,
-                    userId: dbUser.id,
+                    userId: user.email, // Use email as ID concept
                     groupId: dbUser.groupId,
                     contributors: contributorsList.length > 0 ? contributorsList : undefined
                 })
             });
-
-            console.log('Expense API response status:', expenseRes.status);
 
             if (!expenseRes.ok) {
                 const errorData = await expenseRes.json();
@@ -269,14 +233,10 @@ export default function Shopping() {
                 throw new Error('Failed to create expense');
             }
 
-            const newExpense = await expenseRes.json();
-            console.log('Expense created successfully:', newExpense);
-
             showToast('Shopping list submitted successfully!', 'success');
             setItems([]);
             setNote('');
 
-            // Navigate after a short delay to show success message
             setTimeout(() => {
                 router.push('/dashboard');
             }, 1000);
@@ -290,7 +250,7 @@ export default function Shopping() {
 
     const [openHistory, setOpenHistory] = useState(false);
     const [monthlyExpenses, setMonthlyExpenses] = useState<{ [key: string]: Expense[] }>({});
-    const [groupData, setGroupData] = useState<any>(null);
+    // Removed local groupData state, use 'group' from useAuth
 
     // Helper to load image for PDF
     const loadImage = (url: string): Promise<string | null> => {
@@ -335,19 +295,13 @@ export default function Shopping() {
 
     // Fetch expenses and group details for history
     const handleOpenHistory = async () => {
-        if (!user) return;
+        if (!user || !group) return; // Need group data
         setLoading(true);
         try {
-            // 1. Fetch Group Details (Name, Members with Photos)
-            const groupRes = await fetch(`/api/groups/my-group?email=${user.email}`);
-            let currentGroup = null;
-            if (groupRes.ok) {
-                currentGroup = await groupRes.json();
-                setGroupData(currentGroup);
-            }
+            // Group data is already cached in 'group'
 
-            if (currentGroup?.id) {
-                const expensesRes = await fetch(`/api/expenses?groupId=${currentGroup.id}`);
+            if (group.id) {
+                const expensesRes = await fetch(`/api/expenses?groupId=${group.id}`);
                 const expensesData = await expensesRes.json();
 
                 // Group by month
@@ -374,7 +328,8 @@ export default function Shopping() {
     const downloadPDF = async (month: string) => {
         try {
             console.log('Starting PDF generation for:', month);
-
+            // Use cached 'group' instead of 'groupData'
+            const currentGroupData = group;
 
             const expenses = monthlyExpenses[month];
             if (!expenses) {
@@ -384,8 +339,8 @@ export default function Shopping() {
 
             // --- SETTLEMENT LOGIC ---
             const memberBalances: { [email: string]: number } = {};
-            if (groupData?.members) {
-                groupData.members.forEach((m: any) => memberBalances[m.email] = 0);
+            if (currentGroupData?.members) {
+                currentGroupData.members.forEach((m: any) => memberBalances[m.email] = 0);
             }
 
             let totalGroupExpense = 0;
@@ -400,7 +355,7 @@ export default function Shopping() {
                 totalGroupExpense += amount;
             });
 
-            const activeMemberCount = groupData?.members?.length || 0;
+            const activeMemberCount = currentGroupData?.members?.length || 0;
             const sharePerPerson = totalGroupExpense / (activeMemberCount || 1);
 
             const debtors: { email: string, amount: number }[] = [];
@@ -421,8 +376,8 @@ export default function Shopping() {
                 const creditor = creditors[j];
                 const amount = Math.min(debtor.amount, creditor.amount);
 
-                const debtorName = groupData?.members?.find((m: any) => m.email === debtor.email)?.name || debtor.email.split('@')[0];
-                const creditorName = groupData?.members?.find((m: any) => m.email === creditor.email)?.name || creditor.email.split('@')[0];
+                const debtorName = currentGroupData?.members?.find((m: any) => m.email === debtor.email)?.name || debtor.email.split('@')[0];
+                const creditorName = currentGroupData?.members?.find((m: any) => m.email === creditor.email)?.name || creditor.email.split('@')[0];
 
                 settlements.push(`${debtorName} pays ${creditorName}: ${getCurrencySymbol()}${amount.toFixed(2)}`);
 
@@ -445,8 +400,8 @@ export default function Shopping() {
             // Mapping email to loaded photo URL
             const memberPhotos: { [email: string]: string | null } = {};
 
-            if (groupData?.members) {
-                await Promise.all(groupData.members.map(async (m: any) => {
+            if (currentGroupData?.members) {
+                await Promise.all(currentGroupData.members.map(async (m: any) => {
                     if (m.photoUrl) {
                         const loaded = await loadImage(m.photoUrl);
                         if (loaded) { // Only store if successfully loaded
@@ -467,14 +422,14 @@ export default function Shopping() {
             // Group Name (Centered with stylish font)
             doc.setFontSize(20);
             doc.setFont('times', 'bold');
-            doc.text(groupData?.name || 'My Group', pageWidth / 2, 20, { align: 'center' });
+            doc.text(currentGroupData?.name || 'My Group', pageWidth / 2, 20, { align: 'center' });
 
             // Left: Group Members
             doc.setFontSize(8);
             doc.setFont('helvetica', 'normal');
             let leftY = 30;
-            if (groupData?.members) {
-                groupData.members.forEach((m: any) => {
+            if (currentGroupData?.members) {
+                currentGroupData.members.forEach((m: any) => {
                     const mName = m.name || m.email.split('@')[0];
                     doc.text(mName, 14, leftY);
                     leftY += 4;
@@ -509,7 +464,7 @@ export default function Shopping() {
                 const dateStr = `${dateObj.getDate().toString().padStart(2, '0')}/${(dateObj.getMonth() + 1).toString().padStart(2, '0')}/${dateObj.getFullYear()}`;
 
 
-                const member = groupData?.members?.find((m: any) => m.email === (exp as any).userId);
+                const member = currentGroupData?.members?.find((m: any) => m.email === (exp as any).userId);
                 // First two names logic (first name + middle/last name)
                 const fullName = member?.name || (exp as any).userId.split('@')[0];
                 const names = fullName.split(' ');

@@ -38,13 +38,26 @@ export async function POST(request: Request) {
     }
 }
 
-// Get all users (Optional)
+// Get all users or single user
 export async function GET(request: Request) {
+    const { searchParams } = new URL(request.url);
+    const email = searchParams.get('email');
+
     try {
-        const querySnapshot = await getDocs(collection(db, 'users'));
-        const users = querySnapshot.docs.map(doc => doc.data());
-        return NextResponse.json(users);
+        if (email) {
+            const userRef = doc(db, 'users', email);
+            const userSnap = await getDoc(userRef);
+            if (userSnap.exists()) {
+                return NextResponse.json({ id: userSnap.id, ...userSnap.data() });
+            } else {
+                return NextResponse.json({ error: 'User not found' }, { status: 404 });
+            }
+        } else {
+            const querySnapshot = await getDocs(collection(db, 'users'));
+            const users = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+            return NextResponse.json(users);
+        }
     } catch (e) {
-        return NextResponse.json([]);
+        return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
     }
 }

@@ -19,6 +19,7 @@ import ArrowForwardIosIcon from '@mui/icons-material/ArrowForwardIos';
 import IconButton from '@mui/material/IconButton';
 import { useAuth } from '@/components/AuthContext';
 import { useRouter } from 'next/navigation';
+import { useGroupData } from '@/hooks/useGroupData';
 import { useToast } from '@/components/ToastContext';
 import Loader from '@/components/Loader';
 import BottomNav from '@/components/BottomNav';
@@ -51,10 +52,16 @@ interface Expense {
 }
 
 export default function Dashboard() {
-    const { user, loading, currency } = useAuth();
+    const { user, loading: authLoading, currency } = useAuth();
     const router = useRouter();
-    const [group, setGroup] = useState<Group | null>(null);
-    const [expenses, setExpenses] = useState<Expense[]>([]);
+
+    // Use the custom hook for data fetching
+
+    const { group, expenses, loading: dataLoading, mutateGroup, mutateExpenses } = useGroupData();
+
+    // Combine loading states
+    const loading = authLoading || (!!user && dataLoading && !group && expenses.length === 0);
+
     const [totalExpenses, setTotalExpenses] = useState(0);
     const [myExpenses, setMyExpenses] = useState(0);
 
@@ -63,8 +70,6 @@ export default function Dashboard() {
         'EUR': '€',
         'BDT': '৳'
     };
-
-
 
     const [selectedDate, setSelectedDate] = useState(new Date());
 
@@ -75,9 +80,6 @@ export default function Dashboard() {
     };
 
     const CurrencyIcon = currencyIcons[currency] || AttachMoneyIcon;
-
-
-
     const displayCurrency = currencySymbols[currency] || '$';
 
     const { showToast } = useToast();
@@ -88,6 +90,20 @@ export default function Dashboard() {
     const [editingExpenseId, setEditingExpenseId] = useState<string | null>(null);
     const [editAmount, setEditAmount] = useState('');
     const [editDescription, setEditDescription] = useState('');
+
+    // Calculate totals when expenses change
+    useEffect(() => {
+        if (expenses) {
+            const total = expenses.reduce((sum: number, exp: Expense) => sum + exp.amount, 0);
+            const myTotal = expenses
+                .filter((exp: Expense) => exp.userId === user?.email)
+                .reduce((sum: number, exp: Expense) => sum + exp.amount, 0);
+
+            setTotalExpenses(total);
+            setMyExpenses(myTotal);
+        }
+    }, [expenses, user]);
+
 
     const handleOpenEdit = (expense: Expense) => {
         setEditingExpenseId(expense.id);
@@ -112,12 +128,8 @@ export default function Dashboard() {
             });
 
             if (res.ok) {
-                // Update local state
-                setExpenses(prev => prev.map(exp =>
-                    exp.id === editingExpenseId
-                        ? { ...exp, amount: parseFloat(editAmount), description: editDescription }
-                        : exp
-                ));
+                // Update local state by revalidating SWR
+                mutateExpenses();
                 setOpenEditExpense(false);
                 showToast('Expense updated successfully!', 'success');
             } else {
@@ -138,7 +150,7 @@ export default function Dashboard() {
             });
 
             if (res.ok) {
-                setExpenses(prev => prev.filter(exp => exp.id !== id));
+                mutateExpenses();
                 showToast('Expense deleted successfully!', 'success');
             } else {
                 showToast('Failed to delete expense. It might be older than 48 hours.', 'error');
@@ -164,13 +176,7 @@ export default function Dashboard() {
             if (res.ok) {
                 showToast('Member added successfully!', 'success');
                 setNewMemberEmail('');
-                // Optimized: just add member to local state if possible, or trigger re-fetch. Similar fetch logic.
-                // For now fast fix:
-                const groupRes = await fetch(`/api/groups/my-group?email=${user?.email}`);
-                if (groupRes.ok) {
-                    const groupData = await groupRes.json();
-                    setGroup(groupData);
-                }
+                mutateGroup();
                 setOpenAddMember(false);
             } else {
                 showToast(data.error || 'Failed to add member', 'error');
@@ -180,44 +186,11 @@ export default function Dashboard() {
         }
     };
 
-
-
     useEffect(() => {
-        if (!loading && !user) {
+        if (!authLoading && !user) {
             router.push('/');
-        } else if (user) {
-            const fetchMyGroup = async () => {
-                try {
-                    const groupRes = await fetch(`/api/groups/my-group?email=${user?.email}`);
-                    if (groupRes.ok) {
-                        const groupData = await groupRes.json();
-                        setGroup(groupData);
-
-                        // Fetch expenses for this group
-                        if (groupData.id) {
-                            const expensesRes = await fetch(`/api/expenses?groupId=${groupData.id}`);
-                            if (expensesRes.ok) {
-                                const expensesData = await expensesRes.json();
-                                setExpenses(expensesData);
-
-                                // Calculate totals
-                                const total = expensesData.reduce((sum: number, exp: Expense) => sum + exp.amount, 0);
-                                const myTotal = expensesData
-                                    .filter((exp: Expense) => exp.userId === user.email)
-                                    .reduce((sum: number, exp: Expense) => sum + exp.amount, 0);
-
-                                setTotalExpenses(total);
-                                setMyExpenses(myTotal);
-                            }
-                        }
-                    }
-                } catch (error) {
-                    console.error("Failed to fetch group/user data", error);
-                }
-            };
-            fetchMyGroup();
         }
-    }, [user, loading, router]);
+    }, [user, authLoading, router]);
 
     const handlePreviousMonth = () => {
         const newDate = new Date(selectedDate);
