@@ -19,15 +19,29 @@ import DialogContent from '@mui/material/DialogContent';
 import DialogActions from '@mui/material/DialogActions';
 import HistoryIcon from '@mui/icons-material/History';
 import DownloadIcon from '@mui/icons-material/Download';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useAuth } from '@/components/AuthContext';
 import { useRouter } from 'next/navigation';
 import BottomNav from '@/components/BottomNav';
+import Checkbox from '@mui/material/Checkbox';
+import FormControlLabel from '@mui/material/FormControlLabel';
+import Accordion from '@mui/material/Accordion';
+import AccordionSummary from '@mui/material/AccordionSummary';
+import AccordionDetails from '@mui/material/AccordionDetails';
+import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
+import PeopleIcon from '@mui/icons-material/People';
+import { Contributor } from '@/types/settlement-types';
 
 interface GroceryItem {
     id: string;
     name: string;
     price: number;
+}
+
+interface GroupMember {
+    email: string;
+    name?: string;
+    photoUrl?: string;
 }
 
 export default function Shopping() {
@@ -46,7 +60,12 @@ export default function Shopping() {
 
     const [loading, setLoading] = useState(false);
     const [message, setMessage] = useState<{ type: 'success' | 'error' | '', text: string }>({ type: '', text: '' });
-    // const { showToast } = useToast();
+
+    // Contributor state
+    const [groupMembers, setGroupMembers] = useState<GroupMember[]>([]);
+    const [contributors, setContributors] = useState<{ [email: string]: number }>({});
+    const [selectedContributors, setSelectedContributors] = useState<Set<string>>(new Set());
+    const [myContribution, setMyContribution] = useState<number>(0);
 
     // Add item to list
     const handleAddItem = (e: React.FormEvent) => {
@@ -82,6 +101,75 @@ export default function Shopping() {
             default: return '$';
         }
     };
+
+    // Load group members
+    useEffect(() => {
+        const loadGroupMembers = async () => {
+            if (!user) return;
+
+            try {
+                const groupRes = await fetch(`/api/groups/my-group?email=${user.email}`);
+                if (groupRes.ok) {
+                    const groupData = await groupRes.json();
+                    if (groupData?.members) {
+                        setGroupMembers(groupData.members);
+                    }
+                }
+            } catch (error) {
+                console.error('Failed to load group members:', error);
+            }
+        };
+
+        loadGroupMembers();
+    }, [user]);
+
+    // Handle contributor selection
+    const handleContributorToggle = (email: string) => {
+        const newSelected = new Set(selectedContributors);
+        if (newSelected.has(email)) {
+            newSelected.delete(email);
+            const newContributors = { ...contributors };
+            delete newContributors[email];
+            setContributors(newContributors);
+        } else {
+            newSelected.add(email);
+        }
+        setSelectedContributors(newSelected);
+    };
+
+    const handleContributorAmountChange = (email: string, amount: string) => {
+        const numAmount = parseFloat(amount) || 0;
+        setContributors({
+            ...contributors,
+            [email]: numAmount
+        });
+    };
+
+    const handleSplitEqually = () => {
+        if (selectedContributors.size === 0) return;
+
+        const includingMe = selectedContributors.has(user?.email || '');
+        const totalPeople = selectedContributors.size + (includingMe ? 0 : 1);
+        const equalShare = total / totalPeople;
+
+        const newContributors: { [email: string]: number } = {};
+        selectedContributors.forEach(email => {
+            newContributors[email] = equalShare;
+        });
+
+        setContributors(newContributors);
+        setMyContribution(equalShare);
+    };
+
+    const handleIPayAll = () => {
+        setSelectedContributors(new Set());
+        setContributors({});
+        setMyContribution(total);
+    };
+
+    // Calculate totals
+    const totalContributions = Object.values(contributors).reduce((sum, amt) => sum + amt, 0);
+    const remaining = total - totalContributions - myContribution;
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -134,6 +222,22 @@ export default function Shopping() {
                 groupId: dbUser.groupId
             });
 
+            // Prepare contributors array
+            const contributorsList: Contributor[] = [];
+
+            // Add selected contributors
+            selectedContributors.forEach(email => {
+                const amount = contributors[email] || 0;
+                if (amount > 0) {
+                    contributorsList.push({ email, amount });
+                }
+            });
+
+            // Add user's contribution if not zero
+            if (myContribution > 0) {
+                contributorsList.push({ email: user.email!, amount: myContribution });
+            }
+
             const expenseRes = await fetch('/api/expenses', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -141,7 +245,8 @@ export default function Shopping() {
                     amount: total.toString(),
                     description,
                     userId: dbUser.id,
-                    groupId: dbUser.groupId
+                    groupId: dbUser.groupId,
+                    contributors: contributorsList.length > 0 ? contributorsList : undefined
                 })
             });
 
@@ -576,6 +681,142 @@ export default function Shopping() {
                                 {getCurrencySymbol()}{total.toFixed(2)}
                             </Typography>
                         </Box>
+                    </Paper>
+                )}
+
+                {/* Contributor Selection */}
+                {items.length > 0 && groupMembers.length > 1 && (
+                    <Paper className="glass" sx={{ p: 3, mb: 3, background: 'transparent', boxShadow: 'none' }}>
+                        <Accordion defaultExpanded>
+                            <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                    <PeopleIcon color="primary" />
+                                    <Typography variant="h6">Who's Contributing?</Typography>
+                                </Box>
+                            </AccordionSummary>
+                            <AccordionDetails>
+                                <Box sx={{ mb: 2 }}>
+                                    <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                                        Select group members who are contributing money for this purchase
+                                    </Typography>
+
+                                    {/* Group Members */}
+                                    {groupMembers
+                                        .filter(member => member.email !== user?.email)
+                                        .map((member) => (
+                                            <Box key={member.email} sx={{ mb: 2 }}>
+                                                <FormControlLabel
+                                                    control={
+                                                        <Checkbox
+                                                            checked={selectedContributors.has(member.email)}
+                                                            onChange={() => handleContributorToggle(member.email)}
+                                                            disabled={loading}
+                                                        />
+                                                    }
+                                                    label={member.name || member.email.split('@')[0]}
+                                                />
+                                                {selectedContributors.has(member.email) && (
+                                                    <TextField
+                                                        label={`Amount (${getCurrencySymbol()})`}
+                                                        type="number"
+                                                        size="small"
+                                                        fullWidth
+                                                        value={contributors[member.email] || ''}
+                                                        onChange={(e) => handleContributorAmountChange(member.email, e.target.value)}
+                                                        disabled={loading}
+                                                        inputProps={{ step: '0.01', min: '0' }}
+                                                        sx={{ ml: 4, mt: 1 }}
+                                                    />
+                                                )}
+                                            </Box>
+                                        ))}
+
+                                    {/* My Contribution */}
+                                    <Divider sx={{ my: 2 }} />
+                                    <Box sx={{ mb: 2 }}>
+                                        <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+                                            Your contribution:
+                                        </Typography>
+                                        <TextField
+                                            label={`My Amount (${getCurrencySymbol()})`}
+                                            type="number"
+                                            size="small"
+                                            fullWidth
+                                            value={myContribution || ''}
+                                            onChange={(e) => setMyContribution(parseFloat(e.target.value) || 0)}
+                                            disabled={loading}
+                                            inputProps={{ step: '0.01', min: '0' }}
+                                        />
+                                    </Box>
+
+                                    {/* Quick Actions */}
+                                    <Box sx={{ display: 'flex', gap: 1, mb: 2 }}>
+                                        <Button
+                                            variant="outlined"
+                                            size="small"
+                                            onClick={handleSplitEqually}
+                                            disabled={loading || selectedContributors.size === 0}
+                                        >
+                                            Split Equally
+                                        </Button>
+                                        <Button
+                                            variant="outlined"
+                                            size="small"
+                                            onClick={handleIPayAll}
+                                            disabled={loading}
+                                        >
+                                            I'll Pay All
+                                        </Button>
+                                    </Box>
+
+                                    {/* Summary */}
+                                    <Box sx={{ p: 2, bgcolor: 'background.paper', borderRadius: 1 }}>
+                                        <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
+                                            <Typography variant="body2">Total:</Typography>
+                                            <Typography variant="body2" fontWeight="bold">
+                                                {getCurrencySymbol()}{total.toFixed(2)}
+                                            </Typography>
+                                        </Box>
+                                        <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
+                                            <Typography variant="body2">Others' contributions:</Typography>
+                                            <Typography variant="body2">
+                                                {getCurrencySymbol()}{totalContributions.toFixed(2)}
+                                            </Typography>
+                                        </Box>
+                                        <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
+                                            <Typography variant="body2">Your contribution:</Typography>
+                                            <Typography variant="body2">
+                                                {getCurrencySymbol()}{myContribution.toFixed(2)}
+                                            </Typography>
+                                        </Box>
+                                        <Divider sx={{ my: 1 }} />
+                                        <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                                            <Typography variant="body2" fontWeight="bold">
+                                                {remaining >= 0 ? 'Remaining:' : 'Over by:'}
+                                            </Typography>
+                                            <Typography
+                                                variant="body2"
+                                                fontWeight="bold"
+                                                color={remaining < -0.01 ? 'error' : remaining > 0.01 ? 'warning.main' : 'success.main'}
+                                            >
+                                                {getCurrencySymbol()}{Math.abs(remaining).toFixed(2)}
+                                            </Typography>
+                                        </Box>
+                                    </Box>
+
+                                    {remaining < -0.01 && (
+                                        <Typography variant="caption" color="error" sx={{ mt: 1, display: 'block' }}>
+                                            ⚠️ Contributions exceed total amount
+                                        </Typography>
+                                    )}
+                                    {remaining > 0.01 && (
+                                        <Typography variant="caption" color="warning.main" sx={{ mt: 1, display: 'block' }}>
+                                            ℹ️ You'll cover the remaining amount
+                                        </Typography>
+                                    )}
+                                </Box>
+                            </AccordionDetails>
+                        </Accordion>
                     </Paper>
                 )}
 

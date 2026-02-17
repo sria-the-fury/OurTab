@@ -47,6 +47,7 @@ interface Expense {
     userId: string;
     groupId: string;
     date: string;
+    contributors?: Array<{ email: string; amount: number }>;
 }
 
 export default function Dashboard() {
@@ -394,36 +395,56 @@ export default function Dashboard() {
                         <Typography variant="h6" gutterBottom>Settlements (Who owes whom)</Typography>
                         <Grid container spacing={2}>
                             {(() => {
-                                // 1. Calculate balances
+                                // NEW SETTLEMENT LOGIC ACCOUNTING FOR CONTRIBUTORS
                                 const memberBalances: { [key: string]: number } = {};
                                 const members = group.members || [];
 
                                 // Initialize 0 balance for all members
                                 members.forEach(m => memberBalances[m.email] = 0);
 
-                                // Calculate total spent by each person
-                                filteredExpenses.forEach(exp => {
-                                    if (memberBalances[exp.userId] !== undefined) {
-                                        memberBalances[exp.userId] += exp.amount;
+                                // Process each expense
+                                filteredExpenses.forEach((exp: Expense) => {
+                                    if (exp.contributors && exp.contributors.length > 0) {
+                                        // Expense has contributors - track who paid what
+                                        exp.contributors.forEach(contributor => {
+                                            if (memberBalances[contributor.email] !== undefined) {
+                                                memberBalances[contributor.email] += contributor.amount;
+                                            } else {
+                                                memberBalances[contributor.email] = contributor.amount;
+                                            }
+                                        });
+
+                                        // Split the expense equally among all members
+                                        const sharePerPerson = exp.amount / members.length;
+                                        members.forEach(m => {
+                                            memberBalances[m.email] -= sharePerPerson;
+                                        });
                                     } else {
-                                        // Handle case where expense user might not be in current member list (rare)
-                                        memberBalances[exp.userId] = exp.amount;
+                                        // No contributors specified - assume creator paid all, split equally
+                                        if (memberBalances[exp.userId] !== undefined) {
+                                            memberBalances[exp.userId] += exp.amount;
+                                        } else {
+                                            memberBalances[exp.userId] = exp.amount;
+                                        }
+
+                                        // Split equally among all members
+                                        const sharePerPerson = exp.amount / members.length;
+                                        members.forEach(m => {
+                                            memberBalances[m.email] -= sharePerPerson;
+                                        });
                                     }
                                 });
 
-                                const total = Object.values(memberBalances).reduce((a, b) => a + b, 0);
-                                const average = total / (Object.keys(memberBalances).length || 1);
-
-                                // Calculate net balance (Positive = defined receiver, Negative = payer)
+                                // Calculate net balances (Positive = is owed money, Negative = owes money)
                                 const netBalances: { id: string, amount: number }[] = [];
                                 Object.keys(memberBalances).forEach(email => {
                                     netBalances.push({
                                         id: email,
-                                        amount: memberBalances[email] - average
+                                        amount: memberBalances[email]
                                     });
                                 });
 
-                                // separate into receivers (+) and payers (-)
+                                // Separate into receivers (+) and payers (-)
                                 const receivers = netBalances.filter(b => b.amount > 0.01).sort((a, b) => b.amount - a.amount);
                                 const payers = netBalances.filter(b => b.amount < -0.01).sort((a, b) => a.amount - b.amount);
 

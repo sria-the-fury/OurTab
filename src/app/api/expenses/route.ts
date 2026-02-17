@@ -5,20 +5,50 @@ import { collection, addDoc, query, where, getDocs, orderBy, doc, getDoc, writeB
 export async function POST(request: Request) {
     try {
         const body = await request.json();
-        const { amount, description, userId, groupId } = body;
+        const { amount, description, userId, groupId, contributors } = body;
 
         // TODO: Verify Types. Amount should be number.
         if (!amount || !description || !userId || !groupId) {
             return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
         }
 
-        const expenseData = {
-            amount: parseFloat(amount),
+        const totalAmount = parseFloat(amount);
+
+        // Validate contributors if provided
+        if (contributors && Array.isArray(contributors)) {
+            // Validate contributor amounts
+            const contributorTotal = contributors.reduce((sum: number, c: any) => sum + parseFloat(c.amount || 0), 0);
+
+            if (contributorTotal > totalAmount) {
+                return NextResponse.json({
+                    error: 'Total contributor amounts cannot exceed expense amount'
+                }, { status: 400 });
+            }
+
+            // Validate all contributors have email and amount
+            const validContributors = contributors.every((c: any) => c.email && c.amount !== undefined);
+            if (!validContributors) {
+                return NextResponse.json({
+                    error: 'Each contributor must have email and amount'
+                }, { status: 400 });
+            }
+        }
+
+        const expenseData: any = {
+            amount: totalAmount,
             description,
             userId,
             groupId,
             date: new Date().toISOString()
         };
+
+        // Add contributors if provided
+        if (contributors && contributors.length > 0) {
+            expenseData.contributors = contributors.map((c: any) => ({
+                email: c.email,
+                amount: parseFloat(c.amount)
+            }));
+        }
 
         const expenseRef = await addDoc(collection(db, 'expenses'), expenseData);
 
