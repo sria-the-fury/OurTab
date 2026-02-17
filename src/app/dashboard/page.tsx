@@ -240,9 +240,22 @@ export default function Dashboard() {
 
     // Calculate totals based on filtered expenses
     const totalFilteredExpenses = filteredExpenses.reduce((sum, exp) => sum + exp.amount, 0);
-    const myFilteredExpenses = filteredExpenses
-        .filter(exp => exp.userId === user?.email)
-        .reduce((sum, exp) => sum + exp.amount, 0);
+
+    // Calculate my actual expenses accounting for contributors
+    const myFilteredExpenses = (() => {
+        if (!group?.members || !user?.email) return 0;
+
+        const numMembers = group.members.length;
+        let myTotal = 0;
+
+        filteredExpenses.forEach((exp: Expense) => {
+            // Calculate my share of this expense
+            const myShare = exp.amount / numMembers;
+            myTotal += myShare;
+        });
+
+        return myTotal;
+    })();
 
 
 
@@ -570,6 +583,15 @@ export default function Dashboard() {
                                                 <Typography variant="caption" color="text.secondary">
                                                     {memberName} • {expenseDateStr}
                                                 </Typography>
+                                                {expense.contributors && expense.contributors.length > 0 && (
+                                                    <Typography variant="caption" color="primary" sx={{ display: 'block', mt: 0.5 }}>
+                                                        Paid by: {expense.contributors.map(c => {
+                                                            const contributorMember = group?.members?.find(m => m.email === c.email);
+                                                            const contributorName = contributorMember?.name || c.email.split('@')[0];
+                                                            return `${contributorName} (${displayCurrency}${c.amount.toFixed(2)})`;
+                                                        }).join(', ')}
+                                                    </Typography>
+                                                )}
                                             </Box>
                                             <Box sx={{ display: 'flex', alignItems: 'center' }}>
                                                 <Typography variant="h6" color="primary" sx={{ fontWeight: 'bold', mr: 2 }}>

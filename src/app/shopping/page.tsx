@@ -716,17 +716,18 @@ export default function Shopping() {
                                                     label={member.name || member.email.split('@')[0]}
                                                 />
                                                 {selectedContributors.has(member.email) && (
-                                                    <TextField
-                                                        label={`Amount (${getCurrencySymbol()})`}
-                                                        type="number"
-                                                        size="small"
-                                                        fullWidth
-                                                        value={contributors[member.email] || ''}
-                                                        onChange={(e) => handleContributorAmountChange(member.email, e.target.value)}
-                                                        disabled={loading}
-                                                        inputProps={{ step: '0.01', min: '0' }}
-                                                        sx={{ ml: 4, mt: 1 }}
-                                                    />
+                                                    <Box sx={{ pl: 4, pr: 0, mt: 1 }}>
+                                                        <TextField
+                                                            label={`Amount (${getCurrencySymbol()})`}
+                                                            type="number"
+                                                            size="small"
+                                                            fullWidth
+                                                            value={contributors[member.email] || ''}
+                                                            onChange={(e) => handleContributorAmountChange(member.email, e.target.value)}
+                                                            disabled={loading}
+                                                            inputProps={{ step: '0.01', min: '0' }}
+                                                        />
+                                                    </Box>
                                                 )}
                                             </Box>
                                         ))}
