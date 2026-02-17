@@ -14,6 +14,7 @@ import { useState, useEffect } from 'react';
 import BottomNav from '@/components/BottomNav';
 import Loader from '@/components/Loader';
 import Paper from '@mui/material/Paper';
+import { useRouter } from 'next/navigation';
 
 interface Group {
     id: string;
@@ -24,15 +25,19 @@ interface Group {
 
 export default function Profile() {
     const { user, logout, currency, updateCurrency, loading: authLoading } = useAuth();
+    const router = useRouter();
     const [groupName, setGroupName] = useState('');
     const [loading, setLoading] = useState(false);
     const [hasGroup, setHasGroup] = useState(false);
     const [groupDetails, setGroupDetails] = useState<Group | null>(null);
 
+    const [fetchingData, setFetchingData] = useState(true);
+
     useEffect(() => {
         async function fetchUserData() {
             if (user?.email) {
                 try {
+                    setFetchingData(true);
                     console.log('Fetching user data for:', user.email);
                     const res = await fetch('/api/users', {
                         method: 'POST',
@@ -63,7 +68,11 @@ export default function Profile() {
                     }
                 } catch (e) {
                     console.error('Error fetching user data:', e);
+                } finally {
+                    setFetchingData(false);
                 }
+            } else {
+                setFetchingData(false);
             }
         }
         fetchUserData();
@@ -133,8 +142,14 @@ export default function Profile() {
         setLoading(false);
     };
 
-    if (authLoading) return <Loader />;
-    if (!user) return <Typography>Please login</Typography>;
+    useEffect(() => {
+        if (!authLoading && !user) {
+            router.push('/');
+        }
+    }, [user, authLoading, router]);
+
+    if (authLoading || fetchingData) return <Loader />;
+    if (!user) return null;
 
     return (
         <main>

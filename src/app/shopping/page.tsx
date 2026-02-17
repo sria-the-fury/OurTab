@@ -39,6 +39,16 @@ interface GroceryItem {
     price: number;
 }
 
+interface Expense {
+    id: string;
+    amount: number;
+    description: string;
+    userId: string;
+    groupId: string;
+    date: string;
+    contributors?: Array<{ email: string; amount: number }>;
+}
+
 interface GroupMember {
     email: string;
     name?: string;
@@ -279,7 +289,7 @@ export default function Shopping() {
     };
 
     const [openHistory, setOpenHistory] = useState(false);
-    const [monthlyExpenses, setMonthlyExpenses] = useState<{ [key: string]: GroceryItem[] }>({});
+    const [monthlyExpenses, setMonthlyExpenses] = useState<{ [key: string]: Expense[] }>({});
     const [groupData, setGroupData] = useState<any>(null);
 
     // Helper to load image for PDF
