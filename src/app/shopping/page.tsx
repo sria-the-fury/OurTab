@@ -23,6 +23,7 @@ import { useState, useEffect } from 'react';
 import { useAuth } from '@/components/AuthContext';
 import { useRouter } from 'next/navigation';
 import BottomNav from '@/components/BottomNav';
+import { useToast } from '@/components/ToastContext';
 import Checkbox from '@mui/material/Checkbox';
 import FormControlLabel from '@mui/material/FormControlLabel';
 import Accordion from '@mui/material/Accordion';
@@ -47,6 +48,7 @@ interface GroupMember {
 export default function Shopping() {
     const { user, currency } = useAuth();
     const router = useRouter();
+    const { showToast } = useToast();
 
     // Item list state
     const [items, setItems] = useState<GroceryItem[]>([]);
@@ -59,7 +61,6 @@ export default function Shopping() {
     const [note, setNote] = useState('');
 
     const [loading, setLoading] = useState(false);
-    const [message, setMessage] = useState<{ type: 'success' | 'error' | '', text: string }>({ type: '', text: '' });
 
     // Contributor state
     const [groupMembers, setGroupMembers] = useState<GroupMember[]>([]);
@@ -175,14 +176,14 @@ export default function Shopping() {
         e.preventDefault();
 
         if (items.length === 0) {
-            setMessage({ type: 'error', text: 'Please add at least one item.' });
+            showToast('Please add at least one item.', 'error');
             return;
         }
 
         if (!user) return;
 
         setLoading(true);
-        setMessage({ type: '', text: '' });
+
 
         try {
             console.log('Starting expense submission for user:', user.email);
@@ -204,7 +205,7 @@ export default function Shopping() {
 
             if (!dbUser.groupId) {
                 console.log('User has no groupId');
-                setMessage({ type: 'error', text: 'You must belong to a group to add expenses.' });
+                showToast('You must belong to a group to add expenses.', 'error');
                 setLoading(false);
                 return;
             }
@@ -261,7 +262,7 @@ export default function Shopping() {
             const newExpense = await expenseRes.json();
             console.log('Expense created successfully:', newExpense);
 
-            setMessage({ type: 'success', text: 'Shopping list submitted successfully!' });
+            showToast('Shopping list submitted successfully!', 'success');
             setItems([]);
             setNote('');
 
@@ -271,7 +272,7 @@ export default function Shopping() {
             }, 1000);
         } catch (err) {
             console.error('Error adding expense:', err);
-            setMessage({ type: 'error', text: 'Failed to submit shopping list. Please try again.' });
+            showToast('Failed to submit shopping list. Please try again.', 'error');
         } finally {
             setLoading(false);
         }
@@ -350,11 +351,11 @@ export default function Shopping() {
                 setMonthlyExpenses(grouped);
                 setOpenHistory(true);
             } else {
-                setMessage({ type: 'error', text: 'Group not found' });
+                showToast('Group not found', 'error');
             }
         } catch (error) {
             console.error("Failed to fetch history", error);
-            setMessage({ type: 'error', text: 'Failed to load history' });
+            showToast('Failed to load history', 'error');
         } finally {
             setLoading(false);
         }
@@ -363,7 +364,7 @@ export default function Shopping() {
     const downloadPDF = async (month: string) => {
         try {
             console.log('Starting PDF generation for:', month);
-            setMessage({ type: '', text: 'Generating PDF...' });
+
 
             const expenses = monthlyExpenses[month];
             if (!expenses) {
@@ -594,10 +595,10 @@ export default function Shopping() {
             console.log('Saving PDF...');
             doc.save(`expenses_${month.replace(/ /g, '_')}.pdf`);
 
-            setMessage({ type: 'success', text: 'PDF downloaded successfully!' });
+            showToast('PDF downloaded successfully!', 'success');
         } catch (error) {
             console.error("PDF generation failed:", error);
-            setMessage({ type: 'error', text: 'Failed to generate PDF. Check console for details.' });
+            showToast('Failed to generate PDF. Check console for details.', 'error');
         }
     };
 
@@ -613,13 +614,7 @@ export default function Shopping() {
                     Shopping List
                 </Typography>
 
-                {message.text && (
-                    <Box sx={{ mb: 2, p: 2, borderRadius: 1, bgcolor: message.type === 'success' ? 'success.light' : 'error.light' }}>
-                        <Typography color={message.type === 'success' ? 'success.dark' : 'error.dark'}>
-                            {message.text}
-                        </Typography>
-                    </Box>
-                )}
+
 
                 {/* Add Item Form */}
                 <Paper className="glass" sx={{ p: 3, mb: 3, background: 'transparent', boxShadow: 'none' }}>
