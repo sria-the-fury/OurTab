@@ -165,6 +165,14 @@ export default function Shopping() {
     const totalContributions = Object.values(contributors).reduce((sum, amt) => sum + amt, 0);
     const remaining = total - totalContributions - myContribution;
 
+    // Auto-fill "Your contribution" with the remaining amount when others' contributions change
+    useEffect(() => {
+        if (total > 0 && selectedContributors.size > 0) {
+            const autoAmount = total - totalContributions;
+            setMyContribution(Math.max(0, parseFloat(autoAmount.toFixed(2))));
+        }
+    }, [totalContributions, total, selectedContributors.size]);
+
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
 
@@ -210,9 +218,10 @@ export default function Shopping() {
                 }
             });
 
-            // Add user's contribution if not zero
-            if (myContribution > 0) {
-                contributorsList.push({ email: user.email!, amount: myContribution });
+            // Always add the creator's contribution (remaining amount)
+            const creatorAmount = myContribution > 0 ? myContribution : Math.max(0, total - totalContributions);
+            if (creatorAmount > 0.01) {
+                contributorsList.push({ email: user.email!, amount: parseFloat(creatorAmount.toFixed(2)) });
             }
 
             const expenseRes = await fetch('/api/expenses', {
@@ -347,11 +356,36 @@ export default function Shopping() {
             expenses.forEach((exp: any) => {
                 const amount = (exp as any).amount;
                 const payer = (exp as any).userId;
-                if (memberBalances[payer] !== undefined) {
-                    memberBalances[payer] += amount;
+
+                if (exp.contributors && exp.contributors.length > 0) {
+                    // Track individual contributions
+                    let contributorTotal = 0;
+                    exp.contributors.forEach((c: any) => {
+                        if (memberBalances[c.email] !== undefined) {
+                            memberBalances[c.email] += c.amount;
+                        } else {
+                            memberBalances[c.email] = c.amount;
+                        }
+                        contributorTotal += c.amount;
+                    });
+                    // Attribute remainder to creator if contributors don't cover full amount
+                    const remainder = amount - contributorTotal;
+                    if (remainder > 0.01) {
+                        if (memberBalances[payer] !== undefined) {
+                            memberBalances[payer] += remainder;
+                        } else {
+                            memberBalances[payer] = remainder;
+                        }
+                    }
                 } else {
-                    memberBalances[payer] = amount;
+                    // No contributors - creator paid all
+                    if (memberBalances[payer] !== undefined) {
+                        memberBalances[payer] += amount;
+                    } else {
+                        memberBalances[payer] = amount;
+                    }
                 }
+
                 totalGroupExpense += amount;
             });
 

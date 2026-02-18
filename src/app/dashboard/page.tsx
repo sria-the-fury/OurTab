@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import Navbar from '@/components/Navbar';
 import Container from '@mui/material/Container';
 import Typography from '@mui/material/Typography';
@@ -141,11 +141,21 @@ export default function Dashboard() {
         }
     };
 
-    const handleDeleteExpense = async (id: string) => {
-        if (!user || !confirm('Are you sure you want to delete this expense?')) return;
+    const [openDeleteConfirm, setOpenDeleteConfirm] = useState(false);
+    const [expenseToDelete, setExpenseToDelete] = useState<string | null>(null);
+
+    const handleDeleteExpense = (id: string) => {
+        console.log('handleDeleteExpense called with ID:', id);
+        setExpenseToDelete(id);
+        setOpenDeleteConfirm(true);
+        console.log('Set openDeleteConfirm to true');
+    };
+
+    const confirmDeleteExpense = async () => {
+        if (!expenseToDelete || !user) return;
 
         try {
-            const res = await fetch(`/api/expenses?id=${id}&userId=${user.email}`, {
+            const res = await fetch(`/api/expenses?id=${expenseToDelete}&userId=${user.email}`, {
                 method: 'DELETE'
             });
 
@@ -158,6 +168,9 @@ export default function Dashboard() {
         } catch (error) {
             console.error('Failed to delete expense', error);
             showToast('Error deleting expense', 'error');
+        } finally {
+            setOpenDeleteConfirm(false);
+            setExpenseToDelete(null);
         }
     };
 
@@ -228,7 +241,108 @@ export default function Dashboard() {
         });
 
         return myTotal;
+        return myTotal;
     })();
+
+    // Memoize settlement calculation to prevent re-render issues
+    const settlements = useMemo(() => {
+        if (!group || !group.members || group.members.length < 2) return [];
+
+        const memberBalances: { [key: string]: number } = {};
+        const members = group.members;
+
+        // Initialize 0 balance for all members
+        members.forEach(m => memberBalances[m.email] = 0);
+
+        // Process each expense
+        filteredExpenses.forEach((exp: Expense) => {
+            if (exp.contributors && exp.contributors.length > 0) {
+                // Expense has contributors - track who paid what
+                let contributorTotal = 0;
+                exp.contributors.forEach(contributor => {
+                    if (memberBalances[contributor.email] !== undefined) {
+                        memberBalances[contributor.email] += contributor.amount;
+                    } else {
+                        memberBalances[contributor.email] = contributor.amount;
+                    }
+                    contributorTotal += contributor.amount;
+                });
+
+                // If contributors don't cover the full amount,
+                // attribute the remainder to the creator (handles legacy data)
+                const remainder = exp.amount - contributorTotal;
+                if (remainder > 0.01) {
+                    if (memberBalances[exp.userId] !== undefined) {
+                        memberBalances[exp.userId] += remainder;
+                    } else {
+                        memberBalances[exp.userId] = remainder;
+                    }
+                }
+
+                // Split the expense equally among all members
+                const sharePerPerson = exp.amount / members.length;
+                members.forEach(m => {
+                    memberBalances[m.email] -= sharePerPerson;
+                });
+            } else {
+                // No contributors specified - assume creator paid all, split equally
+                if (memberBalances[exp.userId] !== undefined) {
+                    memberBalances[exp.userId] += exp.amount;
+                } else {
+                    memberBalances[exp.userId] = exp.amount;
+                }
+
+                // Split equally among all members
+                const sharePerPerson = exp.amount / members.length;
+                members.forEach(m => {
+                    memberBalances[m.email] -= sharePerPerson;
+                });
+            }
+        });
+
+        // Calculate net balances (Positive = is owed money, Negative = owes money)
+        const netBalances: { id: string, amount: number }[] = [];
+        Object.keys(memberBalances).forEach(email => {
+            netBalances.push({
+                id: email,
+                amount: memberBalances[email]
+            });
+        });
+
+        // Separate into receivers (+) and payers (-)
+        const receivers = netBalances.filter(b => b.amount > 0.01).sort((a, b) => b.amount - a.amount);
+        const payers = netBalances.filter(b => b.amount < -0.01).sort((a, b) => a.amount - b.amount);
+
+        const calculatedSettlements = [];
+
+        let r = 0;
+        let p = 0;
+
+        while (r < receivers.length && p < payers.length) {
+            const receiver = receivers[r];
+            const payer = payers[p];
+
+            // The amount to settle is the minimum of what payer owes and receiver is owed
+            const amount = Math.min(Math.abs(payer.amount), receiver.amount);
+
+            if (amount > 0.01) {
+                calculatedSettlements.push({
+                    from: payer.id,
+                    to: receiver.id,
+                    amount: amount
+                });
+            }
+
+            // Adjust balances
+            receiver.amount -= amount;
+            payer.amount += amount;
+
+            if (receiver.amount < 0.01) r++;
+            if (payer.amount > -0.01) p++;
+        }
+
+        return calculatedSettlements;
+    }, [group, filteredExpenses]);
 
 
 
@@ -380,99 +494,15 @@ export default function Dashboard() {
                     <Box sx={{ mt: 4 }}>
                         <Typography variant="h6" gutterBottom>Settlements (Who owes whom)</Typography>
                         <Grid container spacing={2}>
-                            {(() => {
-                                // NEW SETTLEMENT LOGIC ACCOUNTING FOR CONTRIBUTORS
-                                const memberBalances: { [key: string]: number } = {};
-                                const members = group.members || [];
-
-                                // Initialize 0 balance for all members
-                                members.forEach(m => memberBalances[m.email] = 0);
-
-                                // Process each expense
-                                filteredExpenses.forEach((exp: Expense) => {
-                                    if (exp.contributors && exp.contributors.length > 0) {
-                                        // Expense has contributors - track who paid what
-                                        exp.contributors.forEach(contributor => {
-                                            if (memberBalances[contributor.email] !== undefined) {
-                                                memberBalances[contributor.email] += contributor.amount;
-                                            } else {
-                                                memberBalances[contributor.email] = contributor.amount;
-                                            }
-                                        });
-
-                                        // Split the expense equally among all members
-                                        const sharePerPerson = exp.amount / members.length;
-                                        members.forEach(m => {
-                                            memberBalances[m.email] -= sharePerPerson;
-                                        });
-                                    } else {
-                                        // No contributors specified - assume creator paid all, split equally
-                                        if (memberBalances[exp.userId] !== undefined) {
-                                            memberBalances[exp.userId] += exp.amount;
-                                        } else {
-                                            memberBalances[exp.userId] = exp.amount;
-                                        }
-
-                                        // Split equally among all members
-                                        const sharePerPerson = exp.amount / members.length;
-                                        members.forEach(m => {
-                                            memberBalances[m.email] -= sharePerPerson;
-                                        });
-                                    }
-                                });
-
-                                // Calculate net balances (Positive = is owed money, Negative = owes money)
-                                const netBalances: { id: string, amount: number }[] = [];
-                                Object.keys(memberBalances).forEach(email => {
-                                    netBalances.push({
-                                        id: email,
-                                        amount: memberBalances[email]
-                                    });
-                                });
-
-                                // Separate into receivers (+) and payers (-)
-                                const receivers = netBalances.filter(b => b.amount > 0.01).sort((a, b) => b.amount - a.amount);
-                                const payers = netBalances.filter(b => b.amount < -0.01).sort((a, b) => a.amount - b.amount);
-
-                                const settlements = [];
-
-                                let r = 0;
-                                let p = 0;
-
-                                while (r < receivers.length && p < payers.length) {
-                                    const receiver = receivers[r];
-                                    const payer = payers[p];
-
-                                    // The amount to settle is the minimum of what payer owes and receiver is owed
-                                    const amount = Math.min(Math.abs(payer.amount), receiver.amount);
-
-                                    if (amount > 0.01) {
-                                        settlements.push({
-                                            from: payer.id,
-                                            to: receiver.id,
-                                            amount: amount
-                                        });
-                                    }
-
-                                    // Adjust balances
-                                    receiver.amount -= amount;
-                                    payer.amount += amount;
-
-                                    if (receiver.amount < 0.01) r++;
-                                    if (payer.amount > -0.01) p++;
-                                }
-
-                                if (settlements.length === 0) {
-                                    return (
-                                        <Grid size={{ xs: 12 }}>
-                                            <Paper className="glass" sx={{ p: 2, background: 'transparent' }}>
-                                                <Typography color="text.secondary">All settled up! No payments needed.</Typography>
-                                            </Paper>
-                                        </Grid>
-                                    );
-                                }
-
-                                return settlements.map((settlement, index) => {
+                            {settlements.length === 0 ? (
+                                <Grid size={{ xs: 12 }}>
+                                    <Paper className="glass" sx={{ p: 2, background: 'transparent' }}>
+                                        <Typography color="text.secondary">All settled up! No payments needed.</Typography>
+                                    </Paper>
+                                </Grid>
+                            ) : (
+                                settlements.map((settlement, index) => {
+                                    const members = group?.members || [];
                                     const fromMember = members.find(m => m.email === settlement.from);
                                     const toMember = members.find(m => m.email === settlement.to);
                                     const fromName = fromMember?.name || settlement.from.split('@')[0];
@@ -502,7 +532,7 @@ export default function Dashboard() {
                                     }
 
                                     return (
-                                        <Grid size={{ xs: 12, md: 6 }} key={index}>
+                                        <Grid size={{ xs: 12, md: 6 }} key={`${settlement.from}-${settlement.to}-${settlement.amount}-${index}`}>
                                             <Paper className="glass" sx={{ p: 2, background: 'transparent', borderLeft: '4px solid #6C63FF' }}>
                                                 <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                                                     <Box>
@@ -515,8 +545,8 @@ export default function Dashboard() {
                                             </Paper>
                                         </Grid>
                                     );
-                                });
-                            })()}
+                                })
+                            )}
                         </Grid>
                     </Box>
                 )}
@@ -592,6 +622,22 @@ export default function Dashboard() {
             <Box sx={{ pb: 7 }}> {/* Padding for BottomNav */}
                 <BottomNav />
             </Box>
+
+            {/* Delete Confirmation Dialog */}
+            <Dialog open={openDeleteConfirm} onClose={() => setOpenDeleteConfirm(false)}>
+                <DialogTitle>Delete Expense</DialogTitle>
+                <DialogContent>
+                    <Typography>
+                        Are you sure you want to delete this expense? This action cannot be undone.
+                    </Typography>
+                </DialogContent>
+                <DialogActions>
+                    <Button onClick={() => setOpenDeleteConfirm(false)}>Cancel</Button>
+                    <Button onClick={confirmDeleteExpense} color="error" variant="contained" autoFocus>
+                        Delete
+                    </Button>
+                </DialogActions>
+            </Dialog>
 
             {/* Add Member Dialog */}
             <Dialog open={openAddMember} onClose={() => setOpenAddMember(false)}>
