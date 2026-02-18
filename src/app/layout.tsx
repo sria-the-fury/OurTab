@@ -8,7 +8,7 @@ const outfit = Outfit({ subsets: ['latin'] });
 const abril = Abril_Fatface({ weight: '400', subsets: ['latin'], variable: '--font-abril' });
 
 export const metadata: Metadata = {
-  title: 'Grocery Tracker',
+  title: 'OurTab',
   description: 'Split grocery bills and track shared expenses with ease.',
   manifest: '/manifest.json',
 };
