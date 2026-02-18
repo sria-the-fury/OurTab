@@ -1,4 +1,4 @@
-import type { Metadata } from 'next';
+import type { Metadata, Viewport } from 'next';
 import { Outfit, Abril_Fatface } from 'next/font/google';
 import ThemeRegistry from '@/components/ThemeRegistry';
 import { AuthProvider } from '@/components/AuthContext';
@@ -8,8 +8,17 @@ const outfit = Outfit({ subsets: ['latin'] });
 const abril = Abril_Fatface({ weight: '400', subsets: ['latin'], variable: '--font-abril' });
 
 export const metadata: Metadata = {
-  title: 'OurTab',
+  title: 'Grocery Tracker',
   description: 'Split grocery bills and track shared expenses with ease.',
+  manifest: '/manifest.json',
+};
+
+export const viewport: Viewport = {
+  themeColor: "#000000",
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 1,
+  userScalable: false,
 };
 
 export default function RootLayout({
