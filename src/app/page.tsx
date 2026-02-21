@@ -7,6 +7,7 @@ import Box from '@mui/material/Box';
 import LocalGroceryStoreIcon from '@mui/icons-material/LocalGroceryStore';
 import GoogleSignInButton from '@/components/GoogleSignInButton';
 import { useAuth } from '@/components/AuthContext';
+import Loader from '@/components/Loader';
 import { useRouter } from 'next/navigation';
 import { useEffect } from 'react';
 
@@ -45,7 +46,7 @@ export default function Home() {
 
           <Box sx={{ mt: 4 }}>
             {loading ? (
-              <Typography>Loading...</Typography>
+              <Loader inline />
             ) : (
               !user && <GoogleSignInButton />
             )}

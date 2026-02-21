@@ -3,18 +3,45 @@
 import Box from '@mui/material/Box';
 import { keyframes } from '@mui/material/styles';
 
-const bounce = keyframes`
+const pulse = keyframes`
   0%, 100% {
-    transform: scale(0);
-    opacity: 0.5;
+    transform: scale(0.6);
+    opacity: 0.3;
   }
   50% {
-    transform: scale(1);
+    transform: scale(1.1);
     opacity: 1;
   }
 `;
 
-export default function Loader() {
+interface LoaderProps {
+    inline?: boolean;
+}
+
+export default function Loader({ inline = false }: LoaderProps) {
+    const loaderContent = (
+        <Box sx={{ display: 'flex', gap: 1.5, alignItems: 'center', justifyContent: 'center' }}>
+            {[0, 1, 2].map((i) => (
+                <Box
+                    key={i}
+                    sx={{
+                        width: inline ? 10 : 16,
+                        height: inline ? 10 : 16,
+                        borderRadius: '50%',
+                        backgroundColor: 'primary.main',
+                        animation: `${pulse} 1.5s infinite ease-in-out both`,
+                        animationDelay: `${i * 0.2}s`,
+                        boxShadow: (theme) => `0 0 10px ${theme.palette.primary.main}44`
+                    }}
+                />
+            ))}
+        </Box>
+    );
+
+    if (inline) {
+        return <Box sx={{ py: 2 }}>{loaderContent}</Box>;
+    }
+
     return (
         <Box sx={{
             position: 'fixed',
@@ -26,24 +53,10 @@ export default function Loader() {
             justifyContent: 'center',
             alignItems: 'center',
             zIndex: 9999,
-            backgroundColor: 'rgba(255, 255, 255, 0.8)', // Semi-transparent white
-            backdropFilter: 'blur(5px)'
+            backgroundColor: (theme) => theme.palette.mode === 'light' ? 'rgba(255, 255, 255, 0.7)' : 'rgba(10, 10, 10, 0.7)',
+            backdropFilter: 'blur(8px)'
         }}>
-            <Box sx={{ display: 'flex', gap: 2 }}>
-                {[0, 1, 2].map((i) => (
-                    <Box
-                        key={i}
-                        sx={{
-                            width: 20,
-                            height: 20,
-                            borderRadius: '50%',
-                            backgroundColor: 'primary.main',
-                            animation: `${bounce} 1.4s infinite ease-in-out both`,
-                            animationDelay: `${i * 0.16}s`
-                        }}
-                    />
-                ))}
-            </Box>
+            {loaderContent}
         </Box>
     );
 }
