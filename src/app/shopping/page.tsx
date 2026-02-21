@@ -76,9 +76,9 @@ export default function Shopping() {
     // Use cached group members directly
     const groupMembers = group?.members || [];
 
-    const [contributors, setContributors] = useState<{ [email: string]: number }>({});
+    const [contributors, setContributors] = useState<{ [email: string]: string }>({});
     const [selectedContributors, setSelectedContributors] = useState<Set<string>>(new Set());
-    const [myContribution, setMyContribution] = useState<number>(0);
+    const [myContribution, setMyContribution] = useState<string>('');
 
     // Add item to list
     const handleAddItem = (e: React.FormEvent) => {
@@ -132,10 +132,9 @@ export default function Shopping() {
     };
 
     const handleContributorAmountChange = (email: string, amount: string) => {
-        const numAmount = parseFloat(amount) || 0;
         setContributors({
             ...contributors,
-            [email]: numAmount
+            [email]: amount
         });
     };
 
@@ -145,31 +144,34 @@ export default function Shopping() {
         const includingMe = selectedContributors.has(user?.email || '');
         const totalPeople = selectedContributors.size + (includingMe ? 0 : 1);
         const equalShare = total / totalPeople;
+        const equalShareStr = equalShare.toFixed(2);
 
-        const newContributors: { [email: string]: number } = {};
+        const newContributors: { [email: string]: string } = {};
         selectedContributors.forEach(email => {
-            newContributors[email] = equalShare;
+            newContributors[email] = equalShareStr;
         });
 
         setContributors(newContributors);
-        setMyContribution(equalShare);
+        setMyContribution(equalShareStr);
     };
 
     const handleIPayAll = () => {
         setSelectedContributors(new Set());
         setContributors({});
-        setMyContribution(total);
+        setMyContribution(total.toFixed(2));
     };
 
     // Calculate totals
-    const totalContributions = Object.values(contributors).reduce((sum, amt) => sum + amt, 0);
-    const remaining = total - totalContributions - myContribution;
+    const totalContributions = Object.values(contributors).reduce((sum, amt) => sum + (parseFloat(amt) || 0), 0);
+    const myContributionNum = parseFloat(myContribution) || 0;
+    const remaining = total - totalContributions - myContributionNum;
+
 
     // Auto-fill "Your contribution" with the remaining amount when others' contributions change
     useEffect(() => {
         if (total > 0 && selectedContributors.size > 0) {
             const autoAmount = total - totalContributions;
-            setMyContribution(Math.max(0, parseFloat(autoAmount.toFixed(2))));
+            setMyContribution(Math.max(0, autoAmount).toFixed(2));
         }
     }, [totalContributions, total, selectedContributors.size]);
 
@@ -212,14 +214,15 @@ export default function Shopping() {
 
             // Add selected contributors
             selectedContributors.forEach(email => {
-                const amount = contributors[email] || 0;
+                const amountStr = contributors[email] || '0';
+                const amount = parseFloat(amountStr) || 0;
                 if (amount > 0) {
                     contributorsList.push({ email, amount });
                 }
             });
 
             // Always add the creator's contribution (remaining amount)
-            const creatorAmount = myContribution > 0 ? myContribution : Math.max(0, total - totalContributions);
+            const creatorAmount = myContributionNum > 0 ? myContributionNum : Math.max(0, total - totalContributions);
             if (creatorAmount > 0.01) {
                 contributorsList.push({ email: user.email!, amount: parseFloat(creatorAmount.toFixed(2)) });
             }
@@ -625,7 +628,10 @@ export default function Shopping() {
                             required
                             margin="normal"
                             value={itemName}
-                            onChange={(e) => setItemName(e.target.value)}
+                            onChange={(e) => {
+                                const value = e.target.value;
+                                setItemName(value ? value.charAt(0).toUpperCase() + value.slice(1) : '');
+                            }}
                             disabled={loading}
                             placeholder="e.g., Milk, Bread, Eggs"
                         />
@@ -668,7 +674,7 @@ export default function Shopping() {
                                     >
                                         <ListItemText
                                             primary={item.name}
-                                            secondary={`${getCurrencySymbol()}${item.price.toFixed(2)}`}
+                                            secondary={`${getCurrencySymbol()}${Number(item.price).toFixed(2)}`}
                                         />
                                     </ListItem>
                                     {index < items.length - 1 && <Divider />}
@@ -679,7 +685,7 @@ export default function Shopping() {
                         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                             <Typography variant="h6">Total:</Typography>
                             <Typography variant="h6" color="primary">
-                                {getCurrencySymbol()}{total.toFixed(2)}
+                                {getCurrencySymbol()}{Number(total).toFixed(2)}
                             </Typography>
                         </Box>
                     </Paper>
@@ -744,8 +750,8 @@ export default function Shopping() {
                                             type="number"
                                             size="small"
                                             fullWidth
-                                            value={myContribution || ''}
-                                            onChange={(e) => setMyContribution(parseFloat(e.target.value) || 0)}
+                                            value={myContribution}
+                                            onChange={(e) => setMyContribution(e.target.value)}
                                             disabled={loading}
                                             inputProps={{ step: '0.01', min: '0' }}
                                         />
@@ -776,19 +782,19 @@ export default function Shopping() {
                                         <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
                                             <Typography variant="body2">Total:</Typography>
                                             <Typography variant="body2" fontWeight="bold">
-                                                {getCurrencySymbol()}{total.toFixed(2)}
+                                                {getCurrencySymbol()}{Number(total).toFixed(2)}
                                             </Typography>
                                         </Box>
                                         <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
                                             <Typography variant="body2">Others' contributions:</Typography>
                                             <Typography variant="body2">
-                                                {getCurrencySymbol()}{totalContributions.toFixed(2)}
+                                                {getCurrencySymbol()}{Number(totalContributions).toFixed(2)}
                                             </Typography>
                                         </Box>
                                         <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
                                             <Typography variant="body2">Your contribution:</Typography>
                                             <Typography variant="body2">
-                                                {getCurrencySymbol()}{myContribution.toFixed(2)}
+                                                {getCurrencySymbol()}{Number(myContributionNum).toFixed(2)}
                                             </Typography>
                                         </Box>
                                         <Divider sx={{ my: 1 }} />
@@ -801,7 +807,7 @@ export default function Shopping() {
                                                 fontWeight="bold"
                                                 color={remaining < -0.01 ? 'error' : remaining > 0.01 ? 'warning.main' : 'success.main'}
                                             >
-                                                {getCurrencySymbol()}{Math.abs(remaining).toFixed(2)}
+                                                {getCurrencySymbol()}{Number(Math.abs(remaining)).toFixed(2)}
                                             </Typography>
                                         </Box>
                                     </Box>
