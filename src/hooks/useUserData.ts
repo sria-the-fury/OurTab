@@ -6,7 +6,7 @@ export interface UserData {
     name?: string;
     photoUrl?: string;
     currency?: string;
-    groupId?: string;
+    groupId?: string; // Stored as groupId in Firestore, but conceptually houseId
 }
 
 const fetcher = (url: string) => fetch(url).then((res) => {

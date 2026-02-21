@@ -5,10 +5,10 @@ import { collection, addDoc, query, where, getDocs, orderBy, doc, getDoc, writeB
 export async function POST(request: Request) {
     try {
         const body = await request.json();
-        const { amount, description, userId, groupId, contributors } = body;
+        const { amount, description, userId, houseId, contributors } = body;
 
         // TODO: Verify Types. Amount should be number.
-        if (!amount || !description || !userId || !groupId) {
+        if (!amount || !description || !userId || !houseId) {
             return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
         }
 
@@ -38,7 +38,7 @@ export async function POST(request: Request) {
             amount: totalAmount,
             description,
             userId,
-            groupId,
+            groupId: houseId, // Still stored as groupId in Firestore
             date: new Date().toISOString()
         };
 
@@ -61,15 +61,15 @@ export async function POST(request: Request) {
 
 export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
-    const groupId = searchParams.get('groupId');
+    const houseId = searchParams.get('houseId');
     const userId = searchParams.get('userId');
 
     try {
         const expensesRef = collection(db, 'expenses');
         // Construct query
         let q;
-        if (groupId) {
-            q = query(expensesRef, where("groupId", "==", groupId)); //, orderBy("date", "desc") needs index
+        if (houseId) {
+            q = query(expensesRef, where("groupId", "==", houseId)); //, orderBy("date", "desc") needs index
         } else if (userId) {
             q = query(expensesRef, where("userId", "==", userId));
         } else {

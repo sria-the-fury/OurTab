@@ -5,7 +5,7 @@ import { User, onAuthStateChanged, signInWithPopup, GoogleAuthProvider, signOut 
 import { auth } from '@/lib/firebase';
 import { useRouter } from 'next/navigation';
 import useSWR from 'swr';
-import { Group } from '@/hooks/useGroupData';
+import { House } from '@/hooks/useHouseData';
 import { UserData } from '@/hooks/useUserData';
 
 interface AuthContextType {
@@ -17,9 +17,9 @@ interface AuthContextType {
     updateCurrency: (newCurrency: string) => Promise<void>;
     // Expose cached data
     dbUser: UserData | null;
-    group: Group | null;
+    house: House | null;
     mutateUser: () => Promise<any>;
-    mutateGroup: () => Promise<any>;
+    mutateHouse: () => Promise<any>;
 }
 
 const AuthContext = createContext<AuthContextType>({
@@ -30,9 +30,9 @@ const AuthContext = createContext<AuthContextType>({
     logout: async () => { },
     updateCurrency: async () => { },
     dbUser: null,
-    group: null,
+    house: null,
     mutateUser: async () => { },
-    mutateGroup: async () => { },
+    mutateHouse: async () => { },
 });
 
 export const useAuth = () => useContext(AuthContext);
@@ -52,16 +52,16 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         fetcher
     );
 
-    // 2. Fetch Group Data
-    // We only fetch group if we have a user (and ideally if we know they have a group, but we can just try fetching)
+    // 2. Fetch House Data
+    // We only fetch house if we have a user (and ideally if we know they have a house, but we can just try fetching)
     // Actually, relying on userData.groupId is better to avoid 404s, but initially fetching is fine too.
-    const { data: groupData, mutate: mutateGroup } = useSWR<Group>(
-        user?.email ? `/api/groups/my-group?email=${user.email}` : null,
+    const { data: houseData, mutate: mutateHouse } = useSWR<House>(
+        user?.email ? `/api/houses/my-house?email=${user.email}` : null,
         fetcher
     );
 
     // Derived state
-    const currency = groupData?.currency || userData?.currency || 'USD';
+    const currency = houseData?.currency || userData?.currency || 'USD';
 
     // Overall loading state: Auth is initial load, but we might want to wait for data?
     // Usually only wait for Auth (user presence). Data can pop in.
@@ -118,13 +118,13 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     const updateCurrency = async (newCurrency: string) => {
         if (user?.email) {
             try {
-                // Determine logic based on whether user is in a group or not
+                // Determine logic based on whether user is in a house or not
                 let url = '/api/users';
                 let body: any = { email: user.email, currency: newCurrency };
 
-                if (groupData?.id) {
-                    url = '/api/groups/update';
-                    body = { groupId: groupData.id, currency: newCurrency, userEmail: user.email };
+                if (houseData?.id) {
+                    url = '/api/houses/update';
+                    body = { houseId: houseData.id, currency: newCurrency, userEmail: user.email };
                 }
 
                 await fetch(url, {
@@ -135,7 +135,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
                 // Mutate to update UI instantly
                 mutateUser();
-                mutateGroup();
+                mutateHouse();
 
             } catch (error) {
                 console.error("Failed to sync currency preference", error);
@@ -152,9 +152,9 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
             logout,
             updateCurrency,
             dbUser: userData || null,
-            group: groupData || null,
+            house: houseData || null,
             mutateUser,
-            mutateGroup
+            mutateHouse
         }}>
             {children}
         </AuthContext.Provider>

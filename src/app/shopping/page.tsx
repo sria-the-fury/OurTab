@@ -44,19 +44,19 @@ interface Expense {
     amount: number;
     description: string;
     userId: string;
-    groupId: string;
+    houseId: string;
     date: string;
     contributors?: Array<{ email: string; amount: number }>;
 }
 
-interface GroupMember {
+interface HouseMember {
     email: string;
     name?: string;
     photoUrl?: string;
 }
 
 export default function Shopping() {
-    const { user, currency, dbUser, group } = useAuth();
+    const { user, currency, dbUser, house } = useAuth();
     const router = useRouter();
     const { showToast } = useToast();
 
@@ -73,8 +73,8 @@ export default function Shopping() {
     const [loading, setLoading] = useState(false);
 
     // Contributor state
-    // Use cached group members directly
-    const groupMembers = group?.members || [];
+    // Use cached house members directly
+    const houseMembers = house?.members || [];
 
     const [contributors, setContributors] = useState<{ [email: string]: string }>({});
     const [selectedContributors, setSelectedContributors] = useState<Set<string>>(new Set());
@@ -193,11 +193,11 @@ export default function Shopping() {
 
             // Use cached dbUser
             if (!dbUser || !dbUser.groupId) {
-                console.log('User has no groupId in cache');
+                console.log('User has no houseId in cache');
                 // Fallback check or just error?
                 // If cache is consistent, this should be enough.
                 if (!dbUser?.groupId) {
-                    showToast('You must belong to a group to add expenses.', 'error');
+                    showToast('You must belong to a house to add expenses.', 'error');
                     setLoading(false);
                     return;
                 }
@@ -234,7 +234,7 @@ export default function Shopping() {
                     amount: total.toString(),
                     description,
                     userId: user.email, // Use email as ID concept
-                    groupId: dbUser.groupId,
+                    houseId: dbUser.groupId,
                     contributors: contributorsList.length > 0 ? contributorsList : undefined
                 })
             });
@@ -305,15 +305,15 @@ export default function Shopping() {
         }
     };
 
-    // Fetch expenses and group details for history
+    // Fetch expenses and house details for history
     const handleOpenHistory = async () => {
-        if (!user || !group) return; // Need group data
+        if (!user || !house) return; // Need house data
         setLoading(true);
         try {
-            // Group data is already cached in 'group'
+            // House data is already cached in 'house'
 
-            if (group.id) {
-                const expensesRes = await fetch(`/api/expenses?groupId=${group.id}`);
+            if (house.id) {
+                const expensesRes = await fetch(`/api/expenses?houseId=${house.id}`);
                 const expensesData = await expensesRes.json();
 
                 // Group by month
@@ -327,7 +327,7 @@ export default function Shopping() {
                 setMonthlyExpenses(grouped);
                 setOpenHistory(true);
             } else {
-                showToast('Group not found', 'error');
+                showToast('House not found', 'error');
             }
         } catch (error) {
             console.error("Failed to fetch history", error);
@@ -340,8 +340,7 @@ export default function Shopping() {
     const downloadPDF = async (month: string) => {
         try {
             console.log('Starting PDF generation for:', month);
-            // Use cached 'group' instead of 'groupData'
-            const currentGroupData = group;
+            const currentHouseData = house;
 
             const expenses = monthlyExpenses[month];
             if (!expenses) {
@@ -351,8 +350,8 @@ export default function Shopping() {
 
             // --- SETTLEMENT LOGIC ---
             const memberBalances: { [email: string]: number } = {};
-            if (currentGroupData?.members) {
-                currentGroupData.members.forEach((m: any) => memberBalances[m.email] = 0);
+            if (currentHouseData?.members) {
+                currentHouseData.members.forEach((m: any) => memberBalances[m.email] = 0);
             }
 
             let totalGroupExpense = 0;
@@ -392,7 +391,7 @@ export default function Shopping() {
                 totalGroupExpense += amount;
             });
 
-            const activeMemberCount = currentGroupData?.members?.length || 0;
+            const activeMemberCount = currentHouseData?.members?.length || 0;
             const sharePerPerson = totalGroupExpense / (activeMemberCount || 1);
 
             const debtors: { email: string, amount: number }[] = [];
@@ -413,8 +412,8 @@ export default function Shopping() {
                 const creditor = creditors[j];
                 const amount = Math.min(debtor.amount, creditor.amount);
 
-                const debtorName = currentGroupData?.members?.find((m: any) => m.email === debtor.email)?.name || debtor.email.split('@')[0];
-                const creditorName = currentGroupData?.members?.find((m: any) => m.email === creditor.email)?.name || creditor.email.split('@')[0];
+                const debtorName = currentHouseData?.members?.find((m: any) => m.email === debtor.email)?.name || debtor.email.split('@')[0];
+                const creditorName = currentHouseData?.members?.find((m: any) => m.email === creditor.email)?.name || creditor.email.split('@')[0];
 
                 settlements.push(`${debtorName} pays ${creditorName}: ${getCurrencySymbol()}${amount.toFixed(2)}`);
 
@@ -437,8 +436,8 @@ export default function Shopping() {
             // Mapping email to loaded photo URL
             const memberPhotos: { [email: string]: string | null } = {};
 
-            if (currentGroupData?.members) {
-                await Promise.all(currentGroupData.members.map(async (m: any) => {
+            if (currentHouseData?.members) {
+                await Promise.all(currentHouseData.members.map(async (m: any) => {
                     if (m.photoUrl) {
                         const loaded = await loadImage(m.photoUrl);
                         if (loaded) { // Only store if successfully loaded
@@ -456,17 +455,17 @@ export default function Shopping() {
             const pageWidth = doc.internal.pageSize.width;
 
             // --- HEADER ---
-            // Group Name (Centered with stylish font)
+            // House Name (Centered with stylish font)
             doc.setFontSize(20);
             doc.setFont('times', 'bold');
-            doc.text(currentGroupData?.name || 'My Group', pageWidth / 2, 20, { align: 'center' });
+            doc.text(currentHouseData?.name || 'My House', pageWidth / 2, 20, { align: 'center' });
 
-            // Left: Group Members
+            // Left: House Members
             doc.setFontSize(8);
             doc.setFont('helvetica', 'normal');
             let leftY = 30;
-            if (currentGroupData?.members) {
-                currentGroupData.members.forEach((m: any) => {
+            if (currentHouseData?.members) {
+                currentHouseData.members.forEach((m: any) => {
                     const mName = m.name || m.email.split('@')[0];
                     doc.text(mName, 14, leftY);
                     leftY += 4;
@@ -501,7 +500,7 @@ export default function Shopping() {
                 const dateStr = `${dateObj.getDate().toString().padStart(2, '0')}/${(dateObj.getMonth() + 1).toString().padStart(2, '0')}/${dateObj.getFullYear()}`;
 
 
-                const member = currentGroupData?.members?.find((m: any) => m.email === (exp as any).userId);
+                const member = currentHouseData?.members?.find((m: any) => m.email === (exp as any).userId);
                 // First two names logic (first name + middle/last name)
                 const fullName = member?.name || (exp as any).userId.split('@')[0];
                 const names = fullName.split(' ');
@@ -704,11 +703,11 @@ export default function Shopping() {
                             <AccordionDetails>
                                 <Box sx={{ mb: 2 }}>
                                     <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                                        Select group members who are contributing money for this purchase
+                                        Select house members who are contributing money for this purchase
                                     </Typography>
 
-                                    {/* Group Members */}
-                                    {groupMembers
+                                    {/* House Members */}
+                                    {houseMembers
                                         .filter(member => member.email !== user?.email)
                                         .map((member) => (
                                             <Box key={member.email} sx={{ mb: 2 }}>

@@ -19,7 +19,7 @@ import ArrowForwardIosIcon from '@mui/icons-material/ArrowForwardIos';
 import IconButton from '@mui/material/IconButton';
 import { useAuth } from '@/components/AuthContext';
 import { useRouter } from 'next/navigation';
-import { useGroupData } from '@/hooks/useGroupData';
+import { useHouseData } from '@/hooks/useHouseData';
 import { useToast } from '@/components/ToastContext';
 import Loader from '@/components/Loader';
 import BottomNav from '@/components/BottomNav';
@@ -34,7 +34,7 @@ import PersonAddIcon from '@mui/icons-material/PersonAdd';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
 
-interface Group {
+interface House {
     id: string;
     name: string;
     createdBy: string;
@@ -46,7 +46,7 @@ interface Expense {
     amount: number;
     description: string;
     userId: string;
-    groupId: string;
+    houseId: string;
     date: string;
     contributors?: Array<{ email: string; amount: number }>;
 }
@@ -57,10 +57,12 @@ export default function Dashboard() {
 
     // Use the custom hook for data fetching
 
-    const { group, expenses, loading: dataLoading, mutateGroup, mutateExpenses } = useGroupData();
+    // Use the custom hook for data fetching
+
+    const { house, expenses, loading: dataLoading, mutateHouse, mutateExpenses } = useHouseData();
 
     // Combine loading states
-    const loading = authLoading || (!!user && dataLoading && !group && expenses.length === 0);
+    const loading = authLoading || (!!user && dataLoading && !house && expenses.length === 0);
 
     const [totalExpenses, setTotalExpenses] = useState(0);
     const [myExpenses, setMyExpenses] = useState(0);
@@ -175,13 +177,13 @@ export default function Dashboard() {
     };
 
     const handleAddMember = async () => {
-        if (!newMemberEmail || !group) return;
+        if (!newMemberEmail || !house) return;
 
         try {
-            const res = await fetch('/api/groups/add-member', {
+            const res = await fetch('/api/houses/add-member', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ email: newMemberEmail, groupId: group.id })
+                body: JSON.stringify({ email: newMemberEmail, houseId: house.id })
             });
 
             const data = await res.json();
@@ -189,7 +191,7 @@ export default function Dashboard() {
             if (res.ok) {
                 showToast('Member added successfully!', 'success');
                 setNewMemberEmail('');
-                mutateGroup();
+                mutateHouse();
                 setOpenAddMember(false);
             } else {
                 showToast(data.error || 'Failed to add member', 'error');
@@ -229,9 +231,9 @@ export default function Dashboard() {
 
     // Calculate my actual expenses accounting for contributors
     const myFilteredExpenses = (() => {
-        if (!group?.members || !user?.email) return 0;
+        if (!house?.members || !user?.email) return 0;
 
-        const numMembers = group.members.length;
+        const numMembers = house.members.length;
         let myTotal = 0;
 
         filteredExpenses.forEach((exp: Expense) => {
@@ -246,10 +248,10 @@ export default function Dashboard() {
 
     // Memoize settlement calculation to prevent re-render issues
     const settlements = useMemo(() => {
-        if (!group || !group.members || group.members.length < 2) return [];
+        if (!house || !house.members || house.members.length < 2) return [];
 
         const memberBalances: { [key: string]: number } = {};
-        const members = group.members;
+        const members = house.members;
 
         // Initialize 0 balance for all members
         members.forEach(m => memberBalances[m.email] = 0);
@@ -342,7 +344,7 @@ export default function Dashboard() {
         }
 
         return calculatedSettlements;
-    }, [group, filteredExpenses]);
+    }, [house, filteredExpenses]);
 
 
 
@@ -438,15 +440,15 @@ export default function Dashboard() {
                                 <GroupIcon sx={{ fontSize: 100 }} />
                             </Box>
                             <Typography component="h2" variant="h6" color="secondary" gutterBottom>
-                                My Group
+                                My House
                             </Typography>
-                            {group ? (
+                            {house ? (
                                 <Box>
                                     <Typography component="p" variant="h5" gutterBottom sx={{ fontWeight: 600 }}>
-                                        {group.name}
+                                        {house.name}
                                     </Typography>
                                     <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, mb: 3 }}>
-                                        {group.members?.map((member) => (
+                                        {house.members?.map((member) => (
                                             <Chip
                                                 key={member.email}
                                                 avatar={<Avatar alt={member.name} src={member.photoUrl} />}
@@ -471,9 +473,9 @@ export default function Dashboard() {
                             ) : (
                                 <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'start', justifyContent: 'center', flex: 1 }}>
                                     <Typography color="text.secondary" paragraph>
-                                        You are not in a group yet.
+                                        You are not in a house yet.
                                     </Typography>
-                                    <Button variant="contained" color="secondary" href="/profile">Create Group</Button>
+                                    <Button variant="contained" color="secondary" href="/profile">Create House</Button>
                                 </Box>
                             )}
                         </Paper>
@@ -490,7 +492,7 @@ export default function Dashboard() {
                     User asked for "previous months expenses". 
                     I'll use filteredExpenses so it shows the settlement status FOR THAT MONTH.
                 */}
-                {group && filteredExpenses.length > 0 && group.members && group.members.length > 1 && (
+                {house && filteredExpenses.length > 0 && house.members && house.members.length > 1 && (
                     <Box sx={{ mt: 4 }}>
                         <Typography variant="h6" gutterBottom>Settlements (Who owes whom)</Typography>
                         <Grid container spacing={2}>
@@ -502,7 +504,7 @@ export default function Dashboard() {
                                 </Grid>
                             ) : (
                                 settlements.map((settlement, index) => {
-                                    const members = group?.members || [];
+                                    const members = house?.members || [];
                                     const fromMember = members.find(m => m.email === settlement.from);
                                     const toMember = members.find(m => m.email === settlement.to);
                                     const fromName = fromMember?.name || settlement.from.split('@')[0];
@@ -558,7 +560,7 @@ export default function Dashboard() {
                     ) : (
                         <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
                             {filteredExpenses.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()).map((expense) => {
-                                const member = group?.members?.find(m => m.email === expense.userId);
+                                const member = house?.members?.find(m => m.email === expense.userId);
                                 const memberName = member?.name || expense.userId.split('@')[0];
                                 const expenseDate = new Date(expense.date);
                                 const expenseDateStr = expenseDate.toLocaleString('en-GB', {
@@ -589,7 +591,7 @@ export default function Dashboard() {
                                                 {expense.contributors && expense.contributors.length > 0 && (
                                                     <Typography variant="caption" color="primary" sx={{ display: 'block', mt: 0.5 }}>
                                                         Paid by: {expense.contributors.map(c => {
-                                                            const contributorMember = group?.members?.find(m => m.email === c.email);
+                                                            const contributorMember = house?.members?.find(m => m.email === c.email);
                                                             const contributorName = contributorMember?.name || c.email.split('@')[0];
                                                             return `${contributorName} (${displayCurrency}${c.amount.toFixed(2)})`;
                                                         }).join(', ')}

@@ -41,7 +41,7 @@ export default function Home() {
             ourtab
           </Typography>
           <Typography variant="h6" component="p" gutterBottom align="center" color="text.secondary" sx={{ maxWidth: 600, mb: 4, letterSpacing: 3, textTransform: 'uppercase', fontSize: '0.8rem', fontWeight: 600 }}>
-            MANAGE YOUR GROUP EXPENSES WITH EASE
+            MANAGE YOUR HOUSE EXPENSES WITH EASE
           </Typography>
 
           <Box sx={{ mt: 4 }}>

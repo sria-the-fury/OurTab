@@ -16,7 +16,7 @@ import Loader from '@/components/Loader';
 import Paper from '@mui/material/Paper';
 import { useRouter } from 'next/navigation';
 
-interface Group {
+interface House {
     id: string;
     name: string;
     currency?: string;
@@ -24,14 +24,14 @@ interface Group {
 }
 
 export default function Profile() {
-    const { user, logout, currency, updateCurrency, loading: authLoading, dbUser, group, mutateUser, mutateGroup } = useAuth();
+    const { user, logout, currency, updateCurrency, loading: authLoading, dbUser, house, mutateUser, mutateHouse } = useAuth();
     const router = useRouter();
-    const [groupName, setGroupName] = useState('');
+    const [houseName, setHouseName] = useState('');
     const [loading, setLoading] = useState(false);
 
     // Derived state from cached data
-    const hasGroup = !!dbUser?.groupId;
-    const groupDetails = group;
+    const hasHouse = !!dbUser?.groupId;
+    const houseDetails = house;
 
     const { showToast } = useToast();
     const handleCurrencyChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -39,61 +39,61 @@ export default function Profile() {
         await updateCurrency(newCurrency);
     };
 
-    const handleCreateGroup = async (e: React.FormEvent) => {
+    const handleCreateHouse = async (e: React.FormEvent) => {
         e.preventDefault();
         setLoading(true);
         try {
-            const res = await fetch('/api/groups', {
+            const res = await fetch('/api/houses', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    name: groupName,
+                    name: houseName,
                     createdBy: user?.email, // Using email as identifier for now
-                    currency: currency // Send current currency pref as group currency
+                    currency: currency // Send current currency pref as house currency
                 })
             });
 
             if (res.ok) {
-                showToast('Group created successfully!', 'success');
-                // Revalidate cache to show new group instantly
+                showToast('House created successfully!', 'success');
+                // Revalidate cache to show new house instantly
                 mutateUser();
-                mutateGroup();
+                mutateHouse();
             } else {
-                showToast('Failed to create group', 'error');
+                showToast('Failed to create house', 'error');
             }
         } catch (err) {
             console.error(err);
-            showToast('Error creating group', 'error');
+            showToast('Error creating house', 'error');
         }
         setLoading(false);
     };
 
-    const handleDeleteGroup = async () => {
+    const handleDeleteHouse = async () => {
         if (!user || !user.email) return;
-        if (!confirm('Are you sure you want to delete this group? All members will be removed.')) return;
+        if (!confirm('Are you sure you want to delete this house? All members will be removed.')) return;
         setLoading(true);
         try {
-            // Need groupId. Assuming we have it in groupDetails
-            if (groupDetails && groupDetails.id) {
-                const res = await fetch('/api/groups', {
+            // Need houseId. Assuming we have it in houseDetails
+            if (houseDetails && houseDetails.id) {
+                const res = await fetch('/api/houses', {
                     method: 'DELETE',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ groupId: groupDetails.id, userEmail: user.email })
+                    body: JSON.stringify({ houseId: houseDetails.id, userEmail: user.email })
                 });
 
                 if (res.ok) {
-                    showToast('Group deleted successfully', 'success');
+                    showToast('House deleted successfully', 'success');
                     updateCurrency('USD'); // Reset to default or keep user pref? Let's keep it safe.
                     // Revalidate cache
                     mutateUser();
-                    mutateGroup();
+                    mutateHouse();
                 } else {
-                    showToast('Failed to delete group', 'error');
+                    showToast('Failed to delete house', 'error');
                 }
             }
         } catch (error) {
             console.error("Delete failed", error);
-            showToast('Error deleting group', 'error');
+            showToast('Error deleting house', 'error');
         }
         setLoading(false);
     };
@@ -122,35 +122,35 @@ export default function Profile() {
                 </Box>
 
                 <Box sx={{ mt: 6 }}>
-                    <Typography variant="h6" gutterBottom>My Group</Typography>
+                    <Typography variant="h6" gutterBottom>My House</Typography>
 
-                    {hasGroup && groupDetails ? (
+                    {hasHouse && houseDetails ? (
                         <Paper className="glass" sx={{ p: 3, background: 'transparent', boxShadow: 'none' }}>
                             <Typography variant="h6" color="primary" gutterBottom>
-                                {groupDetails.name}
+                                {houseDetails.name}
                             </Typography>
                             <Typography variant="body1" color="text.secondary">
-                                <strong>Currency:</strong> {groupDetails.currency || 'Not set'}
+                                <strong>Currency:</strong> {houseDetails.currency || 'Not set'}
                             </Typography>
                             <Button
                                 variant="text"
                                 color="error"
                                 size="small"
-                                onClick={handleDeleteGroup}
+                                onClick={handleDeleteHouse}
                                 sx={{ mt: 2 }}
                             >
-                                Delete Group
+                                Delete House
                             </Button>
                         </Paper>
                     ) : (
                         <Paper className="glass" sx={{ p: 3, background: 'transparent', boxShadow: 'none' }}>
-                            <Typography gutterBottom>You are not in a group yet.</Typography>
-                            <form onSubmit={handleCreateGroup}>
+                            <Typography gutterBottom>You are not in a house yet.</Typography>
+                            <form onSubmit={handleCreateHouse}>
                                 <TextField
-                                    label="Group Name"
+                                    label="House Name"
                                     fullWidth
-                                    value={groupName}
-                                    onChange={(e) => setGroupName(e.target.value)}
+                                    value={houseName}
+                                    onChange={(e) => setHouseName(e.target.value)}
                                     required
                                     sx={{ mb: 2 }}
                                 />
@@ -168,7 +168,7 @@ export default function Profile() {
                                     <MenuItem value="BDT">Bangladeshi Taka (৳)</MenuItem>
                                 </TextField>
                                 <Button type="submit" variant="contained" disabled={loading}>
-                                    Create Group
+                                    Create House
                                 </Button>
                             </form>
                         </Paper>
