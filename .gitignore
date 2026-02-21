@@ -47,3 +47,7 @@ lint_output.txt
 lint_output_2.txt
 
 lint_test_output.txt
+
+public/sw.js
+
+public/workbox-f1770938.js
