@@ -23,6 +23,7 @@ import { useHouseData } from '@/hooks/useHouseData';
 import { useToast } from '@/components/ToastContext';
 import Loader from '@/components/Loader';
 import BottomNav from '@/components/BottomNav';
+import AuthGuard from '@/components/AuthGuard';
 import Chip from '@mui/material/Chip';
 import Avatar from '@mui/material/Avatar';
 import Dialog from '@mui/material/Dialog';
@@ -54,8 +55,6 @@ interface Expense {
 export default function Dashboard() {
     const { user, loading: authLoading, currency } = useAuth();
     const router = useRouter();
-
-    // Use the custom hook for data fetching
 
     // Use the custom hook for data fetching
 
@@ -92,6 +91,7 @@ export default function Dashboard() {
     const [editingExpenseId, setEditingExpenseId] = useState<string | null>(null);
     const [editAmount, setEditAmount] = useState('');
     const [editDescription, setEditDescription] = useState('');
+    const [showAllExpenses, setShowAllExpenses] = useState(false);
 
     // Calculate totals when expenses change
     useEffect(() => {
@@ -201,11 +201,6 @@ export default function Dashboard() {
         }
     };
 
-    useEffect(() => {
-        if (!authLoading && !user) {
-            router.push('/');
-        }
-    }, [user, authLoading, router]);
 
     const handlePreviousMonth = () => {
         const newDate = new Date(selectedDate);
@@ -353,136 +348,137 @@ export default function Dashboard() {
     }
 
     return (
-        <main>
-            <Navbar />
-            <Container maxWidth="lg" sx={{ mt: 4 }}>
-                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 4 }}>
-                    <Typography variant="h4" component="h1">
-                        Dashboard
-                    </Typography>
-                    <Button variant="contained" startIcon={<AddIcon />} href="/shopping">
-                        Add Expense
-                    </Button>
-                </Box>
+        <AuthGuard>
+            <main>
+                <Navbar />
+                <Container maxWidth="lg" sx={{ mt: 4 }}>
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 4 }}>
+                        <Typography variant="h4" component="h1">
+                            Dashboard
+                        </Typography>
+                        <Button variant="contained" startIcon={<AddIcon />} href="/shopping">
+                            Add Expense
+                        </Button>
+                    </Box>
 
-                {/* Month Navigation */}
-                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', mb: 3 }}>
-                    <IconButton onClick={handlePreviousMonth}>
-                        <ArrowBackIosIcon />
-                    </IconButton>
-                    <Typography variant="h6" sx={{ mx: 2, minWidth: 150, textAlign: 'center' }}>
-                        {selectedDate.toLocaleString('default', { month: 'long', year: 'numeric' })}
-                    </Typography>
-                    <IconButton onClick={handleNextMonth} disabled={selectedDate.getMonth() === new Date().getMonth() && selectedDate.getFullYear() === new Date().getFullYear()}>
-                        <ArrowForwardIosIcon />
-                    </IconButton>
-                </Box>
+                    {/* Month Navigation */}
+                    <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', mb: 3 }}>
+                        <IconButton onClick={handlePreviousMonth}>
+                            <ArrowBackIosIcon />
+                        </IconButton>
+                        <Typography variant="h6" sx={{ mx: 2, minWidth: 150, textAlign: 'center' }}>
+                            {selectedDate.toLocaleString('default', { month: 'long', year: 'numeric' })}
+                        </Typography>
+                        <IconButton onClick={handleNextMonth} disabled={selectedDate.getMonth() === new Date().getMonth() && selectedDate.getFullYear() === new Date().getFullYear()}>
+                            <ArrowForwardIosIcon />
+                        </IconButton>
+                    </Box>
 
-                <Grid container spacing={3}>
-                    {/* Total Cost Widget */}
-                    <Grid size={{ xs: 12, md: 4 }}>
-                        <Paper sx={{
-                            p: 3,
-                            display: 'flex',
-                            flexDirection: 'column',
-                            height: '100%',
-                            position: 'relative',
-                            overflow: 'hidden',
-                            background: 'linear-gradient(135deg, #6C63FF 0%, #5A52E0 100%)',
-                            color: 'white'
-                        }}>
-                            <Box sx={{ position: 'absolute', top: -10, right: -10, opacity: 0.2 }}>
-                                <CurrencyIcon sx={{ fontSize: 100 }} />
-                            </Box>
-                            <Typography component="h2" variant="h6" gutterBottom sx={{ opacity: 0.9 }}>
-                                Total Expenses
-                            </Typography>
-                            <Typography component="p" variant="h3" sx={{ fontWeight: 'bold', mb: 1 }}>
-                                {displayCurrency}{totalFilteredExpenses.toFixed(2)}
-                            </Typography>
-                            <Typography sx={{ opacity: 0.8 }}>
-                                {selectedDate.toLocaleString('default', { month: 'long' })}
-                            </Typography>
-                        </Paper>
-                    </Grid>
-                    {/* My Cost Widget */}
-                    <Grid size={{ xs: 12, md: 4 }}>
-                        <Paper sx={{
-                            p: 3,
-                            display: 'flex',
-                            flexDirection: 'column',
-                            height: '100%',
-                            position: 'relative',
-                            overflow: 'hidden',
-                        }}>
-                            <Box sx={{ position: 'absolute', top: -10, right: -10, opacity: 0.05, color: 'primary.main' }}>
-                                <ShoppingCartIcon sx={{ fontSize: 100 }} />
-                            </Box>
-                            <Typography component="h2" variant="h6" color="primary" gutterBottom>
-                                My Expenses
-                            </Typography>
-                            <Typography component="p" variant="h3" sx={{ fontWeight: 'bold', color: '#333' }}>
-                                {displayCurrency}{myFilteredExpenses.toFixed(2)}
-                            </Typography>
-                        </Paper>
-                    </Grid>
-                    {/* Group Name Widget */}
-                    <Grid size={{ xs: 12, md: 4 }}>
-                        <Paper sx={{
-                            p: 3,
-                            display: 'flex',
-                            flexDirection: 'column',
-                            height: '100%',
-                            position: 'relative',
-                            overflow: 'hidden'
-                        }}>
-                            <Box sx={{ position: 'absolute', top: -10, right: -10, opacity: 0.05, color: 'secondary.main' }}>
-                                <GroupIcon sx={{ fontSize: 100 }} />
-                            </Box>
-                            <Typography component="h2" variant="h6" color="secondary" gutterBottom>
-                                My House
-                            </Typography>
-                            {house ? (
-                                <Box>
-                                    <Typography component="p" variant="h5" gutterBottom sx={{ fontWeight: 600 }}>
-                                        {house.name}
-                                    </Typography>
-                                    <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, mb: 3 }}>
-                                        {house.members?.map((member) => (
-                                            <Chip
-                                                key={member.email}
-                                                avatar={<Avatar alt={member.name} src={member.photoUrl} />}
-                                                label={member.name || member.email.split('@')[0]}
-                                                variant="filled"
-                                                color="default"
-                                                sx={{ bgcolor: 'rgba(0,0,0,0.05)' }}
-                                            />
-                                        ))}
+                    <Grid container spacing={3}>
+                        {/* Total Cost Widget */}
+                        <Grid size={{ xs: 12, md: 4 }}>
+                            <Paper sx={{
+                                p: 3,
+                                display: 'flex',
+                                flexDirection: 'column',
+                                height: '100%',
+                                position: 'relative',
+                                overflow: 'hidden',
+                                background: 'linear-gradient(135deg, #6C63FF 0%, #5A52E0 100%)',
+                                color: 'white'
+                            }}>
+                                <Box sx={{ position: 'absolute', top: -10, right: -10, opacity: 0.2 }}>
+                                    <CurrencyIcon sx={{ fontSize: 100 }} />
+                                </Box>
+                                <Typography component="h2" variant="h6" gutterBottom sx={{ opacity: 0.9 }}>
+                                    Total Expenses
+                                </Typography>
+                                <Typography component="p" variant="h3" sx={{ fontWeight: 'bold', mb: 1 }}>
+                                    {displayCurrency}{totalFilteredExpenses.toFixed(2)}
+                                </Typography>
+                                <Typography sx={{ opacity: 0.8 }}>
+                                    {selectedDate.toLocaleString('default', { month: 'long' })}
+                                </Typography>
+                            </Paper>
+                        </Grid>
+                        {/* My Cost Widget */}
+                        <Grid size={{ xs: 12, md: 4 }}>
+                            <Paper sx={{
+                                p: 3,
+                                display: 'flex',
+                                flexDirection: 'column',
+                                height: '100%',
+                                position: 'relative',
+                                overflow: 'hidden',
+                            }}>
+                                <Box sx={{ position: 'absolute', top: -10, right: -10, opacity: 0.05, color: 'primary.main' }}>
+                                    <ShoppingCartIcon sx={{ fontSize: 100 }} />
+                                </Box>
+                                <Typography component="h2" variant="h6" color="primary" gutterBottom>
+                                    My Expenses
+                                </Typography>
+                                <Typography component="p" variant="h3" sx={{ fontWeight: 'bold', color: '#333' }}>
+                                    {displayCurrency}{myFilteredExpenses.toFixed(2)}
+                                </Typography>
+                            </Paper>
+                        </Grid>
+                        {/* Group Name Widget */}
+                        <Grid size={{ xs: 12, md: 4 }}>
+                            <Paper sx={{
+                                p: 3,
+                                display: 'flex',
+                                flexDirection: 'column',
+                                height: '100%',
+                                position: 'relative',
+                                overflow: 'hidden'
+                            }}>
+                                <Box sx={{ position: 'absolute', top: -10, right: -10, opacity: 0.05, color: 'secondary.main' }}>
+                                    <GroupIcon sx={{ fontSize: 100 }} />
+                                </Box>
+                                <Typography component="h2" variant="h6" color="secondary" gutterBottom>
+                                    My House
+                                </Typography>
+                                {house ? (
+                                    <Box>
+                                        <Typography component="p" variant="h5" gutterBottom sx={{ fontWeight: 600 }}>
+                                            {house.name}
+                                        </Typography>
+                                        <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, mb: 3 }}>
+                                            {house.members?.map((member) => (
+                                                <Chip
+                                                    key={member.email}
+                                                    avatar={<Avatar alt={member.name} src={member.photoUrl} />}
+                                                    label={member.name || member.email.split('@')[0]}
+                                                    variant="filled"
+                                                    color="default"
+                                                    sx={{ bgcolor: 'rgba(0,0,0,0.05)' }}
+                                                />
+                                            ))}
+                                        </Box>
+                                        <Button
+                                            variant="outlined"
+                                            color="secondary"
+                                            size="small"
+                                            startIcon={<PersonAddIcon />}
+                                            onClick={() => setOpenAddMember(true)}
+                                            sx={{ mt: 'auto', alignSelf: 'flex-start' }}
+                                        >
+                                            Add Member
+                                        </Button>
                                     </Box>
-                                    <Button
-                                        variant="outlined"
-                                        color="secondary"
-                                        size="small"
-                                        startIcon={<PersonAddIcon />}
-                                        onClick={() => setOpenAddMember(true)}
-                                        sx={{ mt: 'auto', alignSelf: 'flex-start' }}
-                                    >
-                                        Add Member
-                                    </Button>
-                                </Box>
-                            ) : (
-                                <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'start', justifyContent: 'center', flex: 1 }}>
-                                    <Typography color="text.secondary" paragraph>
-                                        You are not in a house yet.
-                                    </Typography>
-                                    <Button variant="contained" color="secondary" href="/profile">Create House</Button>
-                                </Box>
-                            )}
-                        </Paper>
+                                ) : (
+                                    <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'start', justifyContent: 'center', flex: 1 }}>
+                                        <Typography color="text.secondary" paragraph>
+                                            You are not in a house yet.
+                                        </Typography>
+                                        <Button variant="contained" color="secondary" href="/profile">Create House</Button>
+                                    </Box>
+                                )}
+                            </Paper>
+                        </Grid>
                     </Grid>
-                </Grid>
 
-                {/* Settlements Widget - KEEP AS IS (Usually settles all time, or maybe just this month? 
+                    {/* Settlements Widget - KEEP AS IS (Usually settles all time, or maybe just this month? 
                     settlements are usually running totals, but for now let's keep it simple and maybe warn user it's all time 
                     OR filter it too? 
                     Actually, settlements should probably be ALL time to be correct mathematically for "owing". 
@@ -492,209 +488,223 @@ export default function Dashboard() {
                     User asked for "previous months expenses". 
                     I'll use filteredExpenses so it shows the settlement status FOR THAT MONTH.
                 */}
-                {house && filteredExpenses.length > 0 && house.members && house.members.length > 1 && (
-                    <Box sx={{ mt: 4 }}>
-                        <Typography variant="h6" gutterBottom>Settlements (Who owes whom)</Typography>
-                        <Grid container spacing={2}>
-                            {settlements.length === 0 ? (
-                                <Grid size={{ xs: 12 }}>
-                                    <Paper className="glass" sx={{ p: 2, background: 'transparent' }}>
-                                        <Typography color="text.secondary">All settled up! No payments needed.</Typography>
-                                    </Paper>
-                                </Grid>
-                            ) : (
-                                settlements.map((settlement, index) => {
-                                    const members = house?.members || [];
-                                    const fromMember = members.find(m => m.email === settlement.from);
-                                    const toMember = members.find(m => m.email === settlement.to);
-                                    const fromName = fromMember?.name || settlement.from.split('@')[0];
-                                    const toName = toMember?.name || settlement.to.split('@')[0];
-                                    const isCurrentUserPayer = settlement.from === user?.email;
-                                    const isCurrentUserReceiver = settlement.to === user?.email;
+                    {house && filteredExpenses.length > 0 && house.members && house.members.length > 1 && (
+                        <Box sx={{ mt: 4 }}>
+                            <Typography variant="h6" gutterBottom>Settlements (Who owes whom)</Typography>
+                            <Grid container spacing={2}>
+                                {settlements.length === 0 ? (
+                                    <Grid size={{ xs: 12 }}>
+                                        <Paper className="glass" sx={{ p: 2, background: 'transparent' }}>
+                                            <Typography color="text.secondary">All settled up! No payments needed.</Typography>
+                                        </Paper>
+                                    </Grid>
+                                ) : (
+                                    settlements.map((settlement, index) => {
+                                        const members = house?.members || [];
+                                        const fromMember = members.find(m => m.email === settlement.from);
+                                        const toMember = members.find(m => m.email === settlement.to);
+                                        const fromName = fromMember?.name || settlement.from.split('@')[0];
+                                        const toName = toMember?.name || settlement.to.split('@')[0];
+                                        const isCurrentUserPayer = settlement.from === user?.email;
+                                        const isCurrentUserReceiver = settlement.to === user?.email;
 
-                                    let message;
-                                    if (isCurrentUserPayer) {
-                                        message = (
-                                            <Typography variant="body1">
-                                                <strong>You</strong> will pay <strong>{toName}</strong>
-                                            </Typography>
-                                        );
-                                    } else if (isCurrentUserReceiver) {
-                                        message = (
-                                            <Typography variant="body1">
-                                                <strong>You</strong> will get from <strong>{fromName}</strong>
-                                            </Typography>
-                                        );
-                                    } else {
-                                        message = (
-                                            <Typography variant="body1">
-                                                <strong>{fromName}</strong> will pay <strong>{toName}</strong>
-                                            </Typography>
-                                        );
-                                    }
+                                        let message;
+                                        if (isCurrentUserPayer) {
+                                            message = (
+                                                <Typography variant="body1">
+                                                    <strong>You</strong> will pay <strong>{toName}</strong>
+                                                </Typography>
+                                            );
+                                        } else if (isCurrentUserReceiver) {
+                                            message = (
+                                                <Typography variant="body1">
+                                                    <strong>You</strong> will get from <strong>{fromName}</strong>
+                                                </Typography>
+                                            );
+                                        } else {
+                                            message = (
+                                                <Typography variant="body1">
+                                                    <strong>{fromName}</strong> will pay <strong>{toName}</strong>
+                                                </Typography>
+                                            );
+                                        }
 
-                                    return (
-                                        <Grid size={{ xs: 12, md: 6 }} key={`${settlement.from}-${settlement.to}-${settlement.amount}-${index}`}>
-                                            <Paper className="glass" sx={{ p: 2, background: 'transparent', borderLeft: '4px solid #6C63FF' }}>
-                                                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                                                    <Box>
-                                                        {message}
+                                        return (
+                                            <Grid size={{ xs: 12, md: 6 }} key={`${settlement.from}-${settlement.to}-${settlement.amount}-${index}`}>
+                                                <Paper className="glass" sx={{ p: 2, background: 'transparent', borderLeft: '4px solid #6C63FF' }}>
+                                                    <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                                                        <Box>
+                                                            {message}
+                                                        </Box>
+                                                        <Typography variant="h6" color="primary" sx={{ fontWeight: 'bold' }}>
+                                                            {displayCurrency}{settlement.amount.toFixed(2)}
+                                                        </Typography>
                                                     </Box>
-                                                    <Typography variant="h6" color="primary" sx={{ fontWeight: 'bold' }}>
-                                                        {displayCurrency}{settlement.amount.toFixed(2)}
-                                                    </Typography>
-                                                </Box>
-                                            </Paper>
-                                        </Grid>
-                                    );
-                                })
-                            )}
-                        </Grid>
-                    </Box>
-                )}
-
-                <Box sx={{ mt: 4 }}>
-                    <Typography variant="h6" gutterBottom>Expenses for {selectedDate.toLocaleString('default', { month: 'long' })}</Typography>
-                    {filteredExpenses.length === 0 ? (
-                        <Typography color="text.secondary">No expenses found.</Typography>
-                    ) : (
-                        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                            {filteredExpenses.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()).map((expense) => {
-                                const member = house?.members?.find(m => m.email === expense.userId);
-                                const memberName = member?.name || expense.userId.split('@')[0];
-                                const expenseDate = new Date(expense.date);
-                                const expenseDateStr = expenseDate.toLocaleString('en-GB', {
-                                    day: 'numeric',
-                                    month: 'short',
-                                    year: 'numeric',
-                                    hour: '2-digit',
-                                    minute: '2-digit',
-                                    hour12: false
-                                });
-
-                                // Check if current user is owner and within 48 hours
-                                const isOwner = user?.email === expense.userId;
-                                const now = new Date();
-                                const diffInHours = (now.getTime() - expenseDate.getTime()) / (1000 * 60 * 60);
-                                const canEdit = isOwner && diffInHours <= 48;
-
-                                return (
-                                    <Paper key={expense.id} className="glass" sx={{ p: 2, background: 'transparent' }}>
-                                        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                            <Box>
-                                                <Typography variant="body1" sx={{ fontWeight: 600 }}>
-                                                    Groceries - {expense.description}
-                                                </Typography>
-                                                <Typography variant="caption" color="text.secondary">
-                                                    {memberName} • {expenseDateStr}
-                                                </Typography>
-                                                {expense.contributors && expense.contributors.length > 0 && (
-                                                    <Typography variant="caption" color="primary" sx={{ display: 'block', mt: 0.5 }}>
-                                                        Paid by: {expense.contributors.map(c => {
-                                                            const contributorMember = house?.members?.find(m => m.email === c.email);
-                                                            const contributorName = contributorMember?.name || c.email.split('@')[0];
-                                                            return `${contributorName} (${displayCurrency}${c.amount.toFixed(2)})`;
-                                                        }).join(', ')}
-                                                    </Typography>
-                                                )}
-                                            </Box>
-                                            <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                                                <Typography variant="h6" color="primary" sx={{ fontWeight: 'bold', mr: 2 }}>
-                                                    {displayCurrency}{expense.amount.toFixed(2)}
-                                                </Typography>
-                                                {canEdit && (
-                                                    <IconButton
-                                                        size="small"
-                                                        color="error"
-                                                        onClick={() => handleDeleteExpense(expense.id)}
-                                                    >
-                                                        <DeleteIcon fontSize="small" />
-                                                    </IconButton>
-                                                )}
-                                            </Box>
-                                        </Box>
-                                    </Paper>
-                                );
-                            })}
+                                                </Paper>
+                                            </Grid>
+                                        );
+                                    })
+                                )}
+                            </Grid>
                         </Box>
                     )}
+
+                    <Box sx={{ mt: 4 }}>
+                        <Typography variant="h6" gutterBottom>Expenses for {selectedDate.toLocaleString('default', { month: 'long' })}</Typography>
+                        {filteredExpenses.length === 0 ? (
+                            <Typography color="text.secondary">No expenses found.</Typography>
+                        ) : (
+                            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                                {(() => {
+                                    const sortedExpenses = [...filteredExpenses].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+                                    const displayedExpenses = showAllExpenses ? sortedExpenses : sortedExpenses.slice(0, 5);
+
+                                    return displayedExpenses.map((expense) => {
+                                        const member = house?.members?.find(m => m.email === expense.userId);
+                                        const memberName = member?.name || expense.userId.split('@')[0];
+                                        const expenseDate = new Date(expense.date);
+                                        const expenseDateStr = expenseDate.toLocaleString('en-GB', {
+                                            day: 'numeric',
+                                            month: 'short',
+                                            year: 'numeric',
+                                            hour: '2-digit',
+                                            minute: '2-digit',
+                                            hour12: false
+                                        });
+
+                                        // Check if current user is owner and within 48 hours
+                                        const isOwner = user?.email === expense.userId;
+                                        const now = new Date();
+                                        const diffInHours = (now.getTime() - expenseDate.getTime()) / (1000 * 60 * 60);
+                                        const canEdit = isOwner && diffInHours <= 48;
+
+                                        return (
+                                            <Paper key={expense.id} className="glass" sx={{ p: 2, background: 'transparent' }}>
+                                                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                                    <Box>
+                                                        <Typography variant="body1" sx={{ fontWeight: 600 }}>
+                                                            Groceries - {expense.description}
+                                                        </Typography>
+                                                        <Typography variant="caption" color="text.secondary">
+                                                            {memberName} • {expenseDateStr}
+                                                        </Typography>
+                                                        {expense.contributors && expense.contributors.length > 0 && (
+                                                            <Typography variant="caption" color="primary" sx={{ display: 'block', mt: 0.5 }}>
+                                                                Paid by: {expense.contributors.map(c => {
+                                                                    const contributorMember = house?.members?.find(m => m.email === c.email);
+                                                                    const contributorName = contributorMember?.name || c.email.split('@')[0];
+                                                                    return `${contributorName} (${displayCurrency}${c.amount.toFixed(2)})`;
+                                                                }).join(', ')}
+                                                            </Typography>
+                                                        )}
+                                                    </Box>
+                                                    <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                                                        <Typography variant="h6" color="primary" sx={{ fontWeight: 'bold', mr: 2 }}>
+                                                            {displayCurrency}{expense.amount.toFixed(2)}
+                                                        </Typography>
+                                                        {canEdit && (
+                                                            <IconButton
+                                                                size="small"
+                                                                color="error"
+                                                                onClick={() => handleDeleteExpense(expense.id)}
+                                                            >
+                                                                <DeleteIcon fontSize="small" />
+                                                            </IconButton>
+                                                        )}
+                                                    </Box>
+                                                </Box>
+                                            </Paper>
+                                        );
+                                    });
+                                })()}
+                                {filteredExpenses.length > 5 && (
+                                    <Button
+                                        onClick={() => setShowAllExpenses(!showAllExpenses)}
+                                        sx={{ mt: 1, alignSelf: 'center' }}
+                                    >
+                                        {showAllExpenses ? 'Show Less' : `Show ${filteredExpenses.length - 5} More`}
+                                    </Button>
+                                )}
+                            </Box>
+                        )}
+                    </Box>
+                </Container>
+
+                <Box sx={{ pb: 7 }}> {/* Padding for BottomNav */}
+                    <BottomNav />
                 </Box>
-            </Container>
 
-            <Box sx={{ pb: 7 }}> {/* Padding for BottomNav */}
-                <BottomNav />
-            </Box>
+                {/* Delete Confirmation Dialog */}
+                <Dialog open={openDeleteConfirm} onClose={() => setOpenDeleteConfirm(false)}>
+                    <DialogTitle>Delete Expense</DialogTitle>
+                    <DialogContent>
+                        <Typography>
+                            Are you sure you want to delete this expense? This action cannot be undone.
+                        </Typography>
+                    </DialogContent>
+                    <DialogActions>
+                        <Button onClick={() => setOpenDeleteConfirm(false)}>Cancel</Button>
+                        <Button onClick={confirmDeleteExpense} color="error" variant="contained" autoFocus>
+                            Delete
+                        </Button>
+                    </DialogActions>
+                </Dialog>
 
-            {/* Delete Confirmation Dialog */}
-            <Dialog open={openDeleteConfirm} onClose={() => setOpenDeleteConfirm(false)}>
-                <DialogTitle>Delete Expense</DialogTitle>
-                <DialogContent>
-                    <Typography>
-                        Are you sure you want to delete this expense? This action cannot be undone.
-                    </Typography>
-                </DialogContent>
-                <DialogActions>
-                    <Button onClick={() => setOpenDeleteConfirm(false)}>Cancel</Button>
-                    <Button onClick={confirmDeleteExpense} color="error" variant="contained" autoFocus>
-                        Delete
-                    </Button>
-                </DialogActions>
-            </Dialog>
+                {/* Add Member Dialog */}
+                <Dialog open={openAddMember} onClose={() => setOpenAddMember(false)}>
+                    <DialogTitle>Add New Member</DialogTitle>
+                    <DialogContent>
+                        <TextField
+                            autoFocus
+                            margin="dense"
+                            id="email"
+                            label="Email Address"
+                            type="email"
+                            fullWidth
+                            variant="outlined"
+                            value={newMemberEmail}
+                            onChange={(e) => setNewMemberEmail(e.target.value)}
+                        />
+                    </DialogContent>
+                    <DialogActions>
+                        <Button onClick={() => setOpenAddMember(false)}>Cancel</Button>
+                        <Button onClick={handleAddMember} disabled={!newMemberEmail}>Add</Button>
+                    </DialogActions>
+                </Dialog>
 
-            {/* Add Member Dialog */}
-            <Dialog open={openAddMember} onClose={() => setOpenAddMember(false)}>
-                <DialogTitle>Add New Member</DialogTitle>
-                <DialogContent>
-                    <TextField
-                        autoFocus
-                        margin="dense"
-                        id="email"
-                        label="Email Address"
-                        type="email"
-                        fullWidth
-                        variant="outlined"
-                        value={newMemberEmail}
-                        onChange={(e) => setNewMemberEmail(e.target.value)}
-                    />
-                </DialogContent>
-                <DialogActions>
-                    <Button onClick={() => setOpenAddMember(false)}>Cancel</Button>
-                    <Button onClick={handleAddMember} disabled={!newMemberEmail}>Add</Button>
-                </DialogActions>
-            </Dialog>
-
-            {/* Edit Expense Dialog */}
-            <Dialog open={openEditExpense} onClose={() => setOpenEditExpense(false)}>
-                <DialogTitle>Edit Expense</DialogTitle>
-                <DialogContent>
-                    <TextField
-                        autoFocus
-                        margin="dense"
-                        id="description"
-                        label="Description"
-                        type="text"
-                        fullWidth
-                        variant="outlined"
-                        value={editDescription}
-                        onChange={(e) => setEditDescription(e.target.value)}
-                        sx={{ mb: 2 }}
-                    />
-                    <TextField
-                        margin="dense"
-                        id="amount"
-                        label="Amount"
-                        type="number"
-                        fullWidth
-                        variant="outlined"
-                        value={editAmount}
-                        onChange={(e) => setEditAmount(e.target.value)}
-                    />
-                </DialogContent>
-                <DialogActions>
-                    <Button onClick={() => setOpenEditExpense(false)}>Cancel</Button>
-                    <Button onClick={handleSaveEdit} variant="contained" color="primary">Save</Button>
-                </DialogActions>
-            </Dialog>
-        </main>
+                {/* Edit Expense Dialog */}
+                <Dialog open={openEditExpense} onClose={() => setOpenEditExpense(false)}>
+                    <DialogTitle>Edit Expense</DialogTitle>
+                    <DialogContent>
+                        <TextField
+                            autoFocus
+                            margin="dense"
+                            id="description"
+                            label="Description"
+                            type="text"
+                            fullWidth
+                            variant="outlined"
+                            value={editDescription}
+                            onChange={(e) => setEditDescription(e.target.value)}
+                            sx={{ mb: 2 }}
+                        />
+                        <TextField
+                            margin="dense"
+                            id="amount"
+                            label="Amount"
+                            type="number"
+                            fullWidth
+                            variant="outlined"
+                            value={editAmount}
+                            onChange={(e) => setEditAmount(e.target.value)}
+                        />
+                    </DialogContent>
+                    <DialogActions>
+                        <Button onClick={() => setOpenEditExpense(false)}>Cancel</Button>
+                        <Button onClick={handleSaveEdit} variant="contained" color="primary">Save</Button>
+                    </DialogActions>
+                </Dialog>
+            </main>
+        </AuthGuard>
     );
 }

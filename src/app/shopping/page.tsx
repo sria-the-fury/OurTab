@@ -23,6 +23,7 @@ import { useState, useEffect } from 'react';
 import { useAuth } from '@/components/AuthContext';
 import { useRouter } from 'next/navigation';
 import BottomNav from '@/components/BottomNav';
+import AuthGuard from '@/components/AuthGuard';
 import { useToast } from '@/components/ToastContext';
 import Checkbox from '@mui/material/Checkbox';
 import FormControlLabel from '@mui/material/FormControlLabel';
@@ -604,295 +605,297 @@ export default function Shopping() {
     };
 
     return (
-        <main>
-            <Navbar actions={
-                <IconButton onClick={handleOpenHistory} sx={{ color: 'black' }}>
-                    <HistoryIcon />
-                </IconButton>
-            } />
-            <Container maxWidth="sm" sx={{ mt: 4, mb: 10 }}>
-                <Typography variant="h4" component="h1" gutterBottom>
-                    Shopping List
-                </Typography>
+        <AuthGuard>
+            <main>
+                <Navbar actions={
+                    <IconButton onClick={handleOpenHistory} sx={{ color: 'black' }}>
+                        <HistoryIcon />
+                    </IconButton>
+                } />
+                <Container maxWidth="sm" sx={{ mt: 4, mb: 10 }}>
+                    <Typography variant="h4" component="h1" gutterBottom>
+                        Shopping List
+                    </Typography>
 
 
 
-                {/* Add Item Form */}
-                <Paper className="glass" sx={{ p: 3, mb: 3, background: 'transparent', boxShadow: 'none' }}>
-                    <Typography variant="h6" gutterBottom>Add Item</Typography>
-                    <Box component="form" onSubmit={handleAddItem}>
-                        <TextField
-                            label="Item Name"
-                            fullWidth
-                            required
-                            margin="normal"
-                            value={itemName}
-                            onChange={(e) => {
-                                const value = e.target.value;
-                                setItemName(value ? value.charAt(0).toUpperCase() + value.slice(1) : '');
-                            }}
-                            disabled={loading}
-                            placeholder="e.g., Milk, Bread, Eggs"
-                        />
-                        <TextField
-                            label={`Price (${getCurrencySymbol()})`}
-                            type="number"
-                            fullWidth
-                            required
-                            margin="normal"
-                            value={itemPrice}
-                            onChange={(e) => setItemPrice(e.target.value)}
-                            disabled={loading}
-                            inputProps={{ step: '0.01', min: '0' }}
-                        />
-                        <Button
-                            type="submit"
-                            variant="outlined"
-                            fullWidth
-                            sx={{ mt: 2 }}
-                            disabled={loading}
-                        >
-                            Add to List
-                        </Button>
-                    </Box>
-                </Paper>
-
-                {/* Items List */}
-                {items.length > 0 && (
+                    {/* Add Item Form */}
                     <Paper className="glass" sx={{ p: 3, mb: 3, background: 'transparent', boxShadow: 'none' }}>
-                        <Typography variant="h6" gutterBottom>Items ({items.length})</Typography>
-                        <List>
-                            {items.map((item, index) => (
-                                <div key={item.id}>
-                                    <ListItem
-                                        secondaryAction={
-                                            <IconButton edge="end" onClick={() => handleRemoveItem(item.id)} disabled={loading}>
-                                                <DeleteIcon />
-                                            </IconButton>
-                                        }
-                                    >
-                                        <ListItemText
-                                            primary={item.name}
-                                            secondary={`${getCurrencySymbol()}${Number(item.price).toFixed(2)}`}
-                                        />
-                                    </ListItem>
-                                    {index < items.length - 1 && <Divider />}
-                                </div>
-                            ))}
-                        </List>
-                        <Divider sx={{ my: 2 }} />
-                        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                            <Typography variant="h6">Total:</Typography>
-                            <Typography variant="h6" color="primary">
-                                {getCurrencySymbol()}{Number(total).toFixed(2)}
-                            </Typography>
-                        </Box>
-                    </Paper>
-                )}
-
-                {/* Contributor Selection */}
-                {items.length > 0 && groupMembers.length > 1 && (
-                    <Paper className="glass" sx={{ p: 3, mb: 3, background: 'transparent', boxShadow: 'none' }}>
-                        <Accordion defaultExpanded>
-                            <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                                    <PeopleIcon color="primary" />
-                                    <Typography variant="h6">Who's Contributing?</Typography>
-                                </Box>
-                            </AccordionSummary>
-                            <AccordionDetails>
-                                <Box sx={{ mb: 2 }}>
-                                    <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                                        Select house members who are contributing money for this purchase
-                                    </Typography>
-
-                                    {/* House Members */}
-                                    {houseMembers
-                                        .filter(member => member.email !== user?.email)
-                                        .map((member) => (
-                                            <Box key={member.email} sx={{ mb: 2 }}>
-                                                <FormControlLabel
-                                                    control={
-                                                        <Checkbox
-                                                            checked={selectedContributors.has(member.email)}
-                                                            onChange={() => handleContributorToggle(member.email)}
-                                                            disabled={loading}
-                                                        />
-                                                    }
-                                                    label={member.name || member.email.split('@')[0]}
-                                                />
-                                                {selectedContributors.has(member.email) && (
-                                                    <Box sx={{ pl: 4, pr: 0, mt: 1 }}>
-                                                        <TextField
-                                                            label={`Amount (${getCurrencySymbol()})`}
-                                                            type="number"
-                                                            size="small"
-                                                            fullWidth
-                                                            value={contributors[member.email] || ''}
-                                                            onChange={(e) => handleContributorAmountChange(member.email, e.target.value)}
-                                                            disabled={loading}
-                                                            inputProps={{ step: '0.01', min: '0' }}
-                                                        />
-                                                    </Box>
-                                                )}
-                                            </Box>
-                                        ))}
-
-                                    {/* My Contribution */}
-                                    <Divider sx={{ my: 2 }} />
-                                    <Box sx={{ mb: 2 }}>
-                                        <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
-                                            Your contribution:
-                                        </Typography>
-                                        <TextField
-                                            label={`My Amount (${getCurrencySymbol()})`}
-                                            type="number"
-                                            size="small"
-                                            fullWidth
-                                            value={myContribution}
-                                            onChange={(e) => setMyContribution(e.target.value)}
-                                            disabled={loading}
-                                            inputProps={{ step: '0.01', min: '0' }}
-                                        />
-                                    </Box>
-
-                                    {/* Quick Actions */}
-                                    <Box sx={{ display: 'flex', gap: 1, mb: 2 }}>
-                                        <Button
-                                            variant="outlined"
-                                            size="small"
-                                            onClick={handleSplitEqually}
-                                            disabled={loading || selectedContributors.size === 0}
-                                        >
-                                            Split Equally
-                                        </Button>
-                                        <Button
-                                            variant="outlined"
-                                            size="small"
-                                            onClick={handleIPayAll}
-                                            disabled={loading}
-                                        >
-                                            I'll Pay All
-                                        </Button>
-                                    </Box>
-
-                                    {/* Summary */}
-                                    <Box sx={{ p: 2, bgcolor: 'background.paper', borderRadius: 1 }}>
-                                        <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
-                                            <Typography variant="body2">Total:</Typography>
-                                            <Typography variant="body2" fontWeight="bold">
-                                                {getCurrencySymbol()}{Number(total).toFixed(2)}
-                                            </Typography>
-                                        </Box>
-                                        <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
-                                            <Typography variant="body2">Others' contributions:</Typography>
-                                            <Typography variant="body2">
-                                                {getCurrencySymbol()}{Number(totalContributions).toFixed(2)}
-                                            </Typography>
-                                        </Box>
-                                        <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
-                                            <Typography variant="body2">Your contribution:</Typography>
-                                            <Typography variant="body2">
-                                                {getCurrencySymbol()}{Number(myContributionNum).toFixed(2)}
-                                            </Typography>
-                                        </Box>
-                                        <Divider sx={{ my: 1 }} />
-                                        <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-                                            <Typography variant="body2" fontWeight="bold">
-                                                {remaining >= 0 ? 'Remaining:' : 'Over by:'}
-                                            </Typography>
-                                            <Typography
-                                                variant="body2"
-                                                fontWeight="bold"
-                                                color={remaining < -0.01 ? 'error' : remaining > 0.01 ? 'warning.main' : 'success.main'}
-                                            >
-                                                {getCurrencySymbol()}{Number(Math.abs(remaining)).toFixed(2)}
-                                            </Typography>
-                                        </Box>
-                                    </Box>
-
-                                    {remaining < -0.01 && (
-                                        <Typography variant="caption" color="error" sx={{ mt: 1, display: 'block' }}>
-                                            ⚠️ Contributions exceed total amount
-                                        </Typography>
-                                    )}
-                                    {remaining > 0.01 && (
-                                        <Typography variant="caption" color="warning.main" sx={{ mt: 1, display: 'block' }}>
-                                            ℹ️ You'll cover the remaining amount
-                                        </Typography>
-                                    )}
-                                </Box>
-                            </AccordionDetails>
-                        </Accordion>
-                    </Paper>
-                )}
-
-                {/* Submit Form */}
-                {items.length > 0 && (
-                    <Paper className="glass" sx={{ p: 3, background: 'transparent', boxShadow: 'none' }}>
-                        <Box component="form" onSubmit={handleSubmit}>
+                        <Typography variant="h6" gutterBottom>Add Item</Typography>
+                        <Box component="form" onSubmit={handleAddItem}>
                             <TextField
-                                label="Note (Optional)"
+                                label="Item Name"
                                 fullWidth
+                                required
                                 margin="normal"
-                                value={note}
-                                onChange={(e) => setNote(e.target.value)}
+                                value={itemName}
+                                onChange={(e) => {
+                                    const value = e.target.value;
+                                    setItemName(value ? value.charAt(0).toUpperCase() + value.slice(1) : '');
+                                }}
                                 disabled={loading}
-                                placeholder="e.g., Weekly groceries"
+                                placeholder="e.g., Milk, Bread, Eggs"
+                            />
+                            <TextField
+                                label={`Price (${getCurrencySymbol()})`}
+                                type="number"
+                                fullWidth
+                                required
+                                margin="normal"
+                                value={itemPrice}
+                                onChange={(e) => setItemPrice(e.target.value)}
+                                disabled={loading}
+                                inputProps={{ step: '0.01', min: '0' }}
                             />
                             <Button
                                 type="submit"
-                                variant="contained"
+                                variant="outlined"
                                 fullWidth
                                 sx={{ mt: 2 }}
                                 disabled={loading}
                             >
-                                {loading ? 'Submitting...' : 'Submit Shopping List'}
+                                Add to List
                             </Button>
                         </Box>
                     </Paper>
-                )}
 
-                {items.length === 0 && (
-                    <Box sx={{ textAlign: 'center', py: 4 }}>
-                        <Typography color="text.secondary">
-                            Add items to your shopping list to get started
-                        </Typography>
-                    </Box>
-                )}
-            </Container>
+                    {/* Items List */}
+                    {items.length > 0 && (
+                        <Paper className="glass" sx={{ p: 3, mb: 3, background: 'transparent', boxShadow: 'none' }}>
+                            <Typography variant="h6" gutterBottom>Items ({items.length})</Typography>
+                            <List>
+                                {items.map((item, index) => (
+                                    <div key={item.id}>
+                                        <ListItem
+                                            secondaryAction={
+                                                <IconButton edge="end" onClick={() => handleRemoveItem(item.id)} disabled={loading}>
+                                                    <DeleteIcon />
+                                                </IconButton>
+                                            }
+                                        >
+                                            <ListItemText
+                                                primary={item.name}
+                                                secondary={`${getCurrencySymbol()}${Number(item.price).toFixed(2)}`}
+                                            />
+                                        </ListItem>
+                                        {index < items.length - 1 && <Divider />}
+                                    </div>
+                                ))}
+                            </List>
+                            <Divider sx={{ my: 2 }} />
+                            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                <Typography variant="h6">Total:</Typography>
+                                <Typography variant="h6" color="primary">
+                                    {getCurrencySymbol()}{Number(total).toFixed(2)}
+                                </Typography>
+                            </Box>
+                        </Paper>
+                    )}
 
-            <Box sx={{ pb: 7 }}>
-                <BottomNav />
-            </Box>
+                    {/* Contributor Selection */}
+                    {items.length > 0 && houseMembers.length > 1 && (
+                        <Paper className="glass" sx={{ p: 3, mb: 3, background: 'transparent', boxShadow: 'none' }}>
+                            <Accordion defaultExpanded>
+                                <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+                                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                        <PeopleIcon color="primary" />
+                                        <Typography variant="h6">Who's Contributing?</Typography>
+                                    </Box>
+                                </AccordionSummary>
+                                <AccordionDetails>
+                                    <Box sx={{ mb: 2 }}>
+                                        <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                                            Select house members who are contributing money for this purchase
+                                        </Typography>
 
-            {/* History Dialog */}
-            <Dialog open={openHistory} onClose={() => setOpenHistory(false)} fullWidth>
-                <DialogTitle>Monthly History</DialogTitle>
-                <DialogContent>
-                    <List>
-                        {Object.keys(monthlyExpenses).map(month => (
-                            <ListItem key={month} secondaryAction={
-                                <IconButton edge="end" onClick={() => downloadPDF(month)}>
-                                    <DownloadIcon />
-                                </IconButton>
-                            }>
-                                <ListItemText
-                                    primary={month}
-                                    secondary={`Total: ${getCurrencySymbol()}${monthlyExpenses[month].reduce((sum, e: any) => sum + e.amount, 0).toFixed(2)}`}
+                                        {/* House Members */}
+                                        {houseMembers
+                                            .filter(member => member.email !== user?.email)
+                                            .map((member) => (
+                                                <Box key={member.email} sx={{ mb: 2 }}>
+                                                    <FormControlLabel
+                                                        control={
+                                                            <Checkbox
+                                                                checked={selectedContributors.has(member.email)}
+                                                                onChange={() => handleContributorToggle(member.email)}
+                                                                disabled={loading}
+                                                            />
+                                                        }
+                                                        label={member.name || member.email.split('@')[0]}
+                                                    />
+                                                    {selectedContributors.has(member.email) && (
+                                                        <Box sx={{ pl: 4, pr: 0, mt: 1 }}>
+                                                            <TextField
+                                                                label={`Amount (${getCurrencySymbol()})`}
+                                                                type="number"
+                                                                size="small"
+                                                                fullWidth
+                                                                value={contributors[member.email] || ''}
+                                                                onChange={(e) => handleContributorAmountChange(member.email, e.target.value)}
+                                                                disabled={loading}
+                                                                inputProps={{ step: '0.01', min: '0' }}
+                                                            />
+                                                        </Box>
+                                                    )}
+                                                </Box>
+                                            ))}
+
+                                        {/* My Contribution */}
+                                        <Divider sx={{ my: 2 }} />
+                                        <Box sx={{ mb: 2 }}>
+                                            <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+                                                Your contribution:
+                                            </Typography>
+                                            <TextField
+                                                label={`My Amount (${getCurrencySymbol()})`}
+                                                type="number"
+                                                size="small"
+                                                fullWidth
+                                                value={myContribution}
+                                                onChange={(e) => setMyContribution(e.target.value)}
+                                                disabled={loading}
+                                                inputProps={{ step: '0.01', min: '0' }}
+                                            />
+                                        </Box>
+
+                                        {/* Quick Actions */}
+                                        <Box sx={{ display: 'flex', gap: 1, mb: 2 }}>
+                                            <Button
+                                                variant="outlined"
+                                                size="small"
+                                                onClick={handleSplitEqually}
+                                                disabled={loading || selectedContributors.size === 0}
+                                            >
+                                                Split Equally
+                                            </Button>
+                                            <Button
+                                                variant="outlined"
+                                                size="small"
+                                                onClick={handleIPayAll}
+                                                disabled={loading}
+                                            >
+                                                I'll Pay All
+                                            </Button>
+                                        </Box>
+
+                                        {/* Summary */}
+                                        <Box sx={{ p: 2, bgcolor: 'background.paper', borderRadius: 1 }}>
+                                            <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
+                                                <Typography variant="body2">Total:</Typography>
+                                                <Typography variant="body2" fontWeight="bold">
+                                                    {getCurrencySymbol()}{Number(total).toFixed(2)}
+                                                </Typography>
+                                            </Box>
+                                            <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
+                                                <Typography variant="body2">Others' contributions:</Typography>
+                                                <Typography variant="body2">
+                                                    {getCurrencySymbol()}{Number(totalContributions).toFixed(2)}
+                                                </Typography>
+                                            </Box>
+                                            <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
+                                                <Typography variant="body2">Your contribution:</Typography>
+                                                <Typography variant="body2">
+                                                    {getCurrencySymbol()}{Number(myContributionNum).toFixed(2)}
+                                                </Typography>
+                                            </Box>
+                                            <Divider sx={{ my: 1 }} />
+                                            <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                                                <Typography variant="body2" fontWeight="bold">
+                                                    {remaining >= 0 ? 'Remaining:' : 'Over by:'}
+                                                </Typography>
+                                                <Typography
+                                                    variant="body2"
+                                                    fontWeight="bold"
+                                                    color={remaining < -0.01 ? 'error' : remaining > 0.01 ? 'warning.main' : 'success.main'}
+                                                >
+                                                    {getCurrencySymbol()}{Number(Math.abs(remaining)).toFixed(2)}
+                                                </Typography>
+                                            </Box>
+                                        </Box>
+
+                                        {remaining < -0.01 && (
+                                            <Typography variant="caption" color="error" sx={{ mt: 1, display: 'block' }}>
+                                                ⚠️ Contributions exceed total amount
+                                            </Typography>
+                                        )}
+                                        {remaining > 0.01 && (
+                                            <Typography variant="caption" color="warning.main" sx={{ mt: 1, display: 'block' }}>
+                                                ℹ️ You'll cover the remaining amount
+                                            </Typography>
+                                        )}
+                                    </Box>
+                                </AccordionDetails>
+                            </Accordion>
+                        </Paper>
+                    )}
+
+                    {/* Submit Form */}
+                    {items.length > 0 && (
+                        <Paper className="glass" sx={{ p: 3, background: 'transparent', boxShadow: 'none' }}>
+                            <Box component="form" onSubmit={handleSubmit}>
+                                <TextField
+                                    label="Note (Optional)"
+                                    fullWidth
+                                    margin="normal"
+                                    value={note}
+                                    onChange={(e) => setNote(e.target.value)}
+                                    disabled={loading}
+                                    placeholder="e.g., Weekly groceries"
                                 />
-                            </ListItem>
-                        ))}
-                        {Object.keys(monthlyExpenses).length === 0 && (
-                            <Typography sx={{ p: 2, textAlign: 'center' }}>No history available</Typography>
-                        )}
-                    </List>
-                </DialogContent>
-                <DialogActions>
-                    <Button onClick={() => setOpenHistory(false)}>Close</Button>
-                </DialogActions>
-            </Dialog>
-        </main>
+                                <Button
+                                    type="submit"
+                                    variant="contained"
+                                    fullWidth
+                                    sx={{ mt: 2 }}
+                                    disabled={loading}
+                                >
+                                    {loading ? 'Submitting...' : 'Submit Shopping List'}
+                                </Button>
+                            </Box>
+                        </Paper>
+                    )}
+
+                    {items.length === 0 && (
+                        <Box sx={{ textAlign: 'center', py: 4 }}>
+                            <Typography color="text.secondary">
+                                Add items to your shopping list to get started
+                            </Typography>
+                        </Box>
+                    )}
+                </Container>
+
+                <Box sx={{ pb: 7 }}>
+                    <BottomNav />
+                </Box>
+
+                {/* History Dialog */}
+                <Dialog open={openHistory} onClose={() => setOpenHistory(false)} fullWidth>
+                    <DialogTitle>Monthly History</DialogTitle>
+                    <DialogContent>
+                        <List>
+                            {Object.keys(monthlyExpenses).map(month => (
+                                <ListItem key={month} secondaryAction={
+                                    <IconButton edge="end" onClick={() => downloadPDF(month)}>
+                                        <DownloadIcon />
+                                    </IconButton>
+                                }>
+                                    <ListItemText
+                                        primary={month}
+                                        secondary={`Total: ${getCurrencySymbol()}${monthlyExpenses[month].reduce((sum, e: any) => sum + e.amount, 0).toFixed(2)}`}
+                                    />
+                                </ListItem>
+                            ))}
+                            {Object.keys(monthlyExpenses).length === 0 && (
+                                <Typography sx={{ p: 2, textAlign: 'center' }}>No history available</Typography>
+                            )}
+                        </List>
+                    </DialogContent>
+                    <DialogActions>
+                        <Button onClick={() => setOpenHistory(false)}>Close</Button>
+                    </DialogActions>
+                </Dialog>
+            </main>
+        </AuthGuard>
     );
 }
 

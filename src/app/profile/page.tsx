@@ -15,6 +15,7 @@ import BottomNav from '@/components/BottomNav';
 import Loader from '@/components/Loader';
 import Paper from '@mui/material/Paper';
 import { useRouter } from 'next/navigation';
+import AuthGuard from '@/components/AuthGuard';
 
 interface House {
     id: string;
@@ -98,41 +99,37 @@ export default function Profile() {
         setLoading(false);
     };
 
-    useEffect(() => {
-        if (!authLoading && !user) {
-            router.push('/');
-        }
-    }, [user, authLoading, router]);
 
     if (authLoading) return <Loader />;
     if (!user) return null;
 
     return (
-        <main>
-            <Navbar />
-            <Container maxWidth="sm" sx={{ mt: 4 }}>
-                <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-                    <Avatar src={user.photoURL || ''} sx={{ width: 100, height: 100, mb: 2 }} />
-                    <Typography variant="h5">{user.displayName}</Typography>
-                    <Typography color="text.secondary" gutterBottom>{user.email}</Typography>
+        <AuthGuard>
+            <main>
+                <Navbar />
+                <Container maxWidth="sm" sx={{ mt: 4 }}>
+                    <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                        <Avatar src={user.photoURL || ''} sx={{ width: 100, height: 100, mb: 2 }} />
+                        <Typography variant="h5">{user.displayName}</Typography>
+                        <Typography color="text.secondary" gutterBottom>{user.email}</Typography>
 
-                    <Button variant="outlined" color="error" onClick={logout} sx={{ mt: 2 }}>
-                        Logout
-                    </Button>
-                </Box>
+                        <Button variant="outlined" color="error" onClick={logout} sx={{ mt: 2 }}>
+                            Logout
+                        </Button>
+                    </Box>
 
-                <Box sx={{ mt: 6 }}>
-                    <Typography variant="h6" gutterBottom>My House</Typography>
+                    <Box sx={{ mt: 6 }}>
+                        <Typography variant="h6" gutterBottom>My House</Typography>
 
-                    {hasHouse && houseDetails ? (
-                        <Paper className="glass" sx={{ p: 3, background: 'transparent', boxShadow: 'none' }}>
-                            <Typography variant="h6" color="primary" gutterBottom>
-                                {houseDetails.name}
-                            </Typography>
-                            <Typography variant="body1" color="text.secondary">
-                                <strong>Currency:</strong> {houseDetails.currency || 'Not set'}
-                            </Typography>
-                            <Button
+                        {hasHouse && houseDetails ? (
+                            <Paper className="glass" sx={{ p: 3, background: 'transparent', boxShadow: 'none' }}>
+                                <Typography variant="h6" color="primary" gutterBottom>
+                                    {houseDetails.name}
+                                </Typography>
+                                <Typography variant="body1" color="text.secondary">
+                                    <strong>Currency:</strong> {houseDetails.currency || 'Not set'}
+                                </Typography>
+                                {/* <Button
                                 variant="text"
                                 color="error"
                                 size="small"
@@ -140,45 +137,46 @@ export default function Profile() {
                                 sx={{ mt: 2 }}
                             >
                                 Delete House
-                            </Button>
-                        </Paper>
-                    ) : (
-                        <Paper className="glass" sx={{ p: 3, background: 'transparent', boxShadow: 'none' }}>
-                            <Typography gutterBottom>You are not in a house yet.</Typography>
-                            <form onSubmit={handleCreateHouse}>
-                                <TextField
-                                    label="House Name"
-                                    fullWidth
-                                    value={houseName}
-                                    onChange={(e) => setHouseName(e.target.value)}
-                                    required
-                                    sx={{ mb: 2 }}
-                                />
-                                <TextField
-                                    select
-                                    label="Default Currency"
-                                    value={currency}
-                                    onChange={handleCurrencyChange}
-                                    fullWidth
-                                    variant="outlined"
-                                    sx={{ mb: 2 }}
-                                >
-                                    <MenuItem value="USD">Dollar ($)</MenuItem>
-                                    <MenuItem value="EUR">Euro (€)</MenuItem>
-                                    <MenuItem value="BDT">Bangladeshi Taka (৳)</MenuItem>
-                                </TextField>
-                                <Button type="submit" variant="contained" disabled={loading}>
-                                    Create House
-                                </Button>
-                            </form>
-                        </Paper>
-                    )}
+                            </Button> */}
+                            </Paper>
+                        ) : (
+                            <Paper className="glass" sx={{ p: 3, background: 'transparent', boxShadow: 'none' }}>
+                                <Typography gutterBottom>You are not in a house yet.</Typography>
+                                <form onSubmit={handleCreateHouse}>
+                                    <TextField
+                                        label="House Name"
+                                        fullWidth
+                                        value={houseName}
+                                        onChange={(e) => setHouseName(e.target.value)}
+                                        required
+                                        sx={{ mb: 2 }}
+                                    />
+                                    <TextField
+                                        select
+                                        label="Default Currency"
+                                        value={currency}
+                                        onChange={handleCurrencyChange}
+                                        fullWidth
+                                        variant="outlined"
+                                        sx={{ mb: 2 }}
+                                    >
+                                        <MenuItem value="USD">Dollar ($)</MenuItem>
+                                        <MenuItem value="EUR">Euro (€)</MenuItem>
+                                        <MenuItem value="BDT">Bangladeshi Taka (৳)</MenuItem>
+                                    </TextField>
+                                    <Button type="submit" variant="contained" disabled={loading}>
+                                        Create House
+                                    </Button>
+                                </form>
+                            </Paper>
+                        )}
+                    </Box>
+                </Container>
+                <Box sx={{ pb: 7 }}>
+                    <BottomNav />
                 </Box>
-            </Container>
-            <Box sx={{ pb: 7 }}>
-                <BottomNav />
-            </Box>
-        </main >
+            </main>
+        </AuthGuard>
     );
 }
 
