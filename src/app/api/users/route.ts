@@ -5,7 +5,7 @@ import { adminDb } from '@/lib/firebaseAdmin';
 export async function POST(request: Request) {
     try {
         const body = await request.json();
-        const { email, name, photoUrl, currency } = body;
+        const { email, name, photoUrl, currency, iban } = body;
 
         if (!email) {
             return NextResponse.json({ error: 'Email is required' }, { status: 400 });
@@ -14,11 +14,12 @@ export async function POST(request: Request) {
         const userRef = adminDb.collection('users').doc(email);
         const userSnap = await userRef.get();
 
-        let userData: { email: any; name?: any; photoUrl?: any; currency?: any } = { email };
+        let userData: { email: any; name?: any; photoUrl?: any; currency?: any; iban?: any } = { email };
 
         if (name !== undefined) userData.name = name;
         if (photoUrl !== undefined) userData.photoUrl = photoUrl;
         if (currency) userData.currency = currency;
+        if (iban !== undefined) userData.iban = iban;
 
         if (userSnap.exists) {
             const existing = userSnap.data()!;

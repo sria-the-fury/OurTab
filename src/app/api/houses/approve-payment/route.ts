@@ -1,0 +1,75 @@
+import { NextResponse } from 'next/server';
+import { adminDb } from '@/lib/firebaseAdmin';
+import { FieldValue } from 'firebase-admin/firestore';
+
+// POST: Approve a pending payment — records it as a settled expense
+export async function POST(request: Request) {
+    try {
+        const body = await request.json();
+        const { houseId, paymentId, approverEmail } = body;
+
+        if (!houseId || !paymentId || !approverEmail) {
+            return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
+        }
+
+        const houseRef = adminDb.collection('groups').doc(houseId);
+        const houseSnap = await houseRef.get();
+
+        if (!houseSnap.exists) {
+            return NextResponse.json({ error: 'House not found' }, { status: 404 });
+        }
+
+        const houseData = houseSnap.data()!;
+        const pendingPayments: any[] = houseData.pendingPayments || [];
+
+        const paymentIndex = pendingPayments.findIndex((p: any) => p.id === paymentId);
+        if (paymentIndex === -1) {
+            return NextResponse.json({ error: 'Payment not found' }, { status: 404 });
+        }
+
+        const payment = pendingPayments[paymentIndex];
+
+        // Only the receiver can approve
+        if (payment.to !== approverEmail) {
+            return NextResponse.json({ error: 'Only the receiver can approve a payment' }, { status: 403 });
+        }
+
+        if (payment.status !== 'pending') {
+            return NextResponse.json({ error: 'Payment is not pending' }, { status: 400 });
+        }
+
+        // Mark payment as approved
+        const updatedPayments = [...pendingPayments];
+        updatedPayments[paymentIndex] = { ...payment, status: 'approved', approvedAt: new Date().toISOString() };
+
+        // Record as a real expense:
+        // Payer (payment.from) paid the full amount. The only person who "benefits" from this split is the receiver (payment.to).
+        // By splitting only between the two, the receiver's debt drops by the amount, and the payer's balance increases correctly.
+        // We record it as: payer paid, only payer+receiver are split (i.e. it's a transfer).
+        // Actually simplest: we create a "settlement" expense where the contributor is the payer and we mark it as a payment.
+        const now = new Date().toISOString();
+        const members = houseData.members || [];
+        await adminDb.collection('expenses').add({
+            description: `Settlement payment`,
+            amount: payment.amount,
+            userId: payment.from,
+            groupId: houseId,
+            date: now,
+            isSettlementPayment: true,
+            method: payment.method || 'bank',
+            settlementBetween: [payment.from, payment.to],
+            contributors: [{ email: payment.from, amount: payment.amount }],
+            createdAt: now,
+        });
+
+        // Update the house with the approved payment
+        await houseRef.update({
+            pendingPayments: updatedPayments,
+        });
+
+        return NextResponse.json({ success: true });
+    } catch (error) {
+        console.error('Error approving payment:', error);
+        return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
+    }
+}

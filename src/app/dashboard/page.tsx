@@ -8,6 +8,8 @@ import Box from '@mui/material/Box';
 import Paper from '@mui/material/Paper';
 import Grid from '@mui/material/Grid';
 import Button from '@mui/material/Button';
+import Chip from '@mui/material/Chip';
+import Alert from '@mui/material/Alert';
 import AddIcon from '@mui/icons-material/Add';
 import AttachMoneyIcon from '@mui/icons-material/AttachMoney';
 import EuroIcon from '@mui/icons-material/Euro';
@@ -24,7 +26,6 @@ import { useToast } from '@/components/ToastContext';
 import Loader from '@/components/Loader';
 import BottomNav from '@/components/BottomNav';
 import AuthGuard from '@/components/AuthGuard';
-import Chip from '@mui/material/Chip';
 import Avatar from '@mui/material/Avatar';
 import Dialog from '@mui/material/Dialog';
 import DialogActions from '@mui/material/DialogActions';
@@ -32,8 +33,10 @@ import DialogContent from '@mui/material/DialogContent';
 import DialogTitle from '@mui/material/DialogTitle';
 import TextField from '@mui/material/TextField';
 import PersonAddIcon from '@mui/icons-material/PersonAdd';
+import PaymentsIcon from '@mui/icons-material/Payments';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
+import HowToVoteIcon from '@mui/icons-material/HowToVote';
 import FormatListBulletedIcon from '@mui/icons-material/FormatListBulleted';
 
 interface House {
@@ -51,6 +54,8 @@ interface Expense {
     houseId: string;
     date: string;
     contributors?: Array<{ email: string; amount: number }>;
+    isSettlementPayment?: boolean;
+    settlementBetween?: string[];
 }
 
 export default function Dashboard() {
@@ -98,11 +103,18 @@ export default function Dashboard() {
     const [editDescription, setEditDescription] = useState('');
     const [showAllExpenses, setShowAllExpenses] = useState(false);
 
+    // Settle Money state
+    const [openPayDialog, setOpenPayDialog] = useState(false);
+    const [paySettlement, setPaySettlement] = useState<{ from: string; to: string; amount: number } | null>(null);
+    const [payAmount, setPayAmount] = useState('');
+    const [payMethod, setPayMethod] = useState<'cash' | 'bank'>('bank');
+
     // Calculate totals when expenses change
     useEffect(() => {
         if (expenses) {
-            const total = expenses.reduce((sum: number, exp: Expense) => sum + exp.amount, 0);
-            const myTotal = expenses
+            const regularExpenses = expenses.filter((e: Expense) => !e.isSettlementPayment);
+            const total = regularExpenses.reduce((sum: number, exp: Expense) => sum + exp.amount, 0);
+            const myTotal = regularExpenses
                 .filter((exp: Expense) => exp.userId === user?.email)
                 .reduce((sum: number, exp: Expense) => sum + exp.amount, 0);
 
@@ -227,7 +239,9 @@ export default function Dashboard() {
     });
 
     // Calculate totals based on filtered expenses
-    const totalFilteredExpenses = filteredExpenses.reduce((sum, exp) => sum + exp.amount, 0);
+    const totalFilteredExpenses = filteredExpenses
+        .filter(exp => !exp.isSettlementPayment)
+        .reduce((sum, exp) => sum + exp.amount, 0);
 
     // Calculate my actual expenses accounting for contributors
     const myFilteredExpenses = (() => {
@@ -236,13 +250,14 @@ export default function Dashboard() {
         const numMembers = house.members.length;
         let myTotal = 0;
 
-        filteredExpenses.forEach((exp: Expense) => {
+        const regularFilteredExpenses = filteredExpenses.filter((e: Expense) => !e.isSettlementPayment);
+
+        regularFilteredExpenses.forEach((exp: Expense) => {
             // Calculate my share of this expense
             const myShare = exp.amount / numMembers;
             myTotal += myShare;
         });
 
-        return myTotal;
         return myTotal;
     })();
 
@@ -256,8 +271,17 @@ export default function Dashboard() {
         // Initialize 0 balance for all members
         members.forEach(m => memberBalances[m.email] = 0);
 
-        // Process each expense
-        filteredExpenses.forEach((exp: Expense) => {
+        // Process all expenses so payments and debts cancel out accurately over time
+        expenses.forEach((exp: Expense) => {
+            if (exp.isSettlementPayment && exp.settlementBetween && exp.settlementBetween.length === 2) {
+                // Settlement payment — only affects the two members involved
+                const [payer, receiver] = [exp.userId, exp.settlementBetween.find(e => e !== exp.userId)!];
+                if (memberBalances[payer] !== undefined) memberBalances[payer] += exp.amount;
+                else memberBalances[payer] = exp.amount;
+                if (memberBalances[receiver] !== undefined) memberBalances[receiver] -= exp.amount;
+                else memberBalances[receiver] = -exp.amount;
+                return;
+            }
             if (exp.contributors && exp.contributors.length > 0) {
                 // Expense has contributors - track who paid what
                 let contributorTotal = 0;
@@ -344,7 +368,7 @@ export default function Dashboard() {
         }
 
         return calculatedSettlements;
-    }, [house, filteredExpenses]);
+    }, [house, expenses]);
 
 
 
@@ -550,17 +574,78 @@ export default function Dashboard() {
 
                     </Grid>
 
-                    {/* Settlements Widget - KEEP AS IS (Usually settles all time, or maybe just this month? 
-                    settlements are usually running totals, but for now let's keep it simple and maybe warn user it's all time 
-                    OR filter it too? 
-                    Actually, settlements should probably be ALL time to be correct mathematically for "owing". 
-                    If we filter by month, it just shows who paid what THIS month, not who owes who overall. 
-                    Let's use filteredExpenses for settlements to show "Monthly Logic" as requested, 
-                    OR keep it global. 
-                    User asked for "previous months expenses". 
-                    I'll use filteredExpenses so it shows the settlement status FOR THAT MONTH.
-                */}
-                    {house && filteredExpenses.length > 0 && house.members && house.members.length > 1 && (
+                    {/* Pending Payment Requests (Receiver View) */}
+                    {house && (() => {
+                        const myPending = (house.pendingPayments || []).filter(
+                            p => p.to === user?.email && p.status === 'pending'
+                        );
+                        if (myPending.length === 0) return null;
+                        const houseMembers = house.members || [];
+                        return (
+                            <Box sx={{ mt: 4 }}>
+                                <Typography variant="h6" gutterBottom>Incoming Payment Requests</Typography>
+                                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                                    {myPending.map(payment => {
+                                        const fromMember = houseMembers.find(m => m.email === payment.from);
+                                        const fromName = fromMember?.name || payment.from.split('@')[0];
+                                        return (
+                                            <Alert
+                                                key={payment.id}
+                                                severity="info"
+                                                action={
+                                                    <Button
+                                                        color="inherit"
+                                                        size="small"
+                                                        startIcon={<HowToVoteIcon />}
+                                                        onClick={async () => {
+                                                            try {
+                                                                const res = await fetch('/api/houses/approve-payment', {
+                                                                    method: 'POST',
+                                                                    headers: { 'Content-Type': 'application/json' },
+                                                                    body: JSON.stringify({
+                                                                        houseId: house.id,
+                                                                        paymentId: payment.id,
+                                                                        approverEmail: user?.email,
+                                                                    }),
+                                                                });
+                                                                if (res.ok) {
+                                                                    showToast('Payment approved! Settlement updated.', 'success');
+                                                                    mutateHouse();
+                                                                    mutateExpenses();
+                                                                } else {
+                                                                    const d = await res.json();
+                                                                    showToast(d.error || 'Failed to approve', 'error');
+                                                                }
+                                                            } catch {
+                                                                showToast('Error approving payment', 'error');
+                                                            }
+                                                        }}
+                                                    >
+                                                        Approve
+                                                    </Button>
+                                                }
+                                            >
+                                                <strong>{fromName}</strong> says he paid you{' '}
+                                                <strong>{displayCurrency}{payment.amount.toFixed(2)}</strong>
+                                                {payment.method && (
+                                                    <Chip
+                                                        label={payment.method === 'cash' ? '💵 Cash' : '🏦 Bank'}
+                                                        size="small"
+                                                        variant="outlined"
+                                                        sx={{ ml: 1, verticalAlign: 'middle', fontSize: '0.7rem' }}
+                                                    />
+                                                )}.{' '}
+                                                Approve to update the settlement.
+                                            </Alert>
+                                        );
+                                    })}
+                                </Box>
+                            </Box>
+                        );
+                    })()}
+
+                    {/* Settlements Widget */}
+                    {house && expenses.length > 0 && house.members && house.members.length > 1 && (
                         <Box sx={{ mt: 4 }}>
                             <Typography variant="h6" gutterBottom>Settlements (Who owes whom)</Typography>
                             <Grid container spacing={2}>
@@ -580,37 +665,72 @@ export default function Dashboard() {
                                         const isCurrentUserPayer = settlement.from === user?.email;
                                         const isCurrentUserReceiver = settlement.to === user?.email;
 
+                                        // Check if current user has a pending payment request for this pair
+                                        const hasPendingRequest = (house.pendingPayments || []).some(
+                                            p => p.from === settlement.from && p.to === settlement.to && p.status === 'pending'
+                                        );
+
+                                        // IBAN of receiver (available from member data fetched via my-house API)
+                                        const toUserIban = (toMember as any)?.iban;
+
                                         let message;
                                         if (isCurrentUserPayer) {
                                             message = (
                                                 <Typography variant="body1">
-                                                    <strong>You</strong> will pay <strong>{toName}</strong>
+                                                    <strong>You</strong> owe <strong>{toName}</strong>
                                                 </Typography>
                                             );
                                         } else if (isCurrentUserReceiver) {
                                             message = (
                                                 <Typography variant="body1">
-                                                    <strong>You</strong> will get from <strong>{fromName}</strong>
+                                                    <strong>{fromName}</strong> owes <strong>you</strong>
                                                 </Typography>
                                             );
                                         } else {
                                             message = (
                                                 <Typography variant="body1">
-                                                    <strong>{fromName}</strong> will pay <strong>{toName}</strong>
+                                                    <strong>{fromName}</strong> owes <strong>{toName}</strong>
                                                 </Typography>
                                             );
                                         }
 
                                         return (
                                             <Grid size={{ xs: 12, md: 6 }} key={`${settlement.from}-${settlement.to}-${settlement.amount}-${index}`}>
-                                                <Paper className="glass" sx={{ p: 2, background: 'transparent', borderLeft: '4px solid #6C63FF' }}>
-                                                    <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                                                <Paper className="glass" sx={{ p: 2, background: 'transparent', borderLeft: `4px solid ${isCurrentUserPayer ? '#ff9800' : isCurrentUserReceiver ? '#4caf50' : '#6C63FF'}` }}>
+                                                    <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 1 }}>
                                                         <Box>
                                                             {message}
+                                                            {isCurrentUserPayer && toUserIban && (
+                                                                <Typography variant="caption" color="text.secondary" sx={{ fontFamily: 'monospace', display: 'block', mt: 0.5 }}>
+                                                                    IBAN: {toUserIban}
+                                                                </Typography>
+                                                            )}
                                                         </Box>
-                                                        <Typography variant="h6" color="primary" sx={{ fontWeight: 'bold' }}>
-                                                            {displayCurrency}{settlement.amount.toFixed(2)}
-                                                        </Typography>
+                                                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                                            <Typography variant="h6" color="primary" sx={{ fontWeight: 'bold' }}>
+                                                                {displayCurrency}{settlement.amount.toFixed(2)}
+                                                            </Typography>
+                                                            {isCurrentUserPayer && (
+                                                                hasPendingRequest ? (
+                                                                    <Chip label="Pending approval" size="small" color="warning" variant="outlined" />
+                                                                ) : (
+                                                                    <Button
+                                                                        variant="contained"
+                                                                        size="small"
+                                                                        startIcon={<PaymentsIcon />}
+                                                                        color="success"
+                                                                        onClick={() => {
+                                                                            setPaySettlement(settlement);
+                                                                            setPayAmount(settlement.amount.toFixed(2));
+                                                                            setPayMethod('bank');
+                                                                            setOpenPayDialog(true);
+                                                                        }}
+                                                                    >
+                                                                        Pay Now
+                                                                    </Button>
+                                                                )
+                                                            )}
+                                                        </Box>
                                                     </Box>
                                                 </Paper>
                                             </Grid>
@@ -621,6 +741,7 @@ export default function Dashboard() {
                         </Box>
                     )}
 
+
                     <Box sx={{ mt: 4 }}>
                         <Typography variant="h6" gutterBottom>Expenses for {selectedDate.toLocaleString('default', { month: 'long' })}</Typography>
                         {filteredExpenses.length === 0 ? (
@@ -628,7 +749,9 @@ export default function Dashboard() {
                         ) : (
                             <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
                                 {(() => {
-                                    const sortedExpenses = [...filteredExpenses].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+                                    const sortedExpenses = [...filteredExpenses]
+                                        .filter((e: any) => !e.isSettlementPayment)
+                                        .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
                                     const displayedExpenses = showAllExpenses ? sortedExpenses : sortedExpenses.slice(0, 5);
 
                                     return displayedExpenses.map((expense) => {
@@ -774,6 +897,104 @@ export default function Dashboard() {
                     <DialogActions>
                         <Button onClick={() => setOpenEditExpense(false)}>Cancel</Button>
                         <Button onClick={handleSaveEdit} variant="contained" color="primary">Save</Button>
+                    </DialogActions>
+                </Dialog>
+
+                {/* Pay Now Confirmation Dialog */}
+                <Dialog open={openPayDialog} onClose={() => setOpenPayDialog(false)} fullWidth maxWidth="xs">
+                    <DialogTitle>Confirm Payment</DialogTitle>
+                    <DialogContent>
+                        {paySettlement && (() => {
+                            const toMember = house?.members?.find(m => m.email === paySettlement.to);
+                            const toName = toMember?.name || paySettlement.to.split('@')[0];
+                            return (
+                                <Box sx={{ pt: 1, display: 'flex', flexDirection: 'column', gap: 2 }}>
+                                    <Typography>
+                                        Paying <strong>{toName}</strong>
+                                    </Typography>
+
+                                    {/* Manual amount input */}
+                                    <TextField
+                                        label="Amount"
+                                        type="number"
+                                        fullWidth
+                                        value={payAmount}
+                                        onChange={(e) => setPayAmount(e.target.value)}
+                                        inputProps={{ min: 0, step: '0.01' }}
+                                        InputProps={{
+                                            startAdornment: (
+                                                <Box component="span" sx={{ mr: 0.5, color: 'text.secondary' }}>{displayCurrency}</Box>
+                                            ),
+                                        }}
+                                    />
+
+                                    {/* Payment method tags */}
+                                    <Box>
+                                        <Typography variant="caption" color="text.secondary" sx={{ mb: 1, display: 'block' }}>Payment method</Typography>
+                                        <Box sx={{ display: 'flex', gap: 1 }}>
+                                            <Chip
+                                                label="🏦 Bank"
+                                                clickable
+                                                color={payMethod === 'bank' ? 'primary' : 'default'}
+                                                variant={payMethod === 'bank' ? 'filled' : 'outlined'}
+                                                onClick={() => setPayMethod('bank')}
+                                                sx={{ fontWeight: payMethod === 'bank' ? 'bold' : 'normal' }}
+                                            />
+                                            <Chip
+                                                label="💵 Cash"
+                                                clickable
+                                                color={payMethod === 'cash' ? 'success' : 'default'}
+                                                variant={payMethod === 'cash' ? 'filled' : 'outlined'}
+                                                onClick={() => setPayMethod('cash')}
+                                                sx={{ fontWeight: payMethod === 'cash' ? 'bold' : 'normal' }}
+                                            />
+                                        </Box>
+                                    </Box>
+
+                                    <Typography variant="body2" color="text.secondary">
+                                        {toName} will receive a notification to approve. Once approved, the settlement will update automatically.
+                                    </Typography>
+                                </Box>
+                            );
+                        })()}
+                    </DialogContent>
+                    <DialogActions>
+                        <Button onClick={() => setOpenPayDialog(false)}>Cancel</Button>
+                        <Button
+                            variant="contained"
+                            color="success"
+                            startIcon={<PaymentsIcon />}
+                            disabled={!payAmount || Number(payAmount) <= 0}
+                            onClick={async () => {
+                                if (!paySettlement || !house || !user?.email) return;
+                                try {
+                                    const res = await fetch('/api/houses/request-payment', {
+                                        method: 'POST',
+                                        headers: { 'Content-Type': 'application/json' },
+                                        body: JSON.stringify({
+                                            houseId: house.id,
+                                            fromEmail: user.email,
+                                            toEmail: paySettlement.to,
+                                            amount: Number(payAmount),
+                                            method: payMethod,
+                                        }),
+                                    });
+                                    const data = await res.json();
+                                    if (res.ok) {
+                                        showToast('Payment request sent! Waiting for approval.', 'success');
+                                        mutateHouse();
+                                        setOpenPayDialog(false);
+                                        setPaySettlement(null);
+                                    } else {
+                                        showToast(data.error || 'Failed to send payment request', 'error');
+                                    }
+                                } catch {
+                                    showToast('Error sending payment request', 'error');
+                                }
+                            }}
+                        >
+                            Confirm Payment
+                        </Button>
                     </DialogActions>
                 </Dialog>
             </main>

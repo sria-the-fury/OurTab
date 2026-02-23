@@ -6,6 +6,7 @@ import Typography from '@mui/material/Typography';
 import Box from '@mui/material/Box';
 import Avatar from '@mui/material/Avatar';
 import Button from '@mui/material/Button';
+import IconButton from '@mui/material/IconButton';
 import TextField from '@mui/material/TextField';
 import MenuItem from '@mui/material/MenuItem';
 import { useAuth } from '@/components/AuthContext';
@@ -19,6 +20,10 @@ import Chip from '@mui/material/Chip';
 import Divider from '@mui/material/Divider';
 import HomeIcon from '@mui/icons-material/Home';
 import DeleteForeverIcon from '@mui/icons-material/DeleteForever';
+import EditIcon from '@mui/icons-material/Edit';
+import CheckIcon from '@mui/icons-material/Check';
+import CloseIcon from '@mui/icons-material/Close';
+import AccountBalanceIcon from '@mui/icons-material/AccountBalance';
 import HowToVoteIcon from '@mui/icons-material/HowToVote';
 import CancelIcon from '@mui/icons-material/Cancel';
 import DirectionsRunIcon from '@mui/icons-material/DirectionsRun';
@@ -35,6 +40,9 @@ export default function Profile() {
     const router = useRouter();
     const [houseName, setHouseName] = useState('');
     const [loading, setLoading] = useState(false);
+    const [ibanValue, setIbanValue] = useState('');
+    const [editingIban, setEditingIban] = useState(false);
+    const [savingIban, setSavingIban] = useState(false);
     const [openDeleteDialog, setOpenDeleteDialog] = useState(false);
     const [openLeaveDialog, setOpenLeaveDialog] = useState(false);
     const { showToast } = useToast();
@@ -254,6 +262,47 @@ export default function Profile() {
                         <Avatar src={user.photoURL || ''} sx={{ width: 100, height: 100, mb: 2 }} />
                         <Typography variant="h5">{user.displayName}</Typography>
                         <Typography color="text.secondary">{user.email}</Typography>
+                        {/* IBAN Row */}
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: 0.5 }}>
+                            <AccountBalanceIcon sx={{ fontSize: 16, color: 'text.secondary' }} />
+                            {editingIban ? (
+                                <>
+                                    <TextField
+                                        size="small"
+                                        placeholder="e.g. DE89 3704 0044 0532 0130 00"
+                                        value={ibanValue}
+                                        onChange={(e) => setIbanValue(e.target.value)}
+                                        sx={{ minWidth: 240 }}
+                                        autoFocus
+                                    />
+                                    <IconButton size="small" color="success" disabled={savingIban} onClick={async () => {
+                                        setSavingIban(true);
+                                        try {
+                                            const res = await fetch('/api/users', {
+                                                method: 'POST',
+                                                headers: { 'Content-Type': 'application/json' },
+                                                body: JSON.stringify({ email: user.email, iban: ibanValue.trim() }),
+                                            });
+                                            if (res.ok) { showToast('IBAN saved', 'success'); mutateUser(); setEditingIban(false); }
+                                            else showToast('Failed to save IBAN', 'error');
+                                        } catch { showToast('Error saving IBAN', 'error'); }
+                                        setSavingIban(false);
+                                    }}><CheckIcon fontSize="small" /></IconButton>
+                                    <IconButton size="small" onClick={() => { setEditingIban(false); setIbanValue(dbUser?.iban || ''); }}>
+                                        <CloseIcon fontSize="small" />
+                                    </IconButton>
+                                </>
+                            ) : (
+                                <>
+                                    <Typography variant="body2" color="text.secondary" sx={{ fontFamily: 'monospace', letterSpacing: 0.5 }}>
+                                        {dbUser?.iban ? dbUser.iban : <em style={{ opacity: 0.5 }}>No IBAN set</em>}
+                                    </Typography>
+                                    <IconButton size="small" onClick={() => { setIbanValue(dbUser?.iban || ''); setEditingIban(true); }}>
+                                        <EditIcon sx={{ fontSize: 14 }} />
+                                    </IconButton>
+                                </>
+                            )}
+                        </Box>
                         {hasHouse && houseDetails && (
                             <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mt: 1 }}>
                                 <HomeIcon sx={{ fontSize: 16, color: 'primary.main' }} />

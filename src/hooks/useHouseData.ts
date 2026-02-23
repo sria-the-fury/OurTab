@@ -7,6 +7,15 @@ export interface House {
     createdBy: string;
     currency?: string;
     members?: { email: string; name?: string; photoUrl?: string }[];
+    pendingPayments?: {
+        id: string;
+        from: string;
+        to: string;
+        amount: number;
+        method?: 'cash' | 'bank';
+        status: 'pending' | 'approved';
+        createdAt: string;
+    }[];
 }
 
 export interface Expense {
@@ -17,6 +26,8 @@ export interface Expense {
     houseId: string;
     date: string;
     contributors?: Array<{ email: string; amount: number }>;
+    isSettlementPayment?: boolean;
+    settlementBetween?: string[];
 }
 
 export interface Todo {
