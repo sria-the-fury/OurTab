@@ -18,6 +18,9 @@ import GroupIcon from '@mui/icons-material/Group';
 import ShoppingCartIcon from '@mui/icons-material/ShoppingCart';
 import ArrowBackIosIcon from '@mui/icons-material/ArrowBackIos';
 import ArrowForwardIosIcon from '@mui/icons-material/ArrowForwardIos';
+import ArrowUpwardIcon from '@mui/icons-material/ArrowUpward';
+import ArrowDownwardIcon from '@mui/icons-material/ArrowDownward';
+import AccountBalanceWalletIcon from '@mui/icons-material/AccountBalanceWallet';
 import IconButton from '@mui/material/IconButton';
 import { useAuth } from '@/components/AuthContext';
 import { useRouter } from 'next/navigation';
@@ -370,7 +373,15 @@ export default function Dashboard() {
         return calculatedSettlements;
     }, [house, expenses]);
 
+    const myDebt = useMemo(() => {
+        if (!user?.email || !settlements) return 0;
+        return settlements.filter((s: any) => s.from === user.email).reduce((sum: number, s: any) => sum + s.amount, 0);
+    }, [settlements, user]);
 
+    const myCredit = useMemo(() => {
+        if (!user?.email || !settlements) return 0;
+        return settlements.filter((s: any) => s.to === user.email).reduce((sum: number, s: any) => sum + s.amount, 0);
+    }, [settlements, user]);
 
     if (loading) {
         return <Loader />;
@@ -428,9 +439,17 @@ export default function Dashboard() {
                                 <Typography variant="caption" color="text.secondary">
                                     {selectedDate.toLocaleString('default', { month: 'long' })}
                                 </Typography>
+                                <Box sx={{ mt: 2, pt: 1.5, borderTop: '1px dashed rgba(108, 99, 255, 0.3)' }}>
+                                    <Typography variant="body2" color="text.secondary">
+                                        My Expenses
+                                    </Typography>
+                                    <Typography component="p" variant="h6" sx={{ fontWeight: 'bold', color: 'text.primary' }}>
+                                        {displayCurrency}{myFilteredExpenses.toFixed(2)}
+                                    </Typography>
+                                </Box>
                             </Paper>
                         </Grid>
-                        {/* My Cost Widget */}
+                        {/* My Settlements Widget */}
                         <Grid size={{ xs: 12, md: 4 }}>
                             <Paper className="glass" sx={{
                                 p: 3,
@@ -443,14 +462,29 @@ export default function Dashboard() {
                                 border: '1px solid rgba(0, 191, 165, 0.2)'
                             }}>
                                 <Box sx={{ position: 'absolute', top: -10, right: -10, opacity: 0.15, color: 'secondary.main' }}>
-                                    <ShoppingCartIcon sx={{ fontSize: 100 }} />
+                                    <AccountBalanceWalletIcon sx={{ fontSize: 100 }} />
                                 </Box>
                                 <Typography component="h2" variant="h6" color="secondary" gutterBottom>
-                                    My Expenses
+                                    My Settlements
                                 </Typography>
-                                <Typography component="p" variant="h3" sx={{ fontWeight: 'bold', color: 'text.primary' }}>
-                                    {displayCurrency}{myFilteredExpenses.toFixed(2)}
-                                </Typography>
+                                <Box sx={{ display: 'flex', gap: 2, alignItems: 'center', mt: 1 }}>
+                                    <Box>
+                                        <Typography variant="body2" color="text.secondary" sx={{ display: 'flex', alignItems: 'center' }}>
+                                            <ArrowUpwardIcon color="error" sx={{ fontSize: 16, mr: 0.5 }} /> To Pay
+                                        </Typography>
+                                        <Typography component="p" variant="h5" sx={{ fontWeight: 'bold', color: 'error.main' }}>
+                                            {displayCurrency}{myDebt.toFixed(2)}
+                                        </Typography>
+                                    </Box>
+                                    <Box>
+                                        <Typography variant="body2" color="text.secondary" sx={{ display: 'flex', alignItems: 'center' }}>
+                                            <ArrowDownwardIcon color="success" sx={{ fontSize: 16, mr: 0.5 }} /> To Receive
+                                        </Typography>
+                                        <Typography component="p" variant="h5" sx={{ fontWeight: 'bold', color: 'success.main' }}>
+                                            {displayCurrency}{myCredit.toFixed(2)}
+                                        </Typography>
+                                    </Box>
+                                </Box>
                             </Paper>
                         </Grid>
                         {/* Group Name Widget */}
