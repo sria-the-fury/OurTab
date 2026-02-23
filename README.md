@@ -126,28 +126,36 @@ Open [http://localhost:3000](http://localhost:3000) in your browser.
 
 ## 📁 Project Structure
 
-```
+```text
 src/
 ├── app/
 │   ├── api/                  # Next.js API routes (Firestore operations)
 │   │   ├── expenses/         # Create, read, update, delete expenses
 │   │   ├── houses/           # House management, member add/delete
-│   │   └── shopping-todos/   # Buy List CRUD
+│   │   ├── settlements/      # Settlement calculation logic
+│   │   ├── shopping-todos/   # Buy List CRUD
+│   │   └── users/            # User profile data
 │   ├── buy-list/             # Buy List page
 │   ├── dashboard/            # Dashboard page
 │   ├── profile/              # Profile & house management page
 │   └── shopping/             # Add Expense / Shopping page
 ├── components/
-│   ├── AuthContext.tsx        # Firebase auth state & user context
-│   ├── AuthGuard.tsx          # Route protection wrapper
-│   ├── BottomNav.tsx          # Mobile bottom navigation
-│   ├── Navbar.tsx             # Top navigation bar with theme toggle
-│   ├── ThemeContext.tsx       # Dark/Light mode persistent context
-│   └── ThemeRegistry.tsx     # MUI theme provider
+│   ├── AuthContext.tsx       # Firebase auth state & user context
+│   ├── AuthGuard.tsx         # Route protection wrapper
+│   ├── BottomNav.tsx         # Mobile bottom navigation
+│   ├── Navbar.tsx            # Top navigation bar with theme toggle
+│   ├── ThemeRegistry.tsx     # MUI theme provider
+│   └── ToastContext.tsx      # Global toast notification system
 ├── hooks/
-│   ├── useHouseData.ts        # Fetches house, expenses & todos with SWR
-│   └── useShoppingTodos.ts    # Fetches and mutates the buy list
-└── theme.ts                   # MUI theme factory (light + dark)
+│   ├── useHouseData.ts       # Fetches house, expenses & todos with SWR
+│   ├── useShoppingTodos.ts   # Fetches and mutates the buy list
+│   └── useUserData.ts        # Fetches user's current house state
+├── lib/
+│   ├── firebase.ts           # Firebase client initialization
+│   └── firebaseAdmin.ts      # Firebase admin initialization for API routes
+├── types/
+│   └── settlement-types.ts   # TypeScript interfaces for settlements
+└── theme.ts                  # MUI theme factory (light + dark)
 ```
 
 ---
