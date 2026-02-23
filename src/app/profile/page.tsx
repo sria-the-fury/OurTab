@@ -250,6 +250,9 @@ export default function Profile() {
                         ) : (
                             <Paper className="glass" sx={{ p: 3, background: 'transparent', boxShadow: 'none' }}>
                                 <Typography gutterBottom>You are not in a house yet.</Typography>
+                                <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                                    You can create a new house below, or share your email — <strong>{user?.email}</strong> — so a housemate can add you to theirs.
+                                </Typography>
                                 <form onSubmit={handleCreateHouse}>
                                     <TextField
                                         label="House Name"
