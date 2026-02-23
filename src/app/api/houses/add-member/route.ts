@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
-import { db } from '@/lib/firebase';
-import { doc, getDoc, updateDoc, arrayUnion } from 'firebase/firestore';
+import { adminDb } from '@/lib/firebaseAdmin';
+import { FieldValue } from 'firebase-admin/firestore';
 
 export async function POST(request: Request) {
     try {
@@ -11,26 +11,24 @@ export async function POST(request: Request) {
             return NextResponse.json({ error: 'Email and HouseId are required' }, { status: 400 });
         }
 
-        const userRef = doc(db, 'users', email);
-        const userSnap = await getDoc(userRef);
+        const userRef = adminDb.collection('users').doc(email);
+        const userSnap = await userRef.get();
 
-        if (!userSnap.exists()) {
+        if (!userSnap.exists) {
             return NextResponse.json({ error: 'User not found. Ask them to sign up first.' }, { status: 404 });
         }
 
-        const userData = userSnap.data();
+        const userData = userSnap.data()!;
         if (userData.groupId) {
             return NextResponse.json({ error: 'User is already in a house.' }, { status: 400 });
         }
 
-        const houseRef = doc(db, 'groups', houseId);
-        await updateDoc(houseRef, {
-            members: arrayUnion(email)
+        const houseRef = adminDb.collection('groups').doc(houseId);
+        await houseRef.update({
+            members: FieldValue.arrayUnion(email)
         });
 
-        await updateDoc(userRef, {
-            groupId: houseId
-        });
+        await userRef.update({ groupId: houseId });
 
         return NextResponse.json({ success: true });
     } catch (error) {

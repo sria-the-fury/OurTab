@@ -120,7 +120,7 @@ export default function Todos() {
                                         }
                                     >
                                         <IconButton
-                                            onClick={() => !todo.isCompleted && toggleTodo(todo.id, !todo.isCompleted)}
+                                            onClick={() => !todo.isCompleted && toggleTodo(todo.id, !todo.isCompleted, user?.email || '')}
                                             sx={{ mr: 1 }}
                                             disabled={todo.isCompleted}
                                         >
@@ -131,6 +131,7 @@ export default function Todos() {
                                         </IconButton>
 
                                         <ListItemText
+                                            secondaryTypographyProps={{ component: 'div' }}
                                             primary={
                                                 <Typography
                                                     variant="body1"
@@ -156,6 +157,29 @@ export default function Todos() {
                                                     <Typography variant="caption" color="text.disabled" sx={{ display: 'block' }}>
                                                         {formatTime(todo.createdAt)}
                                                     </Typography>
+                                                    {todo.isCompleted && (
+                                                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mt: 0.5 }}>
+                                                            {todo.completedBy === 'auto' ? (
+                                                                <Typography variant="caption" sx={{ color: 'success.main', fontStyle: 'italic' }}>
+                                                                    ✨ Auto marked
+                                                                </Typography>
+                                                            ) : todo.completedBy ? (
+                                                                (() => {
+                                                                    const { name: completedByName, photoUrl: completedByPhoto } = getMemberInfo(todo.completedBy);
+                                                                    return (
+                                                                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                                                                            <Avatar src={completedByPhoto || ''} sx={{ width: 14, height: 14, fontSize: '8px' }}>
+                                                                                {completedByName.charAt(0)}
+                                                                            </Avatar>
+                                                                            <Typography variant="caption" color="success.main">
+                                                                                Marked by {completedByName}
+                                                                            </Typography>
+                                                                        </Box>
+                                                                    );
+                                                                })()
+                                                            ) : null}
+                                                        </Box>
+                                                    )}
                                                 </Box>
                                             }
                                         />

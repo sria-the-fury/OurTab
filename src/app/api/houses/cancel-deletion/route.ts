@@ -1,6 +1,5 @@
 import { NextResponse } from 'next/server';
-import { db } from '@/lib/firebase';
-import { doc, getDoc, updateDoc } from 'firebase/firestore';
+import { adminDb } from '@/lib/firebaseAdmin';
 
 export async function POST(request: Request) {
     try {
@@ -10,14 +9,14 @@ export async function POST(request: Request) {
             return NextResponse.json({ error: 'houseId and userEmail are required' }, { status: 400 });
         }
 
-        const houseRef = doc(db, 'groups', houseId);
-        const houseSnap = await getDoc(houseRef);
+        const houseRef = adminDb.collection('groups').doc(houseId);
+        const houseSnap = await houseRef.get();
 
-        if (!houseSnap.exists()) {
+        if (!houseSnap.exists) {
             return NextResponse.json({ error: 'House not found' }, { status: 404 });
         }
 
-        const houseData = houseSnap.data();
+        const houseData = houseSnap.data()!;
         const deletionRequest = houseData.deletionRequest;
 
         if (!deletionRequest) {
@@ -28,7 +27,7 @@ export async function POST(request: Request) {
             return NextResponse.json({ error: 'Only the initiator can cancel' }, { status: 403 });
         }
 
-        await updateDoc(houseRef, { deletionRequest: null });
+        await houseRef.update({ deletionRequest: null });
 
         return NextResponse.json({ success: true });
     } catch (error) {

@@ -1,6 +1,5 @@
 import { NextResponse } from 'next/server';
-import { db } from '@/lib/firebase';
-import { collection, addDoc, query, where, getDocs, doc, updateDoc, setDoc } from 'firebase/firestore';
+import { adminDb } from '@/lib/firebaseAdmin';
 
 export async function POST(request: Request) {
     try {
@@ -11,7 +10,6 @@ export async function POST(request: Request) {
             return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
         }
 
-        // Create a unique ID for this month's settlement
         const settlementId = `${houseId}_${year}_${month}`;
 
         const settlementData = {
@@ -23,8 +21,7 @@ export async function POST(request: Request) {
             updatedAt: new Date().toISOString()
         };
 
-        // Use setDoc to create or update
-        await setDoc(doc(db, 'settlements', settlementId), settlementData);
+        await adminDb.collection('settlements').doc(settlementId).set(settlementData);
 
         return NextResponse.json({ id: settlementId, ...settlementData });
     } catch (error) {
@@ -40,29 +37,24 @@ export async function GET(request: Request) {
     const year = searchParams.get('year');
 
     try {
-        const settlementsRef = collection(db, 'settlements');
-        let q;
+        if (!houseId) {
+            return NextResponse.json({ error: 'houseId is required' }, { status: 400 });
+        }
 
-        if (houseId && month !== null && year !== null) {
-            // Get specific month
+        if (month !== null && year !== null) {
             const settlementId = `${houseId}_${year}_${month}`;
-            const docRef = doc(db, 'settlements', settlementId);
-            const snapshot = await getDocs(query(settlementsRef, where('__name__', '==', settlementId)));
+            const snap = await adminDb.collection('settlements').doc(settlementId).get();
 
-            if (snapshot.empty) {
+            if (!snap.exists) {
                 return NextResponse.json(null);
             }
-
-            const settlement = { id: snapshot.docs[0].id, ...snapshot.docs[0].data() };
-            return NextResponse.json(settlement);
-        } else if (houseId) {
-            // Get all settlements for house
-            q = query(settlementsRef, where('houseId', '==', houseId));
-            const snapshot = await getDocs(q);
+            return NextResponse.json({ id: snap.id, ...snap.data() });
+        } else {
+            const snapshot = await adminDb.collection('settlements')
+                .where('houseId', '==', houseId)
+                .get();
             const settlements = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
             return NextResponse.json(settlements);
-        } else {
-            return NextResponse.json({ error: 'houseId is required' }, { status: 400 });
         }
     } catch (error) {
         console.error('Error fetching settlements:', error);
@@ -71,22 +63,5 @@ export async function GET(request: Request) {
 }
 
 export async function PATCH(request: Request) {
-    try {
-        const body = await request.json();
-        const { settlementId, settlementIndex, paid } = body;
-
-        if (!settlementId || settlementIndex === undefined || paid === undefined) {
-            return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
-        }
-
-        const settlementRef = doc(db, 'settlements', settlementId);
-
-        // This is a simplified approach - in production you'd want to fetch, update array item, then save
-        // For now, we'll handle this via client-side logic and full update via POST
-
-        return NextResponse.json({ error: 'Use POST to update settlements' }, { status: 400 });
-    } catch (error) {
-        console.error('Error updating settlement:', error);
-        return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
-    }
+    return NextResponse.json({ error: 'Use POST to update settlements' }, { status: 400 });
 }

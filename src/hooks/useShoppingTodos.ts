@@ -8,6 +8,8 @@ export interface ShoppingTodo {
     addedBy: string;
     isCompleted: boolean;
     createdAt: string;
+    completedAt?: string;
+    completedBy?: string;  // user email, or 'auto' for auto-marked
     expenseId?: string;
 }
 
@@ -39,12 +41,12 @@ export function useShoppingTodos() {
         }
     };
 
-    const toggleTodo = async (id: string, isCompleted: boolean) => {
+    const toggleTodo = async (id: string, isCompleted: boolean, completedBy?: string) => {
         try {
             const res = await fetch('/api/shopping-todos', {
                 method: 'PATCH',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ id, isCompleted })
+                body: JSON.stringify({ id, isCompleted, completedBy })
             });
             if (res.ok) {
                 mutate();

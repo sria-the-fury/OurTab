@@ -1,6 +1,5 @@
 import { NextResponse } from 'next/server';
-import { db } from '@/lib/firebase';
-import { collection, addDoc, query, where, getDocs, doc, updateDoc, deleteDoc, orderBy } from 'firebase/firestore';
+import { adminDb } from '@/lib/firebaseAdmin';
 
 export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
@@ -11,13 +10,10 @@ export async function GET(request: Request) {
     }
 
     try {
-        const todosRef = collection(db, 'shopping_todos');
-        const q = query(
-            todosRef,
-            where("houseId", "==", houseId)
-        );
+        const snapshot = await adminDb.collection('shopping_todos')
+            .where('houseId', '==', houseId)
+            .get();
 
-        const snapshot = await getDocs(q);
         let todos = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as any[];
 
         // --- Auto-deletion logic (12 hours) ---
@@ -34,11 +30,11 @@ export async function GET(request: Request) {
         });
 
         if (toDeleteIds.length > 0) {
-            const batch = [];
+            const batch = adminDb.batch();
             for (const id of toDeleteIds) {
-                batch.push(deleteDoc(doc(db, 'shopping_todos', id)));
+                batch.delete(adminDb.collection('shopping_todos').doc(id));
             }
-            await Promise.all(batch);
+            await batch.commit();
             console.log(`Auto-deleted ${toDeleteIds.length} old todos`);
             todos = filteredTodos;
         }
@@ -70,7 +66,7 @@ export async function POST(request: Request) {
             createdAt: new Date().toISOString()
         };
 
-        const docRef = await addDoc(collection(db, 'shopping_todos'), todoData);
+        const docRef = await adminDb.collection('shopping_todos').add(todoData);
         return NextResponse.json({ id: docRef.id, ...todoData });
     } catch (error) {
         console.error('Error creating shopping todo:', error);
@@ -81,20 +77,20 @@ export async function POST(request: Request) {
 export async function PATCH(request: Request) {
     try {
         const body = await request.json();
-        const { id, isCompleted, expenseId } = body;
+        const { id, isCompleted, expenseId, completedBy } = body;
 
         if (!id) {
             return NextResponse.json({ error: 'Missing id' }, { status: 400 });
         }
 
-        const todoRef = doc(db, 'shopping_todos', id);
+        const todoRef = adminDb.collection('shopping_todos').doc(id);
+        const todoSnap = await todoRef.get();
 
-        // Fetch current state to prevent unmarking
-        const todoSnap = await getDocs(query(collection(db, 'shopping_todos'), where("__name__", "==", id)));
-        if (todoSnap.empty) {
+        if (!todoSnap.exists) {
             return NextResponse.json({ error: 'To-do not found' }, { status: 404 });
         }
-        const currentData = todoSnap.docs[0].data();
+
+        const currentData = todoSnap.data()!;
         if (currentData.isCompleted && isCompleted === false) {
             return NextResponse.json({ error: 'Completed items cannot be unmarked' }, { status: 400 });
         }
@@ -102,10 +98,11 @@ export async function PATCH(request: Request) {
         const updates: any = { isCompleted };
         if (isCompleted && !currentData.isCompleted) {
             updates.completedAt = new Date().toISOString();
+            if (completedBy) updates.completedBy = completedBy;
         }
         if (expenseId) updates.expenseId = expenseId;
 
-        await updateDoc(todoRef, updates);
+        await todoRef.update(updates);
         return NextResponse.json({ success: true, ...updates });
     } catch (error) {
         console.error('Error updating shopping todo:', error);
@@ -122,17 +119,19 @@ export async function DELETE(request: Request) {
     }
 
     try {
-        const todoRef = doc(db, 'shopping_todos', id);
-        const todoSnap = await getDocs(query(collection(db, 'shopping_todos'), where("__name__", "==", id)));
+        const todoRef = adminDb.collection('shopping_todos').doc(id);
+        const todoSnap = await todoRef.get();
 
-        if (!todoSnap.empty) {
-            const todoData = todoSnap.docs[0].data();
+        if (todoSnap.exists) {
+            const todoData = todoSnap.data()!;
             if (todoData.isCompleted) {
-                return NextResponse.json({ error: 'Completed items cannot be deleted manually. They will be removed automatically after 12 hours.' }, { status: 400 });
+                return NextResponse.json({
+                    error: 'Completed items cannot be deleted manually. They will be removed automatically after 12 hours.'
+                }, { status: 400 });
             }
         }
 
-        await deleteDoc(todoRef);
+        await todoRef.delete();
         return NextResponse.json({ success: true });
     } catch (error) {
         console.error('Error deleting shopping todo:', error);

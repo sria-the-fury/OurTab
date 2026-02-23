@@ -1,36 +1,26 @@
 import { NextResponse } from 'next/server';
-import { db } from '@/lib/firebase';
-import { collection, addDoc, query, where, getDocs, orderBy, doc, getDoc, writeBatch, deleteDoc, updateDoc } from 'firebase/firestore';
+import { adminDb } from '@/lib/firebaseAdmin';
+import { FieldValue } from 'firebase-admin/firestore';
 
 export async function POST(request: Request) {
     try {
         const body = await request.json();
         const { amount, description, userId, houseId, contributors } = body;
 
-        // TODO: Verify Types. Amount should be number.
         if (!amount || !description || !userId || !houseId) {
             return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
         }
 
         const totalAmount = parseFloat(amount);
 
-        // Validate contributors if provided
         if (contributors && Array.isArray(contributors)) {
-            // Validate contributor amounts
             const contributorTotal = contributors.reduce((sum: number, c: any) => sum + parseFloat(c.amount || 0), 0);
-
             if (contributorTotal > totalAmount) {
-                return NextResponse.json({
-                    error: 'Total contributor amounts cannot exceed expense amount'
-                }, { status: 400 });
+                return NextResponse.json({ error: 'Total contributor amounts cannot exceed expense amount' }, { status: 400 });
             }
-
-            // Validate all contributors have email and amount
             const validContributors = contributors.every((c: any) => c.email && c.amount !== undefined);
             if (!validContributors) {
-                return NextResponse.json({
-                    error: 'Each contributor must have email and amount'
-                }, { status: 400 });
+                return NextResponse.json({ error: 'Each contributor must have email and amount' }, { status: 400 });
             }
         }
 
@@ -42,7 +32,6 @@ export async function POST(request: Request) {
             date: new Date().toISOString()
         };
 
-        // Add contributors if provided
         if (contributors && contributors.length > 0) {
             expenseData.contributors = contributors.map((c: any) => ({
                 email: c.email,
@@ -50,33 +39,35 @@ export async function POST(request: Request) {
             }));
         }
 
-        const expenseRef = await addDoc(collection(db, 'expenses'), expenseData);
+        const expenseRef = await adminDb.collection('expenses').add(expenseData);
 
         // --- Auto-mark Shopping To-Dos ---
         try {
-            const todosRef = collection(db, 'shopping_todos');
-            const q = query(todosRef, where("houseId", "==", houseId), where("isCompleted", "==", false));
-            const todosSnap = await getDocs(q);
+            const todosSnap = await adminDb.collection('shopping_todos')
+                .where('houseId', '==', houseId)
+                .where('isCompleted', '==', false)
+                .get();
 
-            const batch = [];
-            for (const doc of todosSnap.docs) {
-                const todo = doc.data();
-                // Match description (case insensitive check)
+            const batch = adminDb.batch();
+            let batchCount = 0;
+            for (const todoDoc of todosSnap.docs) {
+                const todo = todoDoc.data();
                 if (description.toLowerCase().includes(todo.itemName.toLowerCase())) {
-                    batch.push(updateDoc(doc.ref, {
+                    batch.update(todoDoc.ref, {
                         isCompleted: true,
+                        completedBy: 'auto',
                         expenseId: expenseRef.id,
                         completedAt: new Date().toISOString()
-                    }));
+                    });
+                    batchCount++;
                 }
             }
-            if (batch.length > 0) {
-                await Promise.all(batch);
-                console.log(`Auto-marked ${batch.length} todos for expense ${expenseRef.id}`);
+            if (batchCount > 0) {
+                await batch.commit();
+                console.log(`Auto-marked ${batchCount} todos for expense ${expenseRef.id}`);
             }
         } catch (todoError) {
             console.error('Error auto-marking todos:', todoError);
-            // Don't fail the whole request if auto-marking fails
         }
 
         return NextResponse.json({ id: expenseRef.id, ...expenseData });
@@ -92,18 +83,15 @@ export async function GET(request: Request) {
     const userId = searchParams.get('userId');
 
     try {
-        const expensesRef = collection(db, 'expenses');
-        // Construct query
-        let q;
+        let query = adminDb.collection('expenses') as FirebaseFirestore.Query;
+
         if (houseId) {
-            q = query(expensesRef, where("groupId", "==", houseId)); //, orderBy("date", "desc") needs index
+            query = query.where('groupId', '==', houseId);
         } else if (userId) {
-            q = query(expensesRef, where("userId", "==", userId));
-        } else {
-            q = query(expensesRef); // Get All
+            query = query.where('userId', '==', userId);
         }
 
-        const snapshot = await getDocs(q);
+        const snapshot = await query.get();
         const expenses = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
         return NextResponse.json(expenses);
     } catch (error) {
@@ -122,21 +110,19 @@ export async function DELETE(request: Request) {
             return NextResponse.json({ error: 'Missing id or userId' }, { status: 400 });
         }
 
-        const expenseRef = doc(db, 'expenses', id);
-        const expenseSnap = await getDoc(expenseRef);
+        const expenseRef = adminDb.collection('expenses').doc(id);
+        const expenseSnap = await expenseRef.get();
 
-        if (!expenseSnap.exists()) {
+        if (!expenseSnap.exists) {
             return NextResponse.json({ error: 'Expense not found' }, { status: 404 });
         }
 
-        const expenseData = expenseSnap.data();
+        const expenseData = expenseSnap.data()!;
 
-        // 1. Verify ownership
         if (expenseData.userId !== userId) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 403 });
         }
 
-        // 2. Verify time constraints (48 hours)
         const createdDate = new Date(expenseData.date);
         const now = new Date();
         const diffInHours = (now.getTime() - createdDate.getTime()) / (1000 * 60 * 60);
@@ -145,8 +131,7 @@ export async function DELETE(request: Request) {
             return NextResponse.json({ error: 'Cannot delete expense older than 48 hours' }, { status: 403 });
         }
 
-        await deleteDoc(expenseRef);
-
+        await expenseRef.delete();
         return NextResponse.json({ success: true });
     } catch (error) {
         console.error('Error deleting expense:', error);
@@ -163,21 +148,19 @@ export async function PATCH(request: Request) {
             return NextResponse.json({ error: 'Missing id or userId' }, { status: 400 });
         }
 
-        const expenseRef = doc(db, 'expenses', id);
-        const expenseSnap = await getDoc(expenseRef);
+        const expenseRef = adminDb.collection('expenses').doc(id);
+        const expenseSnap = await expenseRef.get();
 
-        if (!expenseSnap.exists()) {
+        if (!expenseSnap.exists) {
             return NextResponse.json({ error: 'Expense not found' }, { status: 404 });
         }
 
-        const expenseData = expenseSnap.data();
+        const expenseData = expenseSnap.data()!;
 
-        // 1. Verify ownership
         if (expenseData.userId !== userId) {
             return NextResponse.json({ error: 'Unauthorized' }, { status: 403 });
         }
 
-        // 2. Verify time constraints
         const createdDate = new Date(expenseData.date);
         const now = new Date();
         const diffInHours = (now.getTime() - createdDate.getTime()) / (1000 * 60 * 60);
@@ -190,8 +173,7 @@ export async function PATCH(request: Request) {
         if (amount) updates.amount = parseFloat(amount);
         if (description) updates.description = description;
 
-        await updateDoc(expenseRef, updates);
-
+        await expenseRef.update(updates);
         return NextResponse.json({ success: true, ...updates });
     } catch (error) {
         console.error('Error updating expense:', error);

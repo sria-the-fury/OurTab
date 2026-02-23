@@ -1,6 +1,5 @@
 import { NextResponse } from 'next/server';
-import { db } from '@/lib/firebase';
-import { doc, setDoc, getDoc, getDocs, collection } from 'firebase/firestore';
+import { adminDb } from '@/lib/firebaseAdmin';
 
 // Create or Update User
 export async function POST(request: Request) {
@@ -12,24 +11,21 @@ export async function POST(request: Request) {
             return NextResponse.json({ error: 'Email is required' }, { status: 400 });
         }
 
-        // Use email as Doc ID for simplicity and uniqueness
-        const userRef = doc(db, 'users', email);
+        const userRef = adminDb.collection('users').doc(email);
+        const userSnap = await userRef.get();
 
-        // Check if exists to preserve groupId if passing only basic info
-        const userSnap = await getDoc(userRef);
         let userData: { email: any; name?: any; photoUrl?: any; currency?: any } = { email };
 
-        // Only set fields if they're not undefined
         if (name !== undefined) userData.name = name;
         if (photoUrl !== undefined) userData.photoUrl = photoUrl;
         if (currency) userData.currency = currency;
 
-        if (userSnap.exists()) {
-            const existing = userSnap.data();
-            userData = { ...existing, ...userData }; // Merge updates
+        if (userSnap.exists) {
+            const existing = userSnap.data()!;
+            userData = { ...existing, ...userData };
         }
 
-        await setDoc(userRef, userData, { merge: true });
+        await userRef.set(userData, { merge: true });
 
         return NextResponse.json({ id: email, ...userData });
     } catch (error) {
@@ -45,16 +41,15 @@ export async function GET(request: Request) {
 
     try {
         if (email) {
-            const userRef = doc(db, 'users', email);
-            const userSnap = await getDoc(userRef);
-            if (userSnap.exists()) {
+            const userSnap = await adminDb.collection('users').doc(email).get();
+            if (userSnap.exists) {
                 return NextResponse.json({ id: userSnap.id, ...userSnap.data() });
             } else {
                 return NextResponse.json({ error: 'User not found' }, { status: 404 });
             }
         } else {
-            const querySnapshot = await getDocs(collection(db, 'users'));
-            const users = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+            const snapshot = await adminDb.collection('users').get();
+            const users = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
             return NextResponse.json(users);
         }
     } catch (e) {

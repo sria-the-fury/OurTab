@@ -1,6 +1,5 @@
 import { NextResponse } from 'next/server';
-import { db } from '@/lib/firebase';
-import { doc, getDoc } from 'firebase/firestore';
+import { adminDb } from '@/lib/firebaseAdmin';
 
 export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
@@ -12,33 +11,30 @@ export async function GET(request: Request) {
 
     try {
         // 1. Get User to find houseId (stored as groupId)
-        const userRef = doc(db, 'users', email);
-        const userSnap = await getDoc(userRef);
+        const userSnap = await adminDb.collection('users').doc(email).get();
 
-        if (!userSnap.exists()) {
+        if (!userSnap.exists) {
             return NextResponse.json({ error: 'User not found' }, { status: 404 });
         }
 
-        const userData = userSnap.data();
+        const userData = userSnap.data()!;
         if (!userData.groupId) {
             return NextResponse.json(null); // No house
         }
 
         // 2. Get House Data
-        const houseRef = doc(db, 'groups', userData.groupId);
-        const houseSnap = await getDoc(houseRef);
+        const houseSnap = await adminDb.collection('groups').doc(userData.groupId).get();
 
-        if (!houseSnap.exists()) {
+        if (!houseSnap.exists) {
             return NextResponse.json({ error: 'House not found' }, { status: 404 });
         }
 
-        const houseData = houseSnap.data();
+        const houseData = houseSnap.data()!;
 
         // 3. Fetch details for all members
         const memberPromises = houseData.members.map(async (memberEmail: string) => {
-            const memberRef = doc(db, 'users', memberEmail);
-            const memberSnap = await getDoc(memberRef);
-            return memberSnap.exists() ? { email: memberEmail, ...memberSnap.data() } : { email: memberEmail };
+            const memberSnap = await adminDb.collection('users').doc(memberEmail).get();
+            return memberSnap.exists ? { email: memberEmail, ...memberSnap.data() } : { email: memberEmail };
         });
 
         const members = await Promise.all(memberPromises);
