@@ -382,65 +382,69 @@ export default function Dashboard() {
                     <Grid container spacing={3}>
                         {/* Total Cost Widget */}
                         <Grid size={{ xs: 12, md: 4 }}>
-                            <Paper sx={{
+                            <Paper className="glass" sx={{
                                 p: 3,
                                 display: 'flex',
                                 flexDirection: 'column',
                                 height: '100%',
                                 position: 'relative',
                                 overflow: 'hidden',
-                                background: 'linear-gradient(135deg, #6C63FF 0%, #5A52E0 100%)',
-                                color: 'white'
+                                bgcolor: 'rgba(108, 99, 255, 0.08)',
+                                border: '1px solid rgba(108, 99, 255, 0.2)'
                             }}>
-                                <Box sx={{ position: 'absolute', top: -10, right: -10, opacity: 0.2 }}>
+                                <Box sx={{ position: 'absolute', top: -10, right: -10, opacity: 0.15, color: 'primary.main' }}>
                                     <CurrencyIcon sx={{ fontSize: 100 }} />
                                 </Box>
-                                <Typography component="h2" variant="h6" gutterBottom sx={{ opacity: 0.9 }}>
+                                <Typography component="h2" variant="h6" color="primary" gutterBottom>
                                     Total Expenses
                                 </Typography>
-                                <Typography component="p" variant="h3" sx={{ fontWeight: 'bold', mb: 1 }}>
+                                <Typography component="p" variant="h3" sx={{ fontWeight: 'bold', color: 'text.primary', mb: 1 }}>
                                     {displayCurrency}{totalFilteredExpenses.toFixed(2)}
                                 </Typography>
-                                <Typography sx={{ opacity: 0.8 }}>
+                                <Typography variant="caption" color="text.secondary">
                                     {selectedDate.toLocaleString('default', { month: 'long' })}
                                 </Typography>
                             </Paper>
                         </Grid>
                         {/* My Cost Widget */}
                         <Grid size={{ xs: 12, md: 4 }}>
-                            <Paper sx={{
+                            <Paper className="glass" sx={{
                                 p: 3,
                                 display: 'flex',
                                 flexDirection: 'column',
                                 height: '100%',
                                 position: 'relative',
                                 overflow: 'hidden',
+                                bgcolor: 'rgba(0, 191, 165, 0.08)',
+                                border: '1px solid rgba(0, 191, 165, 0.2)'
                             }}>
-                                <Box sx={{ position: 'absolute', top: -10, right: -10, opacity: 0.05, color: 'primary.main' }}>
+                                <Box sx={{ position: 'absolute', top: -10, right: -10, opacity: 0.15, color: 'secondary.main' }}>
                                     <ShoppingCartIcon sx={{ fontSize: 100 }} />
                                 </Box>
-                                <Typography component="h2" variant="h6" color="primary" gutterBottom>
+                                <Typography component="h2" variant="h6" color="secondary" gutterBottom>
                                     My Expenses
                                 </Typography>
-                                <Typography component="p" variant="h3" sx={{ fontWeight: 'bold', color: '#333' }}>
+                                <Typography component="p" variant="h3" sx={{ fontWeight: 'bold', color: 'text.primary' }}>
                                     {displayCurrency}{myFilteredExpenses.toFixed(2)}
                                 </Typography>
                             </Paper>
                         </Grid>
                         {/* Group Name Widget */}
                         <Grid size={{ xs: 12, md: 4 }}>
-                            <Paper sx={{
+                            <Paper className="glass" sx={{
                                 p: 3,
                                 display: 'flex',
                                 flexDirection: 'column',
                                 height: '100%',
                                 position: 'relative',
-                                overflow: 'hidden'
+                                overflow: 'hidden',
+                                bgcolor: 'rgba(2, 136, 209, 0.08)',
+                                border: '1px solid rgba(2, 136, 209, 0.2)'
                             }}>
-                                <Box sx={{ position: 'absolute', top: -10, right: -10, opacity: 0.05, color: 'secondary.main' }}>
+                                <Box sx={{ position: 'absolute', top: -10, right: -10, opacity: 0.15, color: 'info.main' }}>
                                     <GroupIcon sx={{ fontSize: 100 }} />
                                 </Box>
-                                <Typography component="h2" variant="h6" color="secondary" gutterBottom>
+                                <Typography component="h2" variant="h6" color="info.main" gutterBottom>
                                     My House
                                 </Typography>
                                 {house ? (
@@ -493,6 +497,8 @@ export default function Dashboard() {
                                 overflow: 'hidden',
                                 cursor: 'pointer',
                                 transition: 'transform 0.2s, box-shadow 0.2s',
+                                bgcolor: 'rgba(237, 108, 2, 0.08)',
+                                border: '1px solid rgba(237, 108, 2, 0.2)',
                                 '&:hover': {
                                     transform: 'translateY(-2px)',
                                     boxShadow: '0 8px 24px rgba(0,0,0,0.1)'
@@ -500,10 +506,10 @@ export default function Dashboard() {
                             }}
                                 onClick={() => router.push('/buy-list')}
                             >
-                                <Box sx={{ position: 'absolute', top: -10, right: -10, opacity: 0.05, color: '#f50057' }}>
+                                <Box sx={{ position: 'absolute', top: -10, right: -10, opacity: 0.15, color: 'warning.main' }}>
                                     <FormatListBulletedIcon sx={{ fontSize: 100 }} />
                                 </Box>
-                                <Typography component="h2" variant="h6" sx={{ color: '#f50057' }} gutterBottom>
+                                <Typography component="h2" variant="h6" color="warning.main" gutterBottom>
                                     Buy List ({pendingTodos.length})
                                 </Typography>
 
@@ -515,7 +521,7 @@ export default function Dashboard() {
                                     ) : (
                                         pendingTodos.slice(0, 3).map(todo => (
                                             <Box key={todo.id} sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                                                <Box sx={{ width: 6, height: 6, borderRadius: '50%', backgroundColor: '#f50057' }} />
+                                                <Box sx={{ width: 6, height: 6, borderRadius: '50%', bgcolor: 'warning.main' }} />
                                                 <Typography variant="body2" noWrap sx={{ flex: 1 }}>
                                                     {todo.itemName}
                                                 </Typography>
