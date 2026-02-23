@@ -16,6 +16,7 @@ import Avatar from '@mui/material/Avatar';
 import ShoppingCartIcon from '@mui/icons-material/ShoppingCart';
 import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
 import RadioButtonUncheckedIcon from '@mui/icons-material/RadioButtonUnchecked';
+import DoneAllIcon from '@mui/icons-material/DoneAll';
 import { useState } from 'react';
 import { useAuth } from '@/components/AuthContext';
 import BottomNav from '@/components/BottomNav';
@@ -168,11 +169,12 @@ export default function Todos() {
                                                                     const { name: completedByName, photoUrl: completedByPhoto } = getMemberInfo(todo.completedBy);
                                                                     return (
                                                                         <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                                                                            <DoneAllIcon color="success" sx={{ fontSize: 16 }} />
                                                                             <Avatar src={completedByPhoto || ''} sx={{ width: 14, height: 14, fontSize: '8px' }}>
                                                                                 {completedByName.charAt(0)}
                                                                             </Avatar>
                                                                             <Typography variant="caption" color="success.main">
-                                                                                Marked by {completedByName}
+                                                                                {completedByName}
                                                                             </Typography>
                                                                         </Box>
                                                                     );
