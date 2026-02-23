@@ -8,11 +8,14 @@ import PersonIcon from '@mui/icons-material/Person';
 import DashboardIcon from '@mui/icons-material/Dashboard';
 import FormatListBulletedIcon from '@mui/icons-material/FormatListBulleted';
 import { useRouter, usePathname } from 'next/navigation';
+import { useAuth } from '@/components/AuthContext';
+import Avatar from '@mui/material/Avatar';
 
 export default function BottomNav() {
     const router = useRouter();
     const pathname = usePathname();
     const [value, setValue] = useState(pathname);
+    const { user } = useAuth();
 
     useEffect(() => {
         setValue(pathname);
@@ -40,7 +43,17 @@ export default function BottomNav() {
                 <BottomNavigationAction label="Dashboard" value="/dashboard" icon={<DashboardIcon />} />
                 <BottomNavigationAction label="Buy List" value="/buy-list" icon={<FormatListBulletedIcon />} />
                 <BottomNavigationAction label="Shopping" value="/shopping" icon={<ShoppingCartIcon />} />
-                <BottomNavigationAction label="Profile" value="/profile" icon={<PersonIcon />} />
+                <BottomNavigationAction
+                    label="Profile"
+                    value="/profile"
+                    icon={
+                        user?.photoURL ? (
+                            <Avatar src={user.photoURL} sx={{ width: 24, height: 24, mb: '2px' }} />
+                        ) : (
+                            <PersonIcon />
+                        )
+                    }
+                />
             </BottomNavigation>
         </Paper>
     );
