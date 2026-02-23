@@ -22,6 +22,11 @@ import DeleteForeverIcon from '@mui/icons-material/DeleteForever';
 import HowToVoteIcon from '@mui/icons-material/HowToVote';
 import CancelIcon from '@mui/icons-material/Cancel';
 import { useRouter } from 'next/navigation';
+import Dialog from '@mui/material/Dialog';
+import DialogTitle from '@mui/material/DialogTitle';
+import DialogContent from '@mui/material/DialogContent';
+import DialogContentText from '@mui/material/DialogContentText';
+import DialogActions from '@mui/material/DialogActions';
 import AuthGuard from '@/components/AuthGuard';
 
 export default function Profile() {
@@ -29,6 +34,7 @@ export default function Profile() {
     const router = useRouter();
     const [houseName, setHouseName] = useState('');
     const [loading, setLoading] = useState(false);
+    const [openDeleteDialog, setOpenDeleteDialog] = useState(false);
     const { showToast } = useToast();
 
     // Derived state
@@ -65,12 +71,13 @@ export default function Profile() {
         setLoading(false);
     };
 
-    const handleInitiateDelete = async () => {
+    const handleInitiateDelete = () => {
+        setOpenDeleteDialog(true);
+    };
+
+    const confirmDeleteHouse = async () => {
+        setOpenDeleteDialog(false);
         if (!user?.email || !houseDetails?.id) return;
-        if (!confirm(memberCount > 1
-            ? 'All members must approve before the house is deleted. Continue?'
-            : 'Are you sure you want to delete this house? All data will be permanently removed.'
-        )) return;
 
         setLoading(true);
         try {
@@ -283,6 +290,24 @@ export default function Profile() {
                         )}
                     </Box>
                 </Container>
+
+                <Dialog open={openDeleteDialog} onClose={() => setOpenDeleteDialog(false)}>
+                    <DialogTitle>Delete House?</DialogTitle>
+                    <DialogContent>
+                        <DialogContentText>
+                            {memberCount > 1
+                                ? 'All members must approve before the house is deleted. Continue to initiate the request?'
+                                : 'Are you sure you want to delete this house? All data will be permanently removed.'}
+                        </DialogContentText>
+                    </DialogContent>
+                    <DialogActions>
+                        <Button onClick={() => setOpenDeleteDialog(false)}>Cancel</Button>
+                        <Button onClick={confirmDeleteHouse} color="error" variant="contained">
+                            {memberCount > 1 ? 'Request Deletion' : 'Delete'}
+                        </Button>
+                    </DialogActions>
+                </Dialog>
+
                 <Box sx={{ pb: 7 }}>
                     <BottomNav />
                 </Box>
