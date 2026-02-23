@@ -5,6 +5,9 @@ import AppBar from '@mui/material/AppBar';
 import Box from '@mui/material/Box';
 import Toolbar from '@mui/material/Toolbar';
 import Typography from '@mui/material/Typography';
+import IconButton from '@mui/material/IconButton';
+import Tooltip from '@mui/material/Tooltip';
+import LogoutIcon from '@mui/icons-material/Logout';
 import Link from 'next/link';
 import { useAuth } from '@/components/AuthContext';
 
@@ -13,7 +16,7 @@ interface NavbarProps {
 }
 
 export default function Navbar({ actions }: NavbarProps) {
-    const { user } = useAuth();
+    const { user, logout } = useAuth();
 
     return (
         <Box sx={{ flexGrow: 1, position: 'sticky', top: 0, zIndex: 1100 }}>
@@ -27,11 +30,16 @@ export default function Navbar({ actions }: NavbarProps) {
                             </Typography>
                         </Box>
                     </Link>
-                    {actions && (
-                        <Box sx={{ position: 'absolute', right: 16 }}>
-                            {actions}
-                        </Box>
-                    )}
+                    <Box sx={{ position: 'absolute', right: 16, display: 'flex', alignItems: 'center', gap: 1 }}>
+                        {actions}
+                        {user && (
+                            <Tooltip title="Logout">
+                                <IconButton onClick={logout} size="small" sx={{ color: 'error.main' }}>
+                                    <LogoutIcon fontSize="small" />
+                                </IconButton>
+                            </Tooltip>
+                        )}
+                    </Box>
                 </Toolbar>
             </AppBar>
         </Box>

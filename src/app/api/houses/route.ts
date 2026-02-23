@@ -1,6 +1,29 @@
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/firebase';
-import { collection, addDoc, updateDoc, doc, getDoc, getDocs, deleteDoc, setDoc } from 'firebase/firestore';
+import { collection, addDoc, updateDoc, doc, getDoc, getDocs, deleteDoc, setDoc, query, where } from 'firebase/firestore';
+
+async function deleteHouseAndAllData(houseId: string, members: string[]) {
+    // 1. Clear groupId from all members
+    const userUpdates = members.map(email =>
+        updateDoc(doc(db, 'users', email), { groupId: null })
+    );
+    await Promise.all(userUpdates);
+
+    // 2. Delete all expenses for this house
+    const expensesSnap = await getDocs(query(collection(db, 'expenses'), where('houseId', '==', houseId)));
+    await Promise.all(expensesSnap.docs.map(d => deleteDoc(d.ref)));
+
+    // 3. Delete all shopping todos for this house
+    const todosSnap = await getDocs(query(collection(db, 'shopping_todos'), where('houseId', '==', houseId)));
+    await Promise.all(todosSnap.docs.map(d => deleteDoc(d.ref)));
+
+    // 4. Delete all settlements for this house
+    const settlementsSnap = await getDocs(query(collection(db, 'settlements'), where('houseId', '==', houseId)));
+    await Promise.all(settlementsSnap.docs.map(d => deleteDoc(d.ref)));
+
+    // 5. Delete the house doc
+    await deleteDoc(doc(db, 'groups', houseId));
+}
 
 export async function POST(request: Request) {
     try {
@@ -68,18 +91,26 @@ export async function DELETE(request: Request) {
         const houseData = houseSnap.data();
 
         if (houseData.createdBy !== userEmail) {
-            return NextResponse.json({ error: 'Only creator can delete' }, { status: 403 });
+            return NextResponse.json({ error: 'Only creator can initiate deletion' }, { status: 403 });
         }
 
-        const updates = houseData.members.map(async (memberEmail: string) => {
-            const userRef = doc(db, 'users', memberEmail);
-            await updateDoc(userRef, { groupId: null });
-        });
+        const members: string[] = houseData.members || [];
 
-        await Promise.all(updates);
-        await deleteDoc(houseRef);
-
-        return NextResponse.json({ success: true });
+        if (members.length <= 1) {
+            // Only one member - delete immediately
+            await deleteHouseAndAllData(houseId, members);
+            return NextResponse.json({ success: true, deleted: true });
+        } else {
+            // Multiple members - create a pending deletion request
+            await updateDoc(houseRef, {
+                deletionRequest: {
+                    initiatedBy: userEmail,
+                    approvals: [],
+                    createdAt: new Date().toISOString()
+                }
+            });
+            return NextResponse.json({ success: true, deleted: false, pendingApproval: true });
+        }
     } catch (error) {
         console.error("Delete house error", error);
         return NextResponse.json({ error: 'Failed to delete house' }, { status: 500 });

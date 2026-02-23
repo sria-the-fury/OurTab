@@ -10,34 +10,37 @@ import TextField from '@mui/material/TextField';
 import MenuItem from '@mui/material/MenuItem';
 import { useAuth } from '@/components/AuthContext';
 import { useToast } from '@/components/ToastContext';
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import BottomNav from '@/components/BottomNav';
 import Loader from '@/components/Loader';
 import Paper from '@mui/material/Paper';
+import Alert from '@mui/material/Alert';
+import Chip from '@mui/material/Chip';
+import Divider from '@mui/material/Divider';
+import HomeIcon from '@mui/icons-material/Home';
+import DeleteForeverIcon from '@mui/icons-material/DeleteForever';
+import HowToVoteIcon from '@mui/icons-material/HowToVote';
+import CancelIcon from '@mui/icons-material/Cancel';
 import { useRouter } from 'next/navigation';
 import AuthGuard from '@/components/AuthGuard';
 
-interface House {
-    id: string;
-    name: string;
-    currency?: string;
-    createdBy: string;
-}
-
 export default function Profile() {
-    const { user, logout, currency, updateCurrency, loading: authLoading, dbUser, house, mutateUser, mutateHouse } = useAuth();
+    const { user, currency, updateCurrency, loading: authLoading, dbUser, house, mutateUser, mutateHouse } = useAuth();
     const router = useRouter();
     const [houseName, setHouseName] = useState('');
     const [loading, setLoading] = useState(false);
-
-    // Derived state from cached data
-    const hasHouse = !!dbUser?.groupId;
-    const houseDetails = house;
-
     const { showToast } = useToast();
+
+    // Derived state
+    const hasHouse = !!dbUser?.groupId;
+    const houseDetails = house as any;
+    const isCreator = houseDetails?.createdBy === user?.email;
+    const deletionRequest = houseDetails?.deletionRequest;
+    const memberCount = (houseDetails?.members || []).length;
+    const hasApproved = deletionRequest?.approvals?.includes(user?.email);
+
     const handleCurrencyChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-        const newCurrency = e.target.value;
-        await updateCurrency(newCurrency);
+        await updateCurrency(e.target.value);
     };
 
     const handleCreateHouse = async (e: React.FormEvent) => {
@@ -47,58 +50,101 @@ export default function Profile() {
             const res = await fetch('/api/houses', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    name: houseName,
-                    createdBy: user?.email, // Using email as identifier for now
-                    currency: currency // Send current currency pref as house currency
-                })
+                body: JSON.stringify({ name: houseName, createdBy: user?.email, currency })
             });
-
             if (res.ok) {
                 showToast('House created successfully!', 'success');
-                // Revalidate cache to show new house instantly
                 mutateUser();
                 mutateHouse();
             } else {
                 showToast('Failed to create house', 'error');
             }
         } catch (err) {
-            console.error(err);
             showToast('Error creating house', 'error');
         }
         setLoading(false);
     };
 
-    const handleDeleteHouse = async () => {
-        if (!user || !user.email) return;
-        if (!confirm('Are you sure you want to delete this house? All members will be removed.')) return;
+    const handleInitiateDelete = async () => {
+        if (!user?.email || !houseDetails?.id) return;
+        if (!confirm(memberCount > 1
+            ? 'All members must approve before the house is deleted. Continue?'
+            : 'Are you sure you want to delete this house? All data will be permanently removed.'
+        )) return;
+
         setLoading(true);
         try {
-            // Need houseId. Assuming we have it in houseDetails
-            if (houseDetails && houseDetails.id) {
-                const res = await fetch('/api/houses', {
-                    method: 'DELETE',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ houseId: houseDetails.id, userEmail: user.email })
-                });
-
-                if (res.ok) {
-                    showToast('House deleted successfully', 'success');
-                    updateCurrency('USD'); // Reset to default or keep user pref? Let's keep it safe.
-                    // Revalidate cache
+            const res = await fetch('/api/houses', {
+                method: 'DELETE',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ houseId: houseDetails.id, userEmail: user.email })
+            });
+            const data = await res.json();
+            if (res.ok) {
+                if (data.deleted) {
+                    showToast('House and all data deleted successfully', 'success');
                     mutateUser();
                     mutateHouse();
                 } else {
-                    showToast('Failed to delete house', 'error');
+                    showToast('Deletion request sent to all members for approval', 'info');
+                    mutateHouse();
                 }
+            } else {
+                showToast(data.error || 'Failed to delete house', 'error');
             }
         } catch (error) {
-            console.error("Delete failed", error);
             showToast('Error deleting house', 'error');
         }
         setLoading(false);
     };
 
+    const handleApproveDeletion = async () => {
+        if (!user?.email || !houseDetails?.id) return;
+        setLoading(true);
+        try {
+            const res = await fetch('/api/houses/approve-deletion', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ houseId: houseDetails.id, userEmail: user.email })
+            });
+            const data = await res.json();
+            if (res.ok) {
+                if (data.deleted) {
+                    showToast('House deleted. All data has been removed.', 'success');
+                } else {
+                    showToast('Your approval has been recorded.', 'success');
+                }
+                mutateUser();
+                mutateHouse();
+            } else {
+                showToast(data.error || 'Failed to approve', 'error');
+            }
+        } catch (error) {
+            showToast('Error approving deletion', 'error');
+        }
+        setLoading(false);
+    };
+
+    const handleCancelDeletion = async () => {
+        if (!user?.email || !houseDetails?.id) return;
+        setLoading(true);
+        try {
+            const res = await fetch('/api/houses/cancel-deletion', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ houseId: houseDetails.id, userEmail: user.email })
+            });
+            if (res.ok) {
+                showToast('Deletion request cancelled', 'success');
+                mutateHouse();
+            } else {
+                showToast('Failed to cancel deletion', 'error');
+            }
+        } catch (error) {
+            showToast('Error cancelling deletion', 'error');
+        }
+        setLoading(false);
+    };
 
     if (authLoading) return <Loader />;
     if (!user) return null;
@@ -111,33 +157,95 @@ export default function Profile() {
                     <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
                         <Avatar src={user.photoURL || ''} sx={{ width: 100, height: 100, mb: 2 }} />
                         <Typography variant="h5">{user.displayName}</Typography>
-                        <Typography color="text.secondary" gutterBottom>{user.email}</Typography>
-
-                        <Button variant="outlined" color="error" onClick={logout} sx={{ mt: 2 }}>
-                            Logout
-                        </Button>
+                        <Typography color="text.secondary">{user.email}</Typography>
+                        {hasHouse && houseDetails && (
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mt: 1 }}>
+                                <HomeIcon sx={{ fontSize: 16, color: 'primary.main' }} />
+                                <Typography variant="body2" color="text.secondary">
+                                    Member of{' '}
+                                    <Box component="span" sx={{ fontWeight: 'bold', fontFamily: 'var(--font-abril)', color: 'primary.main', fontSize: '0.9rem' }}>
+                                        {houseDetails.name}
+                                    </Box>
+                                    {' '}[{houseDetails.currency === 'EUR' ? '€' : houseDetails.currency === 'BDT' ? '৳' : '$'}]
+                                </Typography>
+                            </Box>
+                        )}
                     </Box>
 
                     <Box sx={{ mt: 6 }}>
-                        <Typography variant="h6" gutterBottom>My House</Typography>
 
                         {hasHouse && houseDetails ? (
                             <Paper className="glass" sx={{ p: 3, background: 'transparent', boxShadow: 'none' }}>
-                                <Typography variant="h6" color="primary" gutterBottom>
-                                    {houseDetails.name}
+                                <Typography variant="subtitle2" color="text.secondary" sx={{ mb: 2, textTransform: 'uppercase', letterSpacing: 1 }}>
+                                    House Management
                                 </Typography>
-                                <Typography variant="body1" color="text.secondary">
-                                    <strong>Currency:</strong> {houseDetails.currency || 'Not set'}
-                                </Typography>
-                                {/* <Button
-                                variant="text"
-                                color="error"
-                                size="small"
-                                onClick={handleDeleteHouse}
-                                sx={{ mt: 2 }}
-                            >
-                                Delete House
-                            </Button> */}
+
+                                {/* Deletion logic */}
+                                {!deletionRequest && isCreator && (
+                                    <Button
+                                        variant="outlined"
+                                        color="error"
+                                        size="small"
+                                        startIcon={<DeleteForeverIcon />}
+                                        onClick={handleInitiateDelete}
+                                        disabled={loading}
+                                    >
+                                        {memberCount > 1 ? 'Request House Deletion' : 'Delete House'}
+                                    </Button>
+                                )}
+
+                                {!deletionRequest && !isCreator && (
+                                    <Typography variant="body2" color="text.secondary">
+                                        Only the house creator can initiate deletion.
+                                    </Typography>
+                                )}
+
+                                {deletionRequest && isCreator && (
+                                    <Alert
+                                        severity="warning"
+                                        sx={{ mb: 2 }}
+                                        action={
+                                            <Button
+                                                color="inherit"
+                                                size="small"
+                                                startIcon={<CancelIcon />}
+                                                onClick={handleCancelDeletion}
+                                                disabled={loading}
+                                            >
+                                                Cancel
+                                            </Button>
+                                        }
+                                    >
+                                        <strong>Deletion pending approval.</strong><br />
+                                        Approved by {deletionRequest.approvals?.length || 0} of {memberCount - 1} members.
+                                    </Alert>
+                                )}
+
+                                {deletionRequest && !isCreator && !hasApproved && (
+                                    <Alert
+                                        severity="error"
+                                        sx={{ mb: 2 }}
+                                        action={
+                                            <Button
+                                                color="inherit"
+                                                size="small"
+                                                startIcon={<HowToVoteIcon />}
+                                                onClick={handleApproveDeletion}
+                                                disabled={loading}
+                                            >
+                                                Approve
+                                            </Button>
+                                        }
+                                    >
+                                        <strong>{deletionRequest.initiatedBy}</strong> has requested to delete this house and all its data.
+                                    </Alert>
+                                )}
+
+                                {deletionRequest && !isCreator && hasApproved && (
+                                    <Alert severity="info">
+                                        You have approved the deletion. Waiting for other members.
+                                    </Alert>
+                                )}
                             </Paper>
                         ) : (
                             <Paper className="glass" sx={{ p: 3, background: 'transparent', boxShadow: 'none' }}>
@@ -179,5 +287,3 @@ export default function Profile() {
         </AuthGuard>
     );
 }
-
-
