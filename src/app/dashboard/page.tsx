@@ -34,6 +34,7 @@ import TextField from '@mui/material/TextField';
 import PersonAddIcon from '@mui/icons-material/PersonAdd';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
+import FormatListBulletedIcon from '@mui/icons-material/FormatListBulleted';
 
 interface House {
     id: string;
@@ -57,8 +58,12 @@ export default function Dashboard() {
     const router = useRouter();
 
     // Use the custom hook for data fetching
+    const { house, expenses, todos, loading: dataLoading, mutateHouse, mutateExpenses } = useHouseData();
 
-    const { house, expenses, loading: dataLoading, mutateHouse, mutateExpenses } = useHouseData();
+    // Derived state for pending todos
+    const pendingTodos = useMemo(() => {
+        return todos?.filter(todo => !todo.isCompleted) || [];
+    }, [todos]);
 
     // Combine loading states
     const loading = authLoading || (!!user && dataLoading && !house && expenses.length === 0);
@@ -443,7 +448,7 @@ export default function Dashboard() {
                                         <Typography component="p" variant="h5" gutterBottom sx={{ fontWeight: 600 }}>
                                             {house.name}
                                         </Typography>
-                                        <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, mb: 3 }}>
+                                        <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 1, mb: 3 }}>
                                             {house.members?.map((member) => (
                                                 <Chip
                                                     key={member.email}
@@ -476,6 +481,59 @@ export default function Dashboard() {
                                 )}
                             </Paper>
                         </Grid>
+
+                        {/* Buy List Widget */}
+                        <Grid size={{ xs: 12, md: 4 }}>
+                            <Paper sx={{
+                                p: 3,
+                                display: 'flex',
+                                flexDirection: 'column',
+                                height: '100%',
+                                position: 'relative',
+                                overflow: 'hidden',
+                                cursor: 'pointer',
+                                transition: 'transform 0.2s, box-shadow 0.2s',
+                                '&:hover': {
+                                    transform: 'translateY(-2px)',
+                                    boxShadow: '0 8px 24px rgba(0,0,0,0.1)'
+                                },
+                            }}
+                                onClick={() => router.push('/buy-list')}
+                            >
+                                <Box sx={{ position: 'absolute', top: -10, right: -10, opacity: 0.05, color: '#f50057' }}>
+                                    <FormatListBulletedIcon sx={{ fontSize: 100 }} />
+                                </Box>
+                                <Typography component="h2" variant="h6" sx={{ color: '#f50057' }} gutterBottom>
+                                    Buy List ({pendingTodos.length})
+                                </Typography>
+
+                                <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 1 }}>
+                                    {pendingTodos.length === 0 ? (
+                                        <Typography color="text.secondary" variant="body2" sx={{ my: 'auto', textAlign: 'center' }}>
+                                            No pending items. You're all caught up! ✨
+                                        </Typography>
+                                    ) : (
+                                        pendingTodos.slice(0, 3).map(todo => (
+                                            <Box key={todo.id} sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                                <Box sx={{ width: 6, height: 6, borderRadius: '50%', backgroundColor: '#f50057' }} />
+                                                <Typography variant="body2" noWrap sx={{ flex: 1 }}>
+                                                    {todo.itemName}
+                                                </Typography>
+                                            </Box>
+                                        ))
+                                    )}
+                                    {pendingTodos.length > 3 && (
+                                        <Typography variant="caption" color="text.secondary" sx={{ mt: 1 }}>
+                                            + {pendingTodos.length - 3} more items
+                                        </Typography>
+                                    )}
+                                </Box>
+                                <Typography variant="caption" sx={{ mt: 'auto', pt: 2, color: 'text.secondary', alignSelf: 'flex-start', display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                                    {pendingTodos.length === 0 ? 'Click to add item' : 'Click to open full list'} <ArrowForwardIosIcon sx={{ fontSize: 10 }} />
+                                </Typography>
+                            </Paper>
+                        </Grid>
+
                     </Grid>
 
                     {/* Settlements Widget - KEEP AS IS (Usually settles all time, or maybe just this month? 

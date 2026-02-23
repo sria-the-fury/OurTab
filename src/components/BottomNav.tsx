@@ -3,10 +3,10 @@ import { useState, useEffect } from 'react';
 import BottomNavigation from '@mui/material/BottomNavigation';
 import BottomNavigationAction from '@mui/material/BottomNavigationAction';
 import Paper from '@mui/material/Paper';
-import HomeIcon from '@mui/icons-material/Home';
 import ShoppingCartIcon from '@mui/icons-material/ShoppingCart';
 import PersonIcon from '@mui/icons-material/Person';
-import AssignmentIcon from '@mui/icons-material/Assignment';
+import DashboardIcon from '@mui/icons-material/Dashboard';
+import FormatListBulletedIcon from '@mui/icons-material/FormatListBulleted';
 import { useRouter, usePathname } from 'next/navigation';
 
 export default function BottomNav() {
@@ -19,18 +19,26 @@ export default function BottomNav() {
     }, [pathname]);
 
     return (
-        <Paper className="glass-bottom-nav" sx={{ position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 1000, background: 'transparent', backdropFilter: 'blur(10px)' }} elevation={3}>
+        <Paper sx={{ position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 1000 }} elevation={3} className="glass-nav">
             <BottomNavigation
                 showLabels
-                value={value}
+                value={pathname}
                 onChange={(event, newValue) => {
-                    setValue(newValue);
                     router.push(newValue);
                 }}
-                sx={{ background: 'transparent' }}
+                sx={{
+                    background: 'transparent',
+                    '& .MuiBottomNavigationAction-root': {
+                        minWidth: 'auto',
+                        padding: '6px 0',
+                    },
+                    '& .Mui-selected': {
+                        color: 'primary.main',
+                    }
+                }}
             >
-                <BottomNavigationAction label="Dashboard" value="/dashboard" icon={<HomeIcon />} />
-                <BottomNavigationAction label="Buy List" value="/todos" icon={<AssignmentIcon />} />
+                <BottomNavigationAction label="Dashboard" value="/dashboard" icon={<DashboardIcon />} />
+                <BottomNavigationAction label="Buy List" value="/buy-list" icon={<FormatListBulletedIcon />} />
                 <BottomNavigationAction label="Shopping" value="/shopping" icon={<ShoppingCartIcon />} />
                 <BottomNavigationAction label="Profile" value="/profile" icon={<PersonIcon />} />
             </BottomNavigation>

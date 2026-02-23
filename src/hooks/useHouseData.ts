@@ -19,6 +19,16 @@ export interface Expense {
     contributors?: Array<{ email: string; amount: number }>;
 }
 
+export interface Todo {
+    id: string;
+    itemName: string;
+    isCompleted: boolean;
+    addedBy: string;
+    houseId: string;
+    createdAt: string;
+    completedAt?: string;
+}
+
 const fetcher = (url: string) => fetch(url).then((res) => res.json());
 
 export function useHouseData() {
@@ -36,12 +46,20 @@ export function useHouseData() {
         fetcher
     );
 
+    // 3. Fetch Buy List (todos)
+    const { data: todos, error: todosError, isLoading: todosLoading, mutate: mutateTodos } = useSWR<Todo[]>(
+        house?.id ? `/api/shopping-todos?houseId=${house.id}` : null,
+        fetcher
+    );
+
     return {
         house,
         expenses: expenses || [],
-        loading: houseLoading || (!!house?.id && expensesLoading),
-        error: houseError || expensesError,
+        todos: todos || [],
+        loading: houseLoading || (!!house?.id && (expensesLoading || todosLoading)),
+        error: houseError || expensesError || todosError,
         mutateHouse,
-        mutateExpenses
+        mutateExpenses,
+        mutateTodos
     };
 }
