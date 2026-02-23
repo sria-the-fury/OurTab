@@ -444,13 +444,18 @@ export default function Dashboard() {
                                 <Box sx={{ position: 'absolute', top: -10, right: -10, opacity: 0.15, color: 'info.main' }}>
                                     <GroupIcon sx={{ fontSize: 100 }} />
                                 </Box>
-                                <Typography component="h2" variant="h6" color="info.main" gutterBottom>
-                                    My House
-                                </Typography>
                                 {house ? (
                                     <Box>
-                                        <Typography component="p" variant="h5" sx={{ fontWeight: 'bold', fontFamily: 'var(--font-abril)', color: 'primary.main', mb: 2 }}>
+                                        <Typography component="h2" variant="h4" sx={{
+                                            fontWeight: 'bold',
+                                            fontFamily: 'var(--font-abril)',
+                                            color: 'primary.main',
+                                            mb: 3,
+                                            pt: 1
+                                        }}>
+                                            <Box component="span" sx={{ fontSize: '1.5em', color: 'rgba(108, 99, 255, 0.4)', lineHeight: 0, verticalAlign: 'bottom' }}>&ldquo;</Box>
                                             {house.name}
+                                            <Box component="span" sx={{ fontSize: '1.5em', color: 'rgba(108, 99, 255, 0.4)', lineHeight: 0, verticalAlign: 'top' }}>&rdquo;</Box>
                                         </Typography>
                                         <Box sx={{ display: 'flex', flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 1, mb: 3 }}>
                                             {house.members?.map((member) => (
@@ -477,6 +482,9 @@ export default function Dashboard() {
                                     </Box>
                                 ) : (
                                     <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'start', justifyContent: 'center', flex: 1 }}>
+                                        <Typography component="h2" variant="h6" color="info.main" gutterBottom>
+                                            My House
+                                        </Typography>
                                         <Typography color="text.secondary" paragraph>
                                             You are not in a house yet.
                                         </Typography>
