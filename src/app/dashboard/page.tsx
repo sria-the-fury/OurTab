@@ -449,7 +449,7 @@ export default function Dashboard() {
                                 </Typography>
                                 {house ? (
                                     <Box>
-                                        <Typography component="p" variant="h5" gutterBottom sx={{ fontWeight: 600 }}>
+                                        <Typography component="p" variant="h5" sx={{ fontWeight: 'bold', fontFamily: 'var(--font-abril)', color: 'primary.main', mb: 2 }}>
                                             {house.name}
                                         </Typography>
                                         <Box sx={{ display: 'flex', flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 1, mb: 3 }}>
