@@ -407,7 +407,7 @@ export default function Shopping() {
                 else if (net > 0.01) creditors.push({ email, amount: net });
             });
 
-            const settlements: string[] = [];
+            const settlements: { debtorName: string, creditorName: string, amountStr: string }[] = [];
             let i = 0;
             let j = 0;
 
@@ -419,7 +419,11 @@ export default function Shopping() {
                 const debtorName = currentHouseData?.members?.find((m: any) => m.email === debtor.email)?.name || debtor.email.split('@')[0];
                 const creditorName = currentHouseData?.members?.find((m: any) => m.email === creditor.email)?.name || creditor.email.split('@')[0];
 
-                settlements.push(`${debtorName} pays ${creditorName}: ${getCurrencySymbol()}${amount.toFixed(2)}`);
+                settlements.push({
+                    debtorName,
+                    creditorName,
+                    amountStr: `${getCurrencySymbol()}${amount.toFixed(2)}`
+                });
 
                 debtor.amount -= amount;
                 creditor.amount -= amount;
@@ -428,8 +432,11 @@ export default function Shopping() {
                 if (creditor.amount < 0.01) j++;
             }
 
-            if (activeMemberCount === 0) settlements.push("No members to split expenses.");
-            else if (settlements.length === 0 && totalGroupExpense > 0) settlements.push("All settled! Everyone paid their share.");
+            if (activeMemberCount === 0) {
+                // settlements.push("No members to split expenses.");
+            } else if (settlements.length === 0 && totalGroupExpense > 0) {
+                // settlements.push("All settled! Everyone paid their share.");
+            }
 
 
             // Pre-load assets
@@ -437,19 +444,7 @@ export default function Shopping() {
             // Since we have a helper that converts images to PNG data URLs via canvas, we can use that on the SVG.
             const logoDataUrl = await loadImage('/icon.svg');
 
-            // Mapping email to loaded photo URL
-            const memberPhotos: { [email: string]: string | null } = {};
-
-            if (currentHouseData?.members) {
-                await Promise.all(currentHouseData.members.map(async (m: any) => {
-                    if (m.photoUrl) {
-                        const loaded = await loadImage(m.photoUrl);
-                        if (loaded) { // Only store if successfully loaded
-                            memberPhotos[m.email] = loaded;
-                        }
-                    }
-                }));
-            }
+            // We no longer fetch member photos for the PDF to prevent 429 rate limit errors 
 
             // Import jsPDF
             const { jsPDF } = await import('jspdf');
@@ -487,11 +482,10 @@ export default function Shopping() {
             doc.text(`Date: ${todayStr}`, rightX, 36, { align: 'right' });
 
             // Report Month Title (Optional, fits context)
+            const titleY = Math.max(leftY, 45) + 5;
             doc.setFontSize(14);
             doc.setFont('helvetica', 'bold');
-            doc.text(`Expense Report: ${month}`, 14, 45);
-
-            let memberY = 45;
+            doc.text(`Expense Report: ${month}`, pageWidth / 2, titleY, { align: 'center' });
 
             // --- TABLE ---
             // Sort expenses by date (latest first)
@@ -510,13 +504,35 @@ export default function Shopping() {
                 const names = fullName.split(' ');
                 const displayName = names.length >= 2 ? `${names[0]} ${names[1]}` : names[0];
 
+                let userCellContent = '';
+                const contributors = (exp as any).contributors || [];
+
+                if (contributors.length > 0) {
+                    const shopperContrib = contributors.find((c: any) => c.email === (exp as any).userId);
+                    const shopperAmount = shopperContrib ? shopperContrib.amount : 0;
+                    userCellContent = `${displayName} ${getCurrencySymbol()}${shopperAmount.toFixed(2)}`;
+
+                    const others = contributors.filter((c: any) => c.email !== (exp as any).userId);
+                    if (others.length > 0) {
+                        userCellContent += '\n------------------\n';
+                        userCellContent += others.map((c: any) => {
+                            const otherMember = currentHouseData?.members?.find((m: any) => m.email === c.email);
+                            const otherFullName = otherMember?.name || c.email.split('@')[0];
+                            const otherNames = otherFullName.split(' ');
+                            const otherDisplayName = otherNames.length >= 2 ? `${otherNames[0]} ${otherNames[1]}` : otherNames[0];
+                            return `${otherDisplayName} ${getCurrencySymbol()}${c.amount.toFixed(2)}`;
+                        }).join('\n');
+                    }
+                } else {
+                    userCellContent = `${displayName} ${getCurrencySymbol()}${(exp as any).amount.toFixed(2)}`;
+                }
+
                 return [
                     dateStr,
                     (exp as any).description,
                     {
-                        content: displayName,
-                        styles: { valign: 'middle', halign: 'left' },
-                        userId: (exp as any).userId // Passing ID for drawCell hook
+                        content: userCellContent,
+                        styles: { fontSize: 7, valign: 'middle', halign: 'left' }
                     },
                     `${getCurrencySymbol()}${(exp as any).amount.toFixed(2)}`
                 ];
@@ -529,20 +545,39 @@ export default function Shopping() {
             autoTable(doc, {
                 head: [['Date', 'Description', 'User', 'Amount']],
                 body: tableData,
-                startY: memberY + 15,
+                startY: titleY + 5,
                 theme: 'grid',
-                styles: { fontSize: 9, cellPadding: 3, valign: 'middle' },
+                styles: { fontSize: 7, cellPadding: 3, valign: 'middle' },
                 headStyles: { fillColor: [50, 50, 50] },
                 columnStyles: {
-                    0: { cellWidth: 25 }, // Date
+                    0: { cellWidth: 22 }, // Date
                     1: { cellWidth: 'auto' }, // Desc
                     2: { cellWidth: 40 }, // User
-                    3: { cellWidth: 25, halign: 'right' } // Amount
+                    3: { cellWidth: 18, halign: 'right' } // Amount
                 }
             });
 
             // --- SETTLEMENT SECTION ---
             const finalY = (doc as any).lastAutoTable.finalY + 10;
+
+            // Function to draw settlement line
+            const drawSettlementLine = (settlement: any, yPosition: number) => {
+                let currentX = 14;
+                doc.setFont('helvetica', 'bold');
+                doc.text(settlement.debtorName, currentX, yPosition);
+                currentX += doc.getTextWidth(settlement.debtorName) + 1;
+
+                doc.setFont('helvetica', 'normal');
+                doc.text("pays", currentX, yPosition);
+                currentX += doc.getTextWidth("pays") + 1;
+
+                doc.setFont('helvetica', 'bold');
+                doc.text(settlement.creditorName + ":", currentX, yPosition);
+                currentX += doc.getTextWidth(settlement.creditorName + ":") + 1;
+
+                doc.setFont('helvetica', 'normal');
+                doc.text(settlement.amountStr, currentX, yPosition);
+            };
 
             // Check if we need a new page
             if (finalY > doc.internal.pageSize.height - 40) {
@@ -552,23 +587,31 @@ export default function Shopping() {
                 doc.text("Settlement Plan", 14, 20);
                 let currentY = 30;
                 doc.setFontSize(10);
-                doc.setFont('helvetica', 'normal');
-                settlements.forEach(line => {
-                    doc.text(line, 14, currentY);
-                    currentY += 6;
-                });
+                if (settlements.length === 0) {
+                    doc.setFont('helvetica', 'normal');
+                    doc.text(activeMemberCount === 0 ? "No members to split expenses." : (totalGroupExpense > 0 ? "All settled! Everyone paid their share." : ""), 14, currentY);
+                } else {
+                    settlements.forEach(settlement => {
+                        drawSettlementLine(settlement, currentY);
+                        currentY += 6;
+                    });
+                }
             } else {
                 doc.setFontSize(12);
                 doc.setFont('helvetica', 'bold');
                 doc.text("Settlement Plan", 14, finalY);
 
                 doc.setFontSize(10);
-                doc.setFont('helvetica', 'normal');
                 let currentY = finalY + 8;
-                settlements.forEach(line => {
-                    doc.text(line, 14, currentY);
-                    currentY += 6;
-                });
+                if (settlements.length === 0) {
+                    doc.setFont('helvetica', 'normal');
+                    doc.text(activeMemberCount === 0 ? "No members to split expenses." : (totalGroupExpense > 0 ? "All settled! Everyone paid their share." : ""), 14, currentY);
+                } else {
+                    settlements.forEach(settlement => {
+                        drawSettlementLine(settlement, currentY);
+                        currentY += 6;
+                    });
+                }
             }
 
             // --- FOOTER ---
@@ -578,14 +621,16 @@ export default function Shopping() {
 
                 const footerY = doc.internal.pageSize.height - 10;
 
-                // Draw Brand Logo (Centered)
-                // Assuming logo is square-ish.
+                const footerText = 'OurTab';
                 const logoDim = 6;
-                const centerX = pageWidth / 2;
+                // Draw Brand Logo (Centered relative to text)
+                const textWidth = doc.getTextWidth(footerText);
+                const totalWidth = logoDim + 2 + textWidth; // 2 is padding between logo and text
+                const startX = (pageWidth - totalWidth) / 2;
 
                 if (logoDataUrl) {
                     try {
-                        doc.addImage(logoDataUrl, 'PNG', centerX - 15, footerY - 5, logoDim, logoDim);
+                        doc.addImage(logoDataUrl, 'PNG', startX, footerY - 5, logoDim, logoDim);
                     } catch (e) {
                         console.warn('Failed to add logo to PDF', e);
                     }
@@ -594,11 +639,23 @@ export default function Shopping() {
                 // Brand Name (on same line as logo)
                 doc.setFontSize(10);
                 doc.setFont('times', 'bold');
-                doc.text('OurTab', centerX - 6, footerY);
+                doc.text(footerText, startX + logoDim + 2, footerY);
+
+                // Page Number (Right aligned)
+                doc.setFontSize(8);
+                doc.setFont('helvetica', 'normal');
+                const pageString = `Page ${i} of ${pageCount}`;
+                doc.text(pageString, pageWidth - 14, footerY, { align: 'right' });
             }
 
             console.log('Saving PDF...');
-            doc.save(`expenses_${month.replace(/ /g, '_')}.pdf`);
+
+            const monthName = month.split(' ')[0];
+            const year = month.split(' ')[1];
+            const day = String(today.getDate()).padStart(2, '0');
+            const fileName = `${monthName}_${year}_${day}_Expenses.pdf`;
+
+            doc.save(fileName);
 
             showToast('PDF downloaded successfully!', 'success');
         } catch (error) {

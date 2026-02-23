@@ -10,6 +10,7 @@ import Tooltip from '@mui/material/Tooltip';
 import LogoutIcon from '@mui/icons-material/Logout';
 import Link from 'next/link';
 import { useAuth } from '@/components/AuthContext';
+import { usePathname } from 'next/navigation';
 
 interface NavbarProps {
     actions?: React.ReactNode;
@@ -17,6 +18,9 @@ interface NavbarProps {
 
 export default function Navbar({ actions }: NavbarProps) {
     const { user, logout } = useAuth();
+    const pathname = usePathname();
+
+    const isProfilePage = pathname === '/profile';
 
     return (
         <Box sx={{ flexGrow: 1, position: 'sticky', top: 0, zIndex: 1100 }}>
@@ -32,7 +36,7 @@ export default function Navbar({ actions }: NavbarProps) {
                     </Link>
                     <Box sx={{ position: 'absolute', right: 16, display: 'flex', alignItems: 'center', gap: 1 }}>
                         {actions}
-                        {user && (
+                        {user && isProfilePage && (
                             <Tooltip title="Logout">
                                 <IconButton onClick={logout} size="small" sx={{ color: 'error.main' }}>
                                     <LogoutIcon fontSize="small" />
