@@ -90,10 +90,6 @@ export async function DELETE(request: Request) {
 
         const houseData = houseSnap.data()!;
 
-        if (houseData.createdBy !== userEmail) {
-            return NextResponse.json({ error: 'Only creator can initiate deletion' }, { status: 403 });
-        }
-
         const members: string[] = houseData.members || [];
 
         if (members.length <= 1) {

@@ -1,0 +1,59 @@
+import { NextResponse } from 'next/server';
+import { adminDb } from '@/lib/firebaseAdmin';
+
+export async function POST(request: Request) {
+    try {
+        const body = await request.json();
+        const { houseId, userEmail, userToApprove } = body;
+
+        if (!houseId || !userEmail || !userToApprove) {
+            return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
+        }
+
+        const houseRef = adminDb.collection('groups').doc(houseId);
+        const houseSnap = await houseRef.get();
+
+        if (!houseSnap.exists) {
+            return NextResponse.json({ error: 'House not found' }, { status: 404 });
+        }
+
+        const houseData = houseSnap.data()!;
+        const leaveRequests = houseData.leaveRequests || {};
+        const leaveRequest = leaveRequests[userToApprove];
+
+        if (!leaveRequest) {
+            return NextResponse.json({ error: 'No leave request found for this user' }, { status: 400 });
+        }
+
+        const existingApprovals: string[] = leaveRequest.approvals || [];
+        if (!existingApprovals.includes(userEmail)) {
+            existingApprovals.push(userEmail);
+        }
+
+        const allMembers: string[] = houseData.members || [];
+        const otherMembers = allMembers.filter(m => m !== userToApprove);
+        const allApproved = otherMembers.every(m => existingApprovals.includes(m));
+
+        if (allApproved) {
+            const newMembers = allMembers.filter(m => m !== userToApprove);
+            delete leaveRequests[userToApprove];
+
+            const batch = adminDb.batch();
+            batch.update(houseRef, { members: newMembers, leaveRequests });
+
+            const userRef = adminDb.collection('users').doc(userToApprove);
+            batch.update(userRef, { groupId: null });
+
+            await batch.commit();
+            return NextResponse.json({ success: true, fullyApproved: true, left: true });
+        } else {
+            leaveRequests[userToApprove].approvals = existingApprovals;
+            await houseRef.update({ leaveRequests });
+            return NextResponse.json({ success: true, fullyApproved: false });
+        }
+
+    } catch (error) {
+        console.error('Approve leave error', error);
+        return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
+    }
+}

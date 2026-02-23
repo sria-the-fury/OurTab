@@ -21,6 +21,7 @@ import HomeIcon from '@mui/icons-material/Home';
 import DeleteForeverIcon from '@mui/icons-material/DeleteForever';
 import HowToVoteIcon from '@mui/icons-material/HowToVote';
 import CancelIcon from '@mui/icons-material/Cancel';
+import DirectionsRunIcon from '@mui/icons-material/DirectionsRun';
 import { useRouter } from 'next/navigation';
 import Dialog from '@mui/material/Dialog';
 import DialogTitle from '@mui/material/DialogTitle';
@@ -35,15 +36,24 @@ export default function Profile() {
     const [houseName, setHouseName] = useState('');
     const [loading, setLoading] = useState(false);
     const [openDeleteDialog, setOpenDeleteDialog] = useState(false);
+    const [openLeaveDialog, setOpenLeaveDialog] = useState(false);
     const { showToast } = useToast();
-
     // Derived state
     const hasHouse = !!dbUser?.groupId;
     const houseDetails = house as any;
-    const isCreator = houseDetails?.createdBy === user?.email;
+
+    // Handle older groups that might not have a createdBy field
+    const effectiveCreator = houseDetails?.createdBy || (houseDetails?.members && houseDetails.members[0]);
+    const isCreator = effectiveCreator === user?.email;
+    const creatorLeft = Boolean(houseDetails?.createdBy && houseDetails?.members && !houseDetails.members.includes(houseDetails.createdBy));
+    const canDeleteHouse = isCreator || creatorLeft;
     const deletionRequest = houseDetails?.deletionRequest;
     const memberCount = (houseDetails?.members || []).length;
     const hasApproved = deletionRequest?.approvals?.includes(user?.email);
+
+    const leaveRequests = houseDetails?.leaveRequests || {};
+    const myLeaveRequest = leaveRequests[user?.email || ''];
+    const otherLeaveRequests = Object.entries(leaveRequests).filter(([email]) => email !== user?.email);
 
     const handleCurrencyChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
         await updateCurrency(e.target.value);
@@ -73,6 +83,85 @@ export default function Profile() {
 
     const handleInitiateDelete = () => {
         setOpenDeleteDialog(true);
+    };
+
+    const handleInitiateLeave = () => {
+        setOpenLeaveDialog(true);
+    };
+
+    const confirmLeaveHouse = async () => {
+        setOpenLeaveDialog(false);
+        if (!user?.email || !houseDetails?.id) return;
+        setLoading(true);
+        try {
+            const res = await fetch('/api/houses/leave-house', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ houseId: houseDetails.id, userEmail: user.email })
+            });
+            const data = await res.json();
+            if (res.ok) {
+                if (data.pendingApproval) {
+                    showToast('Leave request sent for approval', 'info');
+                } else {
+                    showToast('You have successfully left the house', 'success');
+                    mutateUser();
+                }
+                mutateHouse();
+            } else {
+                showToast('Failed to leave house', 'error');
+            }
+        } catch (error) {
+            showToast('Error leaving house', 'error');
+        }
+        setLoading(false);
+    };
+
+    const handleCancelLeave = async () => {
+        if (!user?.email || !houseDetails?.id) return;
+        setLoading(true);
+        try {
+            const res = await fetch('/api/houses/cancel-leave', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ houseId: houseDetails.id, userEmail: user.email })
+            });
+            if (res.ok) {
+                showToast('Leave request cancelled', 'success');
+                mutateHouse();
+            } else {
+                showToast('Failed to cancel leave', 'error');
+            }
+        } catch (error) {
+            showToast('Error cancelling leave', 'error');
+        }
+        setLoading(false);
+    };
+
+    const handleApproveLeave = async (userToApprove: string) => {
+        if (!user?.email || !houseDetails?.id) return;
+        setLoading(true);
+        try {
+            const res = await fetch('/api/houses/approve-leave', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ houseId: houseDetails.id, userEmail: user.email, userToApprove })
+            });
+            const data = await res.json();
+            if (res.ok) {
+                if (data.fullyApproved) {
+                    showToast(`${userToApprove} has left the house.`, 'success');
+                } else {
+                    showToast('Approval recorded', 'success');
+                }
+                mutateHouse();
+            } else {
+                showToast('Failed to approve leave', 'error');
+            }
+        } catch (error) {
+            showToast('Error approving leave', 'error');
+        }
+        setLoading(false);
     };
 
     const confirmDeleteHouse = async () => {
@@ -187,27 +276,77 @@ export default function Profile() {
                                     House Management
                                 </Typography>
 
-                                {/* Deletion logic */}
-                                {!deletionRequest && isCreator && (
-                                    <Button
-                                        variant="outlined"
-                                        color="error"
-                                        size="small"
-                                        startIcon={<DeleteForeverIcon />}
-                                        onClick={handleInitiateDelete}
-                                        disabled={loading}
+                                {/* House actions */}
+                                {!deletionRequest && otherLeaveRequests.length === 0 && (
+                                    <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap', mb: 2 }}>
+                                        {memberCount > 1 && !myLeaveRequest && (
+                                            <Button
+                                                variant="outlined"
+                                                color="warning"
+                                                size="small"
+                                                startIcon={<DirectionsRunIcon />}
+                                                onClick={handleInitiateLeave}
+                                                disabled={loading}
+                                            >
+                                                Leave House
+                                            </Button>
+                                        )}
+                                        {canDeleteHouse && !myLeaveRequest && (
+                                            <Button
+                                                variant="outlined"
+                                                color="error"
+                                                size="small"
+                                                startIcon={<DeleteForeverIcon />}
+                                                onClick={handleInitiateDelete}
+                                                disabled={loading}
+                                            >
+                                                {memberCount > 1 ? 'Request House Deletion' : 'Delete House'}
+                                            </Button>
+                                        )}
+                                    </Box>
+                                )}
+
+                                {/* Leave Request logic */}
+                                {myLeaveRequest && (
+                                    <Alert
+                                        severity="warning"
+                                        sx={{ mb: 2 }}
+                                        action={
+                                            <Button color="inherit" size="small" startIcon={<CancelIcon />} onClick={handleCancelLeave} disabled={loading}>
+                                                Cancel
+                                            </Button>
+                                        }
                                     >
-                                        {memberCount > 1 ? 'Request House Deletion' : 'Delete House'}
-                                    </Button>
+                                        <strong>Your leave request is pending.</strong><br />
+                                        Approved by {myLeaveRequest.approvals?.length || 0} of {memberCount - 1} members.
+                                    </Alert>
                                 )}
 
-                                {!deletionRequest && !isCreator && (
-                                    <Typography variant="body2" color="text.secondary">
-                                        Only the house creator can initiate deletion.
-                                    </Typography>
-                                )}
+                                {otherLeaveRequests.map(([email, req]: [string, any]) => {
+                                    const hasApprovedLeave = req.approvals?.includes(user?.email);
+                                    return (
+                                        <Alert
+                                            key={email}
+                                            severity="info"
+                                            sx={{ mb: 2 }}
+                                            action={
+                                                !hasApprovedLeave ? (
+                                                    <Button color="inherit" size="small" startIcon={<HowToVoteIcon />} onClick={() => handleApproveLeave(email)} disabled={loading}>
+                                                        Approve
+                                                    </Button>
+                                                ) : undefined
+                                            }
+                                        >
+                                            {hasApprovedLeave ? (
+                                                <span>You approved <strong>{email}</strong>'s request to leave. Waiting for others.</span>
+                                            ) : (
+                                                <span><strong>{email}</strong> has requested to leave the house.</span>
+                                            )}
+                                        </Alert>
+                                    );
+                                })}
 
-                                {deletionRequest && isCreator && (
+                                {deletionRequest && deletionRequest.initiatedBy === user?.email && (
                                     <Alert
                                         severity="warning"
                                         sx={{ mb: 2 }}
@@ -228,7 +367,7 @@ export default function Profile() {
                                     </Alert>
                                 )}
 
-                                {deletionRequest && !isCreator && !hasApproved && (
+                                {deletionRequest && deletionRequest.initiatedBy !== user?.email && !hasApproved && (
                                     <Alert
                                         severity="error"
                                         sx={{ mb: 2 }}
@@ -248,8 +387,8 @@ export default function Profile() {
                                     </Alert>
                                 )}
 
-                                {deletionRequest && !isCreator && hasApproved && (
-                                    <Alert severity="info">
+                                {deletionRequest && deletionRequest.initiatedBy !== user?.email && hasApproved && (
+                                    <Alert severity="info" sx={{ mb: 2 }}>
                                         You have approved the deletion. Waiting for other members.
                                     </Alert>
                                 )}
@@ -297,13 +436,30 @@ export default function Profile() {
                         <DialogContentText>
                             {memberCount > 1
                                 ? 'All members must approve before the house is deleted. Continue to initiate the request?'
-                                : 'Are you sure you want to delete this house? All data will be permanently removed.'}
+                                : 'Are you sure you want to delete this house? All data will be permanently removed. This cannot be undone.'}
                         </DialogContentText>
                     </DialogContent>
                     <DialogActions>
                         <Button onClick={() => setOpenDeleteDialog(false)}>Cancel</Button>
                         <Button onClick={confirmDeleteHouse} color="error" variant="contained">
                             {memberCount > 1 ? 'Request Deletion' : 'Delete'}
+                        </Button>
+                    </DialogActions>
+                </Dialog>
+
+                <Dialog open={openLeaveDialog} onClose={() => setOpenLeaveDialog(false)}>
+                    <DialogTitle>Leave House?</DialogTitle>
+                    <DialogContent>
+                        <DialogContentText>
+                            Are you sure you want to leave this house? You will no longer be able to see its expenses or buy list. Your past expenses will remain.
+                            <br /><br />
+                            <strong>Warning:</strong> Please ensure you have settled any outstanding balances before leaving.
+                        </DialogContentText>
+                    </DialogContent>
+                    <DialogActions>
+                        <Button onClick={() => setOpenLeaveDialog(false)}>Cancel</Button>
+                        <Button onClick={confirmLeaveHouse} color="warning" variant="contained">
+                            Leave House
                         </Button>
                     </DialogActions>
                 </Dialog>
