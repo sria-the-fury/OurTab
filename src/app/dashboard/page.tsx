@@ -452,7 +452,7 @@ export default function Dashboard() {
                                         <Typography component="p" variant="h5" gutterBottom sx={{ fontWeight: 600 }}>
                                             {house.name}
                                         </Typography>
-                                        <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 1, mb: 3 }}>
+                                        <Box sx={{ display: 'flex', flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 1, mb: 3 }}>
                                             {house.members?.map((member) => (
                                                 <Chip
                                                     key={member.email}
