@@ -6,6 +6,7 @@ import Paper from '@mui/material/Paper';
 import HomeIcon from '@mui/icons-material/Home';
 import ShoppingCartIcon from '@mui/icons-material/ShoppingCart';
 import PersonIcon from '@mui/icons-material/Person';
+import AssignmentIcon from '@mui/icons-material/Assignment';
 import { useRouter, usePathname } from 'next/navigation';
 
 export default function BottomNav() {
@@ -29,6 +30,7 @@ export default function BottomNav() {
                 sx={{ background: 'transparent' }}
             >
                 <BottomNavigationAction label="Dashboard" value="/dashboard" icon={<HomeIcon />} />
+                <BottomNavigationAction label="Buy List" value="/todos" icon={<AssignmentIcon />} />
                 <BottomNavigationAction label="Shopping" value="/shopping" icon={<ShoppingCartIcon />} />
                 <BottomNavigationAction label="Profile" value="/profile" icon={<PersonIcon />} />
             </BottomNavigation>

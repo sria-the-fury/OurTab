@@ -582,8 +582,8 @@ export default function Dashboard() {
                                             <Paper key={expense.id} className="glass" sx={{ p: 2, background: 'transparent' }}>
                                                 <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                                                     <Box>
-                                                        <Typography variant="body1" sx={{ fontWeight: 600 }}>
-                                                            Groceries - {expense.description}
+                                                        <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                                                            Groceries: {expense.description}
                                                         </Typography>
                                                         <Typography variant="caption" color="text.secondary">
                                                             {memberName} • {expenseDateStr}

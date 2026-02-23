@@ -32,6 +32,7 @@ import AccordionSummary from '@mui/material/AccordionSummary';
 import AccordionDetails from '@mui/material/AccordionDetails';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import PeopleIcon from '@mui/icons-material/People';
+import RadioButtonUncheckedIcon from '@mui/icons-material/RadioButtonUnchecked';
 import { Contributor } from '@/types/settlement-types';
 
 interface GroceryItem {
@@ -81,6 +82,7 @@ export default function Shopping() {
     const [selectedContributors, setSelectedContributors] = useState<Set<string>>(new Set());
     const [myContribution, setMyContribution] = useState<string>('');
 
+
     // Add item to list
     const handleAddItem = (e: React.FormEvent) => {
         e.preventDefault();
@@ -97,6 +99,7 @@ export default function Shopping() {
         setItemName('');
         setItemPrice('');
     };
+
 
     // Remove item from list
     const handleRemoveItem = (id: string) => {
@@ -618,7 +621,6 @@ export default function Shopping() {
                     </Typography>
 
 
-
                     {/* Add Item Form */}
                     <Paper className="glass" sx={{ p: 3, mb: 3, background: 'transparent', boxShadow: 'none' }}>
                         <Typography variant="h6" gutterBottom>Add Item</Typography>
@@ -868,7 +870,6 @@ export default function Shopping() {
                     <BottomNav />
                 </Box>
 
-                {/* History Dialog */}
                 <Dialog open={openHistory} onClose={() => setOpenHistory(false)} fullWidth>
                     <DialogTitle>Monthly History</DialogTitle>
                     <DialogContent>

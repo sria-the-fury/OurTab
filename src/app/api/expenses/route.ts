@@ -52,6 +52,33 @@ export async function POST(request: Request) {
 
         const expenseRef = await addDoc(collection(db, 'expenses'), expenseData);
 
+        // --- Auto-mark Shopping To-Dos ---
+        try {
+            const todosRef = collection(db, 'shopping_todos');
+            const q = query(todosRef, where("houseId", "==", houseId), where("isCompleted", "==", false));
+            const todosSnap = await getDocs(q);
+
+            const batch = [];
+            for (const doc of todosSnap.docs) {
+                const todo = doc.data();
+                // Match description (case insensitive check)
+                if (description.toLowerCase().includes(todo.itemName.toLowerCase())) {
+                    batch.push(updateDoc(doc.ref, {
+                        isCompleted: true,
+                        expenseId: expenseRef.id,
+                        completedAt: new Date().toISOString()
+                    }));
+                }
+            }
+            if (batch.length > 0) {
+                await Promise.all(batch);
+                console.log(`Auto-marked ${batch.length} todos for expense ${expenseRef.id}`);
+            }
+        } catch (todoError) {
+            console.error('Error auto-marking todos:', todoError);
+            // Don't fail the whole request if auto-marking fails
+        }
+
         return NextResponse.json({ id: expenseRef.id, ...expenseData });
     } catch (error) {
         console.error('Error creating expense:', error);
