@@ -22,6 +22,8 @@ import ArrowUpwardIcon from '@mui/icons-material/ArrowUpward';
 import ArrowDownwardIcon from '@mui/icons-material/ArrowDownward';
 import AccountBalanceWalletIcon from '@mui/icons-material/AccountBalanceWallet';
 import IconButton from '@mui/material/IconButton';
+import ContentCopyIcon from '@mui/icons-material/ContentCopy';
+import Tooltip from '@mui/material/Tooltip';
 import { useAuth } from '@/components/AuthContext';
 import { useRouter } from 'next/navigation';
 import { useHouseData } from '@/hooks/useHouseData';
@@ -46,7 +48,7 @@ interface House {
     id: string;
     name: string;
     createdBy: string;
-    members?: { email: string; name?: string; photoUrl?: string }[];
+    members?: { email: string; name?: string; photoUrl?: string; iban?: string }[];
 }
 
 interface Expense {
@@ -111,6 +113,20 @@ export default function Dashboard() {
     const [paySettlement, setPaySettlement] = useState<{ from: string; to: string; amount: number } | null>(null);
     const [payAmount, setPayAmount] = useState('');
     const [payMethod, setPayMethod] = useState<'cash' | 'bank'>('bank');
+
+    // Member Details Dialog State
+    const [openMemberDialog, setOpenMemberDialog] = useState(false);
+    const [selectedMember, setSelectedMember] = useState<{ email: string; name?: string; photoUrl?: string; iban?: string } | null>(null);
+
+    const handleMemberClick = (member: any) => {
+        setSelectedMember(member);
+        setOpenMemberDialog(true);
+    };
+
+    const handleCopy = (text: string) => {
+        navigator.clipboard.writeText(text);
+        showToast('Copied to clipboard!', 'success');
+    };
 
     // Calculate totals when expenses change
     useEffect(() => {
@@ -523,6 +539,7 @@ export default function Dashboard() {
                                                     label={member.name || member.email.split('@')[0]}
                                                     variant="filled"
                                                     color="default"
+                                                    onClick={() => handleMemberClick(member)}
                                                     sx={{ bgcolor: 'rgba(0,0,0,0.05)' }}
                                                 />
                                             ))}
@@ -1029,6 +1046,43 @@ export default function Dashboard() {
                         >
                             Confirm Payment
                         </Button>
+                    </DialogActions>
+                </Dialog>
+
+                {/* Member Details Dialog */}
+                <Dialog open={openMemberDialog} onClose={() => setOpenMemberDialog(false)} maxWidth="xs" fullWidth>
+                    <DialogTitle>Member Details</DialogTitle>
+                    <DialogContent>
+                        {selectedMember && (
+                            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, mt: 1 }}>
+                                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                                        <Avatar src={selectedMember.photoUrl} alt={selectedMember.name} />
+                                        <Typography variant="body1"><strong>{selectedMember.name || selectedMember.email.split('@')[0]}</strong></Typography>
+                                    </Box>
+                                    <Tooltip title="Copy Name">
+                                        <IconButton onClick={() => handleCopy(selectedMember.name || selectedMember.email.split('@')[0])} size="small">
+                                            <ContentCopyIcon fontSize="small" />
+                                        </IconButton>
+                                    </Tooltip>
+                                </Box>
+                                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                                    <Typography variant="body2" color="text.secondary">
+                                        <strong>IBAN:</strong> {selectedMember.iban || 'Not provided'}
+                                    </Typography>
+                                    {selectedMember.iban && (
+                                        <Tooltip title="Copy IBAN">
+                                            <IconButton onClick={() => handleCopy(selectedMember.iban!)} size="small">
+                                                <ContentCopyIcon fontSize="small" />
+                                            </IconButton>
+                                        </Tooltip>
+                                    )}
+                                </Box>
+                            </Box>
+                        )}
+                    </DialogContent>
+                    <DialogActions>
+                        <Button onClick={() => setOpenMemberDialog(false)}>Close</Button>
                     </DialogActions>
                 </Dialog>
             </main>
