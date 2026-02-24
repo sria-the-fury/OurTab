@@ -266,6 +266,8 @@ export default function Shopping() {
 
     const [openHistory, setOpenHistory] = useState(false);
     const [monthlyExpenses, setMonthlyExpenses] = useState<{ [key: string]: Expense[] }>({});
+    const [allExpenses, setAllExpenses] = useState<Expense[]>([]);
+
     // Removed local groupData state, use 'group' from useAuth
 
     // Helper to load image for PDF
@@ -329,6 +331,7 @@ export default function Shopping() {
                     grouped[monthKey].push(exp);
                 });
                 setMonthlyExpenses(grouped);
+                setAllExpenses(expensesData);
                 setOpenHistory(true);
             } else {
                 showToast('House not found', 'error');
@@ -346,25 +349,40 @@ export default function Shopping() {
             console.log('Starting PDF generation for:', month);
             const currentHouseData = house;
 
-            const expenses = monthlyExpenses[month];
-            if (!expenses) {
+            const monthExpenses = monthlyExpenses[month];
+            if (!monthExpenses) {
                 console.error('No expenses found for month:', month);
                 return;
             }
 
-            // --- SETTLEMENT LOGIC ---
-            const memberBalances: { [email: string]: number } = {};
-            if (currentHouseData?.members) {
-                currentHouseData.members.forEach((m: any) => memberBalances[m.email] = 0);
-            }
+            // Filter out settlements for table and total
+            const expenses = monthExpenses.filter((e: any) => !e.isSettlementPayment);
 
-            let totalGroupExpense = 0;
+            // --- SETTLEMENT LOGIC --- (Follows Dashboard logic using allExpenses)
+            const memberBalances: { [email: string]: number } = {};
+            const members = currentHouseData?.members || [];
+            members.forEach((m: any) => memberBalances[m.email] = 0);
+
+            let totalGroupExpense = 0; // For the monthly table total, we will calculate from `expenses` later
+
             expenses.forEach((exp: any) => {
-                const amount = (exp as any).amount;
-                const payer = (exp as any).userId;
+                totalGroupExpense += exp.amount;
+            });
+
+            allExpenses.forEach((exp: any) => {
+                const amount = exp.amount;
+                const payer = exp.userId;
+
+                if (exp.isSettlementPayment && exp.settlementBetween && exp.settlementBetween.length === 2) {
+                    const [p, r] = [exp.userId, exp.settlementBetween.find((e: string) => e !== exp.userId)!];
+                    if (memberBalances[p] !== undefined) memberBalances[p] += amount;
+                    else memberBalances[p] = amount;
+                    if (memberBalances[r] !== undefined) memberBalances[r] -= amount;
+                    else memberBalances[r] = -amount;
+                    return;
+                }
 
                 if (exp.contributors && exp.contributors.length > 0) {
-                    // Track individual contributions
                     let contributorTotal = 0;
                     exp.contributors.forEach((c: any) => {
                         if (memberBalances[c.email] !== undefined) {
@@ -374,7 +392,6 @@ export default function Shopping() {
                         }
                         contributorTotal += c.amount;
                     });
-                    // Attribute remainder to creator if contributors don't cover full amount
                     const remainder = amount - contributorTotal;
                     if (remainder > 0.01) {
                         if (memberBalances[payer] !== undefined) {
@@ -383,59 +400,62 @@ export default function Shopping() {
                             memberBalances[payer] = remainder;
                         }
                     }
+                    const sharePerPerson = amount / members.length;
+                    members.forEach((m: any) => memberBalances[m.email] -= sharePerPerson);
                 } else {
-                    // No contributors - creator paid all
                     if (memberBalances[payer] !== undefined) {
                         memberBalances[payer] += amount;
                     } else {
                         memberBalances[payer] = amount;
                     }
+                    const sharePerPerson = amount / members.length;
+                    members.forEach((m: any) => memberBalances[m.email] -= sharePerPerson);
                 }
-
-                totalGroupExpense += amount;
             });
 
-            const activeMemberCount = currentHouseData?.members?.length || 0;
-            const sharePerPerson = totalGroupExpense / (activeMemberCount || 1);
-
-            const debtors: { email: string, amount: number }[] = [];
-            const creditors: { email: string, amount: number }[] = [];
-
+            const netBalances: { id: string, amount: number }[] = [];
             Object.keys(memberBalances).forEach(email => {
-                const net = memberBalances[email] - sharePerPerson;
-                if (net < -0.01) debtors.push({ email, amount: -net });
-                else if (net > 0.01) creditors.push({ email, amount: net });
+                netBalances.push({
+                    id: email,
+                    amount: memberBalances[email]
+                });
             });
+
+            const receivers = netBalances.filter(b => b.amount > 0.01).sort((a, b) => b.amount - a.amount);
+            const payers = netBalances.filter(b => b.amount < -0.01).sort((a, b) => a.amount - b.amount);
 
             const settlements: { debtorName: string, creditorName: string, amountStr: string }[] = [];
-            let i = 0;
-            let j = 0;
+            let r = 0;
+            let p = 0;
 
-            while (i < debtors.length && j < creditors.length) {
-                const debtor = debtors[i];
-                const creditor = creditors[j];
-                const amount = Math.min(debtor.amount, creditor.amount);
+            while (r < receivers.length && p < payers.length) {
+                const receiver = receivers[r];
+                const payer = payers[p];
+                const amount = Math.min(Math.abs(payer.amount), receiver.amount);
 
-                const debtorName = currentHouseData?.members?.find((m: any) => m.email === debtor.email)?.name || debtor.email.split('@')[0];
-                const creditorName = currentHouseData?.members?.find((m: any) => m.email === creditor.email)?.name || creditor.email.split('@')[0];
+                if (amount > 0.01) {
+                    const debtorName = members.find((m: any) => m.email === payer.id)?.name || payer.id.split('@')[0];
+                    const creditorName = members.find((m: any) => m.email === receiver.id)?.name || receiver.id.split('@')[0];
 
-                settlements.push({
-                    debtorName,
-                    creditorName,
-                    amountStr: `${getCurrencySymbol()}${amount.toFixed(2)}`
-                });
+                    settlements.push({
+                        debtorName,
+                        creditorName,
+                        amountStr: `${getCurrencySymbol()}${amount.toFixed(2)}`
+                    });
+                }
 
-                debtor.amount -= amount;
-                creditor.amount -= amount;
+                receiver.amount -= amount;
+                payer.amount += amount;
 
-                if (debtor.amount < 0.01) i++;
-                if (creditor.amount < 0.01) j++;
+                if (receiver.amount < 0.01) r++;
+                if (payer.amount > -0.01) p++;
             }
 
+            const activeMemberCount = members.length;
             if (activeMemberCount === 0) {
-                // settlements.push("No members to split expenses.");
-            } else if (settlements.length === 0 && totalGroupExpense > 0) {
-                // settlements.push("All settled! Everyone paid their share.");
+                // ...
+            } else if (settlements.length === 0) {
+                // ...
             }
 
 
@@ -456,7 +476,7 @@ export default function Shopping() {
             // --- HEADER ---
             // House Name (Centered with stylish font)
             doc.setFontSize(20);
-            doc.setFont('times', 'bold');
+            doc.setFont('abril', 'bold');
             doc.text(currentHouseData?.name || 'My House', pageWidth / 2, 20, { align: 'center' });
 
             // Left: House Members
@@ -484,7 +504,7 @@ export default function Shopping() {
             // Report Month Title (Optional, fits context)
             const titleY = Math.max(leftY, 45) + 5;
             doc.setFontSize(14);
-            doc.setFont('helvetica', 'bold');
+            doc.setFont('abril', 'bold');
             doc.text(`Expense Report: ${month}`, pageWidth / 2, titleY, { align: 'center' });
 
             // --- TABLE ---
@@ -589,7 +609,7 @@ export default function Shopping() {
                 doc.setFontSize(10);
                 if (settlements.length === 0) {
                     doc.setFont('helvetica', 'normal');
-                    doc.text(activeMemberCount === 0 ? "No members to split expenses." : (totalGroupExpense > 0 ? "All settled! Everyone paid their share." : ""), 14, currentY);
+                    doc.text(activeMemberCount === 0 ? "No members to split expenses." : (allExpenses.length > 0 ? "All settled! Everyone paid their share." : ""), 14, currentY);
                 } else {
                     settlements.forEach(settlement => {
                         drawSettlementLine(settlement, currentY);
@@ -605,7 +625,7 @@ export default function Shopping() {
                 let currentY = finalY + 8;
                 if (settlements.length === 0) {
                     doc.setFont('helvetica', 'normal');
-                    doc.text(activeMemberCount === 0 ? "No members to split expenses." : (totalGroupExpense > 0 ? "All settled! Everyone paid their share." : ""), 14, currentY);
+                    doc.text(activeMemberCount === 0 ? "No members to split expenses." : (allExpenses.length > 0 ? "All settled! Everyone paid their share." : ""), 14, currentY);
                 } else {
                     settlements.forEach(settlement => {
                         drawSettlementLine(settlement, currentY);
@@ -939,7 +959,7 @@ export default function Shopping() {
                                 }>
                                     <ListItemText
                                         primary={month}
-                                        secondary={`Total: ${getCurrencySymbol()}${monthlyExpenses[month].reduce((sum, e: any) => sum + e.amount, 0).toFixed(2)}`}
+                                        secondary={`Total: ${getCurrencySymbol()}${monthlyExpenses[month].filter((e: any) => !e.isSettlementPayment).reduce((sum, e: any) => sum + e.amount, 0).toFixed(2)}`}
                                     />
                                 </ListItem>
                             ))}
