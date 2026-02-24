@@ -56,7 +56,7 @@ export default function Profile() {
         name?: string;
         currency?: string;
         createdBy?: string;
-        members?: string[];
+        members?: { email: string; name?: string; photoUrl?: string; }[];
         deletionRequest?: {
             initiatedBy?: string;
             approvals?: string[];
@@ -67,9 +67,9 @@ export default function Profile() {
         pendingPayments?: unknown[];
     }
     const houseDetails = house as HouseDetails | null;
-    const effectiveCreator = houseDetails?.createdBy || (houseDetails?.members && houseDetails.members[0]);
+    const effectiveCreator = houseDetails?.createdBy || (houseDetails?.members && houseDetails.members[0]?.email);
     const isCreator = effectiveCreator === user?.email;
-    const creatorLeft = Boolean(houseDetails?.createdBy && houseDetails?.members && !houseDetails.members.includes(houseDetails.createdBy));
+    const creatorLeft = Boolean(houseDetails?.createdBy && houseDetails?.members && !houseDetails.members.some(m => m.email === houseDetails.createdBy));
     const canDeleteHouse = isCreator || creatorLeft;
     const deletionRequest = houseDetails?.deletionRequest;
     const memberCount = (houseDetails?.members || []).length;
@@ -359,13 +359,21 @@ export default function Profile() {
 
                                 {otherLeaveRequests.map(([email, req]: [string, { approvals?: string[] }]) => {
                                     const hasApprovedLeave = req.approvals?.includes(user?.email ?? '');
+                                    const requesterObj = houseDetails?.members?.find(m => m.email === email);
+                                    const requesterName = requesterObj?.name || email.split('@')[0];
+                                    const requesterPhotoUrl = requesterObj?.photoUrl || '';
                                     return (
                                         <Alert key={email} severity="info" action={!hasApprovedLeave ? (
                                             <Button color="inherit" size="small" startIcon={<HowToVoteIcon />} onClick={() => handleApproveLeave(email)} disabled={loading}>Approve</Button>
                                         ) : undefined}>
-                                            {hasApprovedLeave
-                                                ? <span>You approved <strong>{email}</strong>&apos;s request. Waiting for others.</span>
-                                                : <span><strong>{email}</strong> has requested to leave the house.</span>}
+                                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                                <Avatar src={requesterPhotoUrl} sx={{ width: 24, height: 24 }} />
+                                                <Box>
+                                                    {hasApprovedLeave
+                                                        ? <span>You approved <strong>{requesterName}</strong>&apos;s request. Waiting for others.</span>
+                                                        : <span><strong>{requesterName}</strong> has requested to leave the house.</span>}
+                                                </Box>
+                                            </Box>
                                         </Alert>
                                     );
                                 })}
@@ -377,11 +385,21 @@ export default function Profile() {
                                     </Alert>
                                 )}
 
-                                {deletionRequest && deletionRequest.initiatedBy !== user?.email && !hasApproved && (
-                                    <Alert severity="error" action={<Button color="inherit" size="small" startIcon={<HowToVoteIcon />} onClick={handleApproveDeletion} disabled={loading}>Approve</Button>}>
-                                        <strong>{deletionRequest.initiatedBy}</strong> has requested to delete this house and all its data.
-                                    </Alert>
-                                )}
+                                {deletionRequest && deletionRequest.initiatedBy !== user?.email && !hasApproved && (() => {
+                                    const initiatorObj = houseDetails?.members?.find(m => m.email === deletionRequest.initiatedBy);
+                                    const initiatorName = initiatorObj?.name || deletionRequest.initiatedBy?.split('@')[0] || 'A member';
+                                    const initiatorPhotoUrl = initiatorObj?.photoUrl || '';
+                                    return (
+                                        <Alert severity="error" action={<Button color="inherit" size="small" startIcon={<HowToVoteIcon />} onClick={handleApproveDeletion} disabled={loading}>Approve</Button>}>
+                                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                                <Avatar src={initiatorPhotoUrl} sx={{ width: 24, height: 24 }} />
+                                                <Box>
+                                                    <strong>{initiatorName}</strong> has requested to delete this house and all its data.
+                                                </Box>
+                                            </Box>
+                                        </Alert>
+                                    );
+                                })()}
 
                                 {deletionRequest && deletionRequest.initiatedBy !== user?.email && hasApproved && (
                                     <Alert severity="info">You have approved the deletion. Waiting for other members.</Alert>

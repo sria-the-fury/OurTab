@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { adminDb } from '@/lib/firebaseAdmin';
+import { createNotification } from '@/lib/notifications';
 
 export async function POST(request: Request) {
     try {
@@ -45,10 +46,36 @@ export async function POST(request: Request) {
             batch.update(userRef, { groupId: null });
 
             await batch.commit();
+
+            // Notify fully approved
+            try {
+                await createNotification({
+                    userId: userToApprove,
+                    type: 'house',
+                    message: `Your request to leave the house has been fully approved.`
+                });
+                const otherNots = newMembers.map((m: string) => createNotification({
+                    userId: m,
+                    type: 'house',
+                    message: `${userToApprove} has left the house.`
+                }));
+                await Promise.all(otherNots);
+            } catch (e) { console.error('Error notif fully approved', e); }
+
             return NextResponse.json({ success: true, fullyApproved: true, left: true });
         } else {
             leaveRequests[userToApprove].approvals = existingApprovals;
             await houseRef.update({ leaveRequests });
+
+            // Notify partial approval
+            try {
+                await createNotification({
+                    userId: userToApprove,
+                    type: 'house',
+                    message: `${userEmail} approved your request to leave.`
+                });
+            } catch (e) { console.error('Error notif partial approval', e); }
+
             return NextResponse.json({ success: true, fullyApproved: false });
         }
 

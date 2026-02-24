@@ -810,72 +810,76 @@ export default function Dashboard() {
                                         .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
                                     const displayedExpenses = showAllExpenses ? sortedExpenses : sortedExpenses.slice(0, 5);
 
-                                    return displayedExpenses.map((expense) => {
-                                        const member = house?.members?.find(m => m.email === expense.userId);
-                                        const memberName = member?.name || expense.userId.split('@')[0];
-                                        const expenseDate = new Date(expense.date);
-                                        const expenseDateStr = expenseDate.toLocaleString('en-GB', {
-                                            day: 'numeric',
-                                            month: 'short',
-                                            year: 'numeric',
-                                            hour: '2-digit',
-                                            minute: '2-digit',
-                                            hour12: false
-                                        });
+                                    return (
+                                        <>
+                                            {displayedExpenses.map((expense) => {
+                                                const member = house?.members?.find(m => m.email === expense.userId);
+                                                const memberName = member?.name || expense.userId.split('@')[0];
+                                                const expenseDate = new Date(expense.date);
+                                                const expenseDateStr = expenseDate.toLocaleString('en-GB', {
+                                                    day: 'numeric',
+                                                    month: 'short',
+                                                    year: 'numeric',
+                                                    hour: '2-digit',
+                                                    minute: '2-digit',
+                                                    hour12: false
+                                                });
 
-                                        // Check if current user is owner and within 48 hours
-                                        const isOwner = user?.email === expense.userId;
-                                        const now = new Date();
-                                        const diffInHours = (now.getTime() - expenseDate.getTime()) / (1000 * 60 * 60);
-                                        const canEdit = isOwner && diffInHours <= 48;
+                                                // Check if current user is owner and within 48 hours
+                                                const isOwner = user?.email === expense.userId;
+                                                const now = new Date();
+                                                const diffInHours = (now.getTime() - expenseDate.getTime()) / (1000 * 60 * 60);
+                                                const canEdit = isOwner && diffInHours <= 48;
 
-                                        return (
-                                            <Paper key={expense.id} className="glass" sx={{ p: 2, background: 'transparent' }}>
-                                                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                                    <Box>
-                                                        <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                                                            Groceries: {expense.description}
-                                                        </Typography>
-                                                        <Typography variant="caption" color="text.secondary">
-                                                            {memberName} • {expenseDateStr}
-                                                        </Typography>
-                                                        {expense.contributors && expense.contributors.length > 0 && (
-                                                            <Typography variant="caption" color="primary" sx={{ display: 'block', mt: 0.5 }}>
-                                                                Paid by: {expense.contributors.map(c => {
-                                                                    const contributorMember = house?.members?.find(m => m.email === c.email);
-                                                                    const contributorName = contributorMember?.name || c.email.split('@')[0];
-                                                                    return `${contributorName} (${displayCurrency}${c.amount.toFixed(2)})`;
-                                                                }).join(', ')}
-                                                            </Typography>
-                                                        )}
-                                                    </Box>
-                                                    <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                                                        <Typography variant="h6" color="primary" sx={{ fontWeight: 'bold', mr: 2 }}>
-                                                            {displayCurrency}{expense.amount.toFixed(2)}
-                                                        </Typography>
-                                                        {canEdit && (
-                                                            <IconButton
-                                                                size="small"
-                                                                color="error"
-                                                                onClick={() => handleDeleteExpense(expense.id)}
-                                                            >
-                                                                <DeleteIcon fontSize="small" />
-                                                            </IconButton>
-                                                        )}
-                                                    </Box>
-                                                </Box>
-                                            </Paper>
-                                        );
-                                    });
+                                                return (
+                                                    <Paper key={expense.id} className="glass" sx={{ p: 2, background: 'transparent' }}>
+                                                        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                                            <Box>
+                                                                <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                                                                    Groceries: {expense.description}
+                                                                </Typography>
+                                                                <Typography variant="caption" color="text.secondary">
+                                                                    {memberName} • {expenseDateStr}
+                                                                </Typography>
+                                                                {expense.contributors && expense.contributors.length > 0 && (
+                                                                    <Typography variant="caption" color="primary" sx={{ display: 'block', mt: 0.5 }}>
+                                                                        Paid by: {expense.contributors.map(c => {
+                                                                            const contributorMember = house?.members?.find(m => m.email === c.email);
+                                                                            const contributorName = contributorMember?.name || c.email.split('@')[0];
+                                                                            return `${contributorName} (${displayCurrency}${c.amount.toFixed(2)})`;
+                                                                        }).join(', ')}
+                                                                    </Typography>
+                                                                )}
+                                                            </Box>
+                                                            <Box sx={{ display: 'flex', alignItems: 'center' }}>
+                                                                <Typography variant="h6" color="primary" sx={{ fontWeight: 'bold', mr: 2 }}>
+                                                                    {displayCurrency}{expense.amount.toFixed(2)}
+                                                                </Typography>
+                                                                {canEdit && (
+                                                                    <IconButton
+                                                                        size="small"
+                                                                        color="error"
+                                                                        onClick={() => handleDeleteExpense(expense.id)}
+                                                                    >
+                                                                        <DeleteIcon fontSize="small" />
+                                                                    </IconButton>
+                                                                )}
+                                                            </Box>
+                                                        </Box>
+                                                    </Paper>
+                                                );
+                                            })}
+                                            {sortedExpenses.length > 5 && (
+                                                <Button
+                                                    onClick={() => setShowAllExpenses(!showAllExpenses)}
+                                                    sx={{ mt: 1, alignSelf: 'center' }}
+                                                >
+                                                    {showAllExpenses ? 'Show Less' : `Show ${sortedExpenses.length - 5} More`}
+                                                </Button>
+                                            )}
+                                        </>
+                                    );
                                 })()}
-                                {filteredExpenses.length > 5 && (
-                                    <Button
-                                        onClick={() => setShowAllExpenses(!showAllExpenses)}
-                                        sx={{ mt: 1, alignSelf: 'center' }}
-                                    >
-                                        {showAllExpenses ? 'Show Less' : `Show ${filteredExpenses.length - 5} More`}
-                                    </Button>
-                                )}
                             </Box>
                         )}
                     </Box>

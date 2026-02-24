@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { adminDb } from '@/lib/firebaseAdmin';
+import { createNotification } from '@/lib/notifications';
 
 export async function POST(request: Request) {
     try {
@@ -46,6 +47,73 @@ export async function POST(request: Request) {
         }
 
         const expenseRef = await adminDb.collection('expenses').add(expenseData);
+
+        // --- Notify other house members ---
+        try {
+            const houseSnap = await adminDb.collection('groups').doc(houseId).get();
+            const houseData = houseSnap.data();
+
+            // Find the sender (current user) to get their info
+            // Since members array might just be strings (emails), let's ensure we handle both cases
+            // We might need to fetch user info from the 'users' collection or rely on the senderName logic
+            // Assuming members is an array of strings (emails)
+            let finalSenderName = userId.split('@')[0];
+            let finalSenderPhotoUrl = ''; // We don't have photo URL if it's just strings. We'd have to query the 'users' collection.
+
+            // Try to fetch the full sender profile from the users collection
+            try {
+                const userSnap = await adminDb.collection('users').doc(userId).get();
+                if (userSnap.exists) {
+                    const userData = userSnap.data();
+                    if (userData?.name) finalSenderName = userData.name;
+                    if (userData?.photoUrl) finalSenderPhotoUrl = userData.photoUrl;
+                }
+            } catch (userErr) {
+                console.error('Error fetching sender profile:', userErr);
+            }
+
+            if (houseData && Array.isArray(houseData.members)) {
+                // If the array contains strings:
+                const isStringArray = houseData.members.length > 0 && typeof houseData.members[0] === 'string';
+
+                if (isStringArray) {
+                    const notifications = houseData.members
+                        .filter((memberEmail: string) => memberEmail !== userId)
+                        .map((memberEmail: string) =>
+                            createNotification({
+                                userId: memberEmail,
+                                type: 'expense',
+                                message: `has made an expense of $${totalAmount.toFixed(2)}.`,
+                                senderName: finalSenderName,
+                                senderPhotoUrl: finalSenderPhotoUrl,
+                                relatedId: expenseRef.id
+                            })
+                        );
+                    await Promise.all(notifications);
+                } else {
+                    // If the array contains objects (as previously assumed)
+                    const sender = houseData.members.find((m: any) => m.email === userId) || {};
+                    const objectSenderName = sender.name || finalSenderName;
+                    const objectSenderPhotoUrl = sender.photoUrl || finalSenderPhotoUrl;
+
+                    const notifications = houseData.members
+                        .filter((member: any) => member.email !== userId)
+                        .map((member: any) =>
+                            createNotification({
+                                userId: member.email,
+                                type: 'expense',
+                                message: `has made an expense of $${totalAmount.toFixed(2)}.`,
+                                senderName: objectSenderName,
+                                senderPhotoUrl: objectSenderPhotoUrl,
+                                relatedId: expenseRef.id
+                            })
+                        );
+                    await Promise.all(notifications);
+                }
+            }
+        } catch (notifError) {
+            console.error('Error sending expense notifications:', notifError);
+        }
 
         // --- Auto-mark Shopping To-Dos ---
         try {

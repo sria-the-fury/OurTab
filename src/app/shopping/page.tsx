@@ -667,7 +667,17 @@ export default function Shopping() {
         <AuthGuard>
             <main>
                 <Navbar actions={
-                    <IconButton onClick={handleOpenHistory} sx={{ color: 'black' }}>
+                    <IconButton
+                        color="primary"
+                        onClick={handleOpenHistory}
+                        sx={{
+                            bgcolor: 'background.paper',
+                            boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
+                            '&:hover': { bgcolor: 'rgba(108, 99, 255, 0.1)' },
+                            width: 40,
+                            height: 40
+                        }}
+                    >
                         <HistoryIcon />
                     </IconButton>
                 } />
@@ -871,11 +881,6 @@ export default function Shopping() {
                                             </Box>
                                         </Box>
 
-                                        {remaining < -0.01 && (
-                                            <Typography variant="caption" color="error" sx={{ mt: 1, display: 'block' }}>
-                                                ⚠️ Contributions exceed total amount
-                                            </Typography>
-                                        )}
                                         {remaining > 0.01 && (
                                             <Typography variant="caption" color="warning.main" sx={{ mt: 1, display: 'block' }}>
                                                 ℹ️ You&apos;ll cover the remaining amount

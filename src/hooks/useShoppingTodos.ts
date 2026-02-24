@@ -23,21 +23,21 @@ export function useShoppingTodos() {
         fetcher
     );
 
-    const addTodo = async (itemName: string, addedBy: string) => {
-        if (!house?.id) return;
+    const addTodosBatch = async (items: string[], addedBy: string) => {
+        if (!house?.id || items.length === 0) return;
 
         try {
             const res = await fetch('/api/shopping-todos', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ itemName, houseId: house.id, addedBy })
+                body: JSON.stringify({ items, houseId: house.id, addedBy })
             });
             if (res.ok) {
                 mutate();
                 return await res.json();
             }
         } catch (err) {
-            console.error('Failed to add todo:', err);
+            console.error('Failed to add todos batch:', err);
         }
     };
 
@@ -73,7 +73,7 @@ export function useShoppingTodos() {
         todos: todos || [],
         loading: isLoading,
         error,
-        addTodo,
+        addTodosBatch,
         toggleTodo,
         deleteTodo,
         mutate

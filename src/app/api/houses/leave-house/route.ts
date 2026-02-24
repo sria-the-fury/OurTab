@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { adminDb } from '@/lib/firebaseAdmin';
+import { createNotification } from '@/lib/notifications';
 
 export async function POST(request: Request) {
     try {
@@ -39,6 +40,24 @@ export async function POST(request: Request) {
 
             await batch.commit();
 
+            // Notify everyone else that user left
+            try {
+                const userSnap = await adminDb.collection('users').doc(userEmail).get();
+                const userName = userSnap.exists ? (userSnap.data()?.name || userEmail.split('@')[0]) : userEmail.split('@')[0];
+                const userPhotoUrl = userSnap.exists ? userSnap.data()?.photoUrl : undefined;
+
+                const notifications = members.map((m: string) =>
+                    createNotification({
+                        userId: m,
+                        type: 'house',
+                        message: `has left the house.`,
+                        senderName: userName,
+                        senderPhotoUrl: userPhotoUrl
+                    })
+                );
+                await Promise.all(notifications);
+            } catch (err) { console.error('Error notifying leave', err); }
+
             return NextResponse.json({ success: true, left: true });
         } else {
             const leaveRequests = houseData.leaveRequests || {};
@@ -48,6 +67,27 @@ export async function POST(request: Request) {
             };
 
             await houseRef.update({ leaveRequests });
+
+            // Notify everyone else that user requested to leave
+            try {
+                const userSnap = await adminDb.collection('users').doc(userEmail).get();
+                const userName = userSnap.exists ? (userSnap.data()?.name || userEmail.split('@')[0]) : userEmail.split('@')[0];
+                const userPhotoUrl = userSnap.exists ? userSnap.data()?.photoUrl : undefined;
+
+                const notifications = members
+                    .filter(m => m !== userEmail)
+                    .map((m: string) =>
+                        createNotification({
+                            userId: m,
+                            type: 'house',
+                            message: `wants to leave. Please check any remaining settlement and approve.`,
+                            senderName: userName,
+                            senderPhotoUrl: userPhotoUrl
+                        })
+                    );
+                await Promise.all(notifications);
+            } catch (err) { console.error('Error notifying leave request', err); }
+
             return NextResponse.json({ success: true, left: false, pendingApproval: true });
         }
     } catch (error) {

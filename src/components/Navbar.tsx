@@ -11,6 +11,7 @@ import LogoutIcon from '@mui/icons-material/Logout';
 import Link from 'next/link';
 import { useAuth } from '@/components/AuthContext';
 import { usePathname } from 'next/navigation';
+import NotificationBell from '@/components/NotificationBell';
 
 interface NavbarProps {
     actions?: React.ReactNode;
@@ -21,6 +22,7 @@ export default function Navbar({ actions }: NavbarProps) {
     const pathname = usePathname();
 
     const isProfilePage = pathname === '/profile';
+    const isDashboardPage = pathname === '/dashboard';
 
     return (
         <Box sx={{ flexGrow: 1, position: 'sticky', top: 0, zIndex: 1100 }}>
@@ -35,10 +37,22 @@ export default function Navbar({ actions }: NavbarProps) {
                         </Box>
                     </Link>
                     <Box sx={{ position: 'absolute', right: 16, display: 'flex', alignItems: 'center', gap: 1 }}>
+                        {isDashboardPage && <NotificationBell />}
                         {actions}
                         {user && isProfilePage && (
                             <Tooltip title="Logout">
-                                <IconButton onClick={logout} size="small" sx={{ color: 'error.main' }}>
+                                <IconButton
+                                    onClick={logout}
+                                    size="small"
+                                    color="error"
+                                    sx={{
+                                        bgcolor: 'background.paper',
+                                        boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
+                                        '&:hover': { bgcolor: 'rgba(211, 47, 47, 0.1)' },
+                                        width: 40,
+                                        height: 40
+                                    }}
+                                >
                                     <LogoutIcon fontSize="small" />
                                 </IconButton>
                             </Tooltip>

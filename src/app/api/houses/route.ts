@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { adminDb } from '@/lib/firebaseAdmin';
+import { createNotification } from '@/lib/notifications';
 
 async function deleteHouseAndAllData(houseId: string, members: string[]) {
     const batch = adminDb.batch();
@@ -102,6 +103,28 @@ export async function DELETE(request: Request) {
                     createdAt: new Date().toISOString()
                 }
             });
+
+            // Notify all other members
+            try {
+                const userSnap = await adminDb.collection('users').doc(userEmail).get();
+                const userName = userSnap.exists ? (userSnap.data()?.name || userEmail.split('@')[0]) : userEmail.split('@')[0];
+                const userPhotoUrl = userSnap.exists ? userSnap.data()?.photoUrl : undefined;
+                const houseName = houseData.name || 'the house';
+
+                const notifications = members
+                    .filter((m: string) => m !== userEmail)
+                    .map((m: string) =>
+                        createNotification({
+                            userId: m,
+                            type: 'house',
+                            message: `has initiated to delete ${houseName}. Please approve carefully or all data will be lost.`,
+                            senderName: userName,
+                            senderPhotoUrl: userPhotoUrl
+                        })
+                    );
+                await Promise.all(notifications);
+            } catch (err) { console.error('Error notifying delete request', err); }
+
             return NextResponse.json({ success: true, deleted: false, pendingApproval: true });
         }
     } catch (error) {

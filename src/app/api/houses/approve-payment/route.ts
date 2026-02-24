@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { adminDb } from '@/lib/firebaseAdmin';
+import { createNotification } from '@/lib/notifications';
 
 interface PendingPayment {
     id: string;
@@ -82,6 +83,22 @@ export async function POST(request: Request) {
         await houseRef.update({
             pendingPayments: updatedPayments,
         });
+
+        // Notify the sender
+        try {
+            const approverSnap = await adminDb.collection('users').doc(approverEmail).get();
+            const approverName = approverSnap.exists ? (approverSnap.data()?.name || approverEmail.split('@')[0]) : approverEmail.split('@')[0];
+            const approverPhotoUrl = approverSnap.exists ? approverSnap.data()?.photoUrl : undefined;
+
+            await createNotification({
+                userId: payment.from,
+                type: 'settlement',
+                message: `approved your payment of $${payment.amount}.`,
+                relatedId: payment.id,
+                senderName: approverName,
+                senderPhotoUrl: approverPhotoUrl
+            });
+        } catch (e) { console.error('Error notifying payment approval', e); }
 
         return NextResponse.json({ success: true });
     } catch (error) {

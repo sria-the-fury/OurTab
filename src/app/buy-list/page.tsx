@@ -25,14 +25,26 @@ import { useShoppingTodos } from '@/hooks/useShoppingTodos';
 
 export default function Todos() {
     const { user, house } = useAuth();
-    const { todos, loading: todosLoading, addTodo, toggleTodo, deleteTodo } = useShoppingTodos();
+    const { todos, loading: todosLoading, addTodosBatch, toggleTodo, deleteTodo } = useShoppingTodos();
     const [todoInput, setTodoInput] = useState('');
+    const [pendingItems, setPendingItems] = useState<string[]>([]);
 
-    const handleAddTodo = (e: React.FormEvent) => {
+    const handleAddPendingItem = (e: React.FormEvent) => {
         e.preventDefault();
-        if (todoInput.trim() && user?.email) {
-            addTodo(todoInput.trim(), user.email);
+        if (todoInput.trim()) {
+            setPendingItems([...pendingItems, todoInput.trim()]);
             setTodoInput('');
+        }
+    };
+
+    const handleRemovePendingItem = (indexToRemove: number) => {
+        setPendingItems(pendingItems.filter((_, index) => index !== indexToRemove));
+    };
+
+    const handleSubmitBatch = async () => {
+        if (pendingItems.length > 0 && user?.email) {
+            await addTodosBatch(pendingItems, user.email);
+            setPendingItems([]);
         }
     };
 
@@ -89,7 +101,7 @@ export default function Todos() {
                     </Typography>
 
                     <Paper className="glass" sx={{ p: 3, mb: 3, background: 'transparent', boxShadow: 'none' }}>
-                        <Box component="form" onSubmit={handleAddTodo} sx={{ display: 'flex', gap: 1, mb: 3 }}>
+                        <Box component="form" onSubmit={handleAddPendingItem} sx={{ display: 'flex', gap: 1, mb: 3 }}>
                             <TextField
                                 fullWidth
                                 placeholder="What needs to be bought?"
@@ -112,6 +124,40 @@ export default function Todos() {
                                 Add
                             </Button>
                         </Box>
+
+                        {pendingItems.length > 0 && (
+                            <Box sx={{ mb: 3, p: 2, borderRadius: '12px', bgcolor: 'rgba(108, 99, 255, 0.05)', border: '1px solid rgba(108, 99, 255, 0.2)' }}>
+                                <Typography variant="subtitle2" color="primary" sx={{ mb: 1.5, fontWeight: 600 }}>
+                                    Pending Items ({pendingItems.length})
+                                </Typography>
+                                <List sx={{ pt: 0, pb: 2 }}>
+                                    {pendingItems.map((item, index) => (
+                                        <ListItem
+                                            key={`pending-${index}`}
+                                            dense
+                                            sx={{ py: 0.5, px: 1 }}
+                                            secondaryAction={
+                                                <IconButton edge="end" size="small" onClick={() => handleRemovePendingItem(index)}>
+                                                    <DeleteIcon color="error" sx={{ fontSize: 16 }} />
+                                                </IconButton>
+                                            }
+                                        >
+                                            <RadioButtonUncheckedIcon sx={{ opacity: 0.3, fontSize: 16, mr: 1.5 }} />
+                                            <ListItemText primary={<Typography variant="body2">{item}</Typography>} />
+                                        </ListItem>
+                                    ))}
+                                </List>
+                                <Button
+                                    fullWidth
+                                    variant="contained"
+                                    color="primary"
+                                    onClick={handleSubmitBatch}
+                                    startIcon={<ShoppingCartIcon />}
+                                >
+                                    Submit Pending Items
+                                </Button>
+                            </Box>
+                        )}
 
                         <List sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
                             {todos.map((todo) => {
