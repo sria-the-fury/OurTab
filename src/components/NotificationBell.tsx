@@ -29,7 +29,7 @@ function showBrowserNotification(senderName?: string, message?: string, icon?: s
 export default function NotificationBell() {
     const router = useRouter();
     const { unreadCount, notifications } = useNotifications();
-    const prevCountRef = useRef(0);
+    const prevCountRef = useRef<number | null>(null); // null = not yet initialized
     const [mounted, setMounted] = useState(false);
 
     useEffect(() => {
@@ -38,12 +38,17 @@ export default function NotificationBell() {
     }, []);
 
     useEffect(() => {
-        if (!mounted) return;
-        if (unreadCount > prevCountRef.current) {
-            // New notification arrived
-            playNotificationSound();
+        if (!mounted || unreadCount === undefined) return;
 
-            // Browser notification (shown when tab is in background)
+        // First time we get data: just record the baseline, no sound
+        if (prevCountRef.current === null) {
+            prevCountRef.current = unreadCount;
+            return;
+        }
+
+        // Only play sound if count genuinely increased
+        if (unreadCount > prevCountRef.current) {
+            playNotificationSound();
             const latest = notifications.find(n => !n.read);
             showBrowserNotification(latest?.senderName, latest?.message, latest?.senderPhotoUrl);
         }
