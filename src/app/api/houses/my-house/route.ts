@@ -22,8 +22,14 @@ export async function GET(request: Request) {
             return NextResponse.json(null); // No house
         }
 
-        // 2. Get House Data
-        const houseSnap = await adminDb.collection('groups').doc(userData.groupId).get();
+        const houseRef = adminDb.collection('groups').doc(userData.groupId);
+
+        // 2. Fetch house data, members, and pendingPayments subcollection in parallel
+        const [houseSnap, , pendingPaymentsSnap] = await Promise.all([
+            houseRef.get(),
+            Promise.resolve(null),
+            houseRef.collection('pendingPayments').get(),
+        ]);
 
         if (!houseSnap.exists) {
             return NextResponse.json({ error: 'House not found' }, { status: 404 });
@@ -39,10 +45,21 @@ export async function GET(request: Request) {
 
         const members = await Promise.all(memberPromises);
 
+        // 4. Map pendingPayments from subcollection
+        const pendingPayments = pendingPaymentsSnap.docs.map(doc => ({
+            id: doc.id,
+            ...doc.data()
+        }));
+
+        // Remove the old array field from houseData if it exists, replace with subcollection data
+        const { pendingPayments: _oldArray, ...restHouseData } = houseData;
+        void _oldArray; // suppress unused variable warning
+
         return NextResponse.json({
             id: houseSnap.id,
-            ...houseData,
-            members
+            ...restHouseData,
+            members,
+            pendingPayments,
         });
 
     } catch (error) {

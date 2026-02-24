@@ -1,17 +1,6 @@
 import { NextResponse } from 'next/server';
 import { adminDb } from '@/lib/firebaseAdmin';
 
-interface PendingPayment {
-    id: string;
-    from: string;
-    to: string;
-    amount: number;
-    method?: string;
-    status: string;
-    createdAt?: unknown;
-    approvedAt?: string;
-}
-
 // POST: Cancel a pending payment — removes it entirely
 export async function POST(request: Request) {
     try {
@@ -22,22 +11,19 @@ export async function POST(request: Request) {
             return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
         }
 
-        const houseRef = adminDb.collection('groups').doc(houseId);
-        const houseSnap = await houseRef.get();
+        const paymentRef = adminDb
+            .collection('groups')
+            .doc(houseId)
+            .collection('pendingPayments')
+            .doc(paymentId);
 
-        if (!houseSnap.exists) {
-            return NextResponse.json({ error: 'House not found' }, { status: 404 });
-        }
+        const paymentSnap = await paymentRef.get();
 
-        const houseData = houseSnap.data()!;
-        const pendingPayments: PendingPayment[] = houseData.pendingPayments || [];
-
-        const paymentIndex = pendingPayments.findIndex((p: PendingPayment) => p.id === paymentId);
-        if (paymentIndex === -1) {
+        if (!paymentSnap.exists) {
             return NextResponse.json({ error: 'Payment not found' }, { status: 404 });
         }
 
-        const payment = pendingPayments[paymentIndex];
+        const payment = paymentSnap.data()!;
 
         // Only the sender can cancel it
         if (payment.from !== cancellerEmail) {
@@ -48,13 +34,8 @@ export async function POST(request: Request) {
             return NextResponse.json({ error: 'Payment is not pending' }, { status: 400 });
         }
 
-        // Remove the pending payment entirely
-        const updatedPayments = pendingPayments.filter((p: PendingPayment) => p.id !== paymentId);
-
-        // Update the house with the removed payment
-        await houseRef.update({
-            pendingPayments: updatedPayments,
-        });
+        // Delete the payment document
+        await paymentRef.delete();
 
         return NextResponse.json({ success: true });
     } catch (error) {

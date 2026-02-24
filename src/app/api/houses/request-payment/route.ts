@@ -12,10 +12,26 @@ export async function POST(request: Request) {
             return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
         }
 
-        const houseRef = adminDb.collection('groups').doc(houseId);
+        const paymentsRef = adminDb
+            .collection('groups')
+            .doc(houseId)
+            .collection('pendingPayments');
 
+        // Check for duplicate pending request
+        const existingSnap = await paymentsRef
+            .where('from', '==', fromEmail)
+            .where('to', '==', toEmail)
+            .where('status', '==', 'pending')
+            .limit(1)
+            .get();
+
+        if (!existingSnap.empty) {
+            return NextResponse.json({ error: 'A pending payment request already exists' }, { status: 409 });
+        }
+
+        const newPaymentRef = paymentsRef.doc();
         const newPayment = {
-            id: `${fromEmail}_${toEmail}_${Date.now()}`,
+            id: newPaymentRef.id,
             from: fromEmail,
             to: toEmail,
             amount: Number(amount),
@@ -24,32 +40,10 @@ export async function POST(request: Request) {
             createdAt: new Date().toISOString(),
         };
 
-        await adminDb.runTransaction(async (transaction) => {
-            const houseSnap = await transaction.get(houseRef);
-
-            if (!houseSnap.exists) {
-                throw new Error('House not found');
-            }
-
-            const houseData = houseSnap.data()!;
-            const pendingPayments: { from: string; to: string; status: string }[] = houseData.pendingPayments || [];
-
-            // Check for duplicate pending request inside transaction
-            const alreadyExists = pendingPayments.some(
-                (p: { from: string; to: string; status: string }) => p.from === fromEmail && p.to === toEmail && p.status === 'pending'
-            );
-            if (alreadyExists) {
-                throw new Error('A pending payment request already exists');
-            }
-
-            transaction.update(houseRef, {
-                pendingPayments: [...pendingPayments, newPayment],
-            });
-        });
+        await newPaymentRef.set(newPayment);
 
         // Notify the receiver
         try {
-            // Fetch sender's profile info
             const senderSnap = await adminDb.collection('users').doc(fromEmail).get();
             const senderName = senderSnap.exists ? (senderSnap.data()?.name || fromEmail.split('@')[0]) : fromEmail.split('@')[0];
             const senderPhotoUrl = senderSnap.exists ? senderSnap.data()?.photoUrl : undefined;
@@ -71,7 +65,6 @@ export async function POST(request: Request) {
     } catch (error: Error | unknown) {
         console.error('Error creating payment request:', error);
 
-        // Handle specific transaction errors to yield correct status codes
         if (error instanceof Error) {
             if (error.message === 'House not found') {
                 return NextResponse.json({ error: error.message }, { status: 404 });

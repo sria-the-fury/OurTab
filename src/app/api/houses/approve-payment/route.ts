@@ -23,22 +23,19 @@ export async function POST(request: Request) {
             return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
         }
 
-        const houseRef = adminDb.collection('groups').doc(houseId);
-        const houseSnap = await houseRef.get();
+        const paymentRef = adminDb
+            .collection('groups')
+            .doc(houseId)
+            .collection('pendingPayments')
+            .doc(paymentId);
 
-        if (!houseSnap.exists) {
-            return NextResponse.json({ error: 'House not found' }, { status: 404 });
-        }
+        const paymentSnap = await paymentRef.get();
 
-        const houseData = houseSnap.data()!;
-        const pendingPayments: PendingPayment[] = houseData.pendingPayments || [];
-
-        const paymentIndex = pendingPayments.findIndex((p: PendingPayment) => p.id === paymentId);
-        if (paymentIndex === -1) {
+        if (!paymentSnap.exists) {
             return NextResponse.json({ error: 'Payment not found' }, { status: 404 });
         }
 
-        const payment = pendingPayments[paymentIndex];
+        const payment = paymentSnap.data() as PendingPayment;
 
         // Only the receiver can approve
         if (payment.to !== approverEmail) {
@@ -49,22 +46,15 @@ export async function POST(request: Request) {
             return NextResponse.json({ error: 'Payment is not pending' }, { status: 400 });
         }
 
-        // Mark payment as approved
-        const updatedPayments = [...pendingPayments];
-        updatedPayments[paymentIndex] = { ...payment, status: 'approved', approvedAt: new Date().toISOString() };
-
-        // Record as a real expense:
-        // Payer (payment.from) paid the full amount. The only person who "benefits" from this split is the receiver (payment.to).
-        // By splitting only between the two, the receiver's debt drops by the amount, and the payer's balance increases correctly.
-        // We record it as: payer paid, only payer+receiver are split (i.e. it's a transfer).
-        // Actually simplest: we create a "settlement" expense where the contributor is the payer and we mark it as a payment.
         const approvedAt = new Date().toISOString();
+
         // payment.createdAt may be a Firestore Timestamp or an ISO string
         const rawSentAt = payment.createdAt;
         const sentAt = rawSentAt
             ? (typeof rawSentAt === 'string' ? rawSentAt : (rawSentAt as { toDate?: () => { toISOString?: () => string } }).toDate?.()?.toISOString?.() || approvedAt)
             : null;
-        console.log('[approve-payment] sentAt:', sentAt, '| approvedAt:', approvedAt);
+
+        // Record as a settled expense
         await adminDb.collection('expenses').add({
             description: `Settlement payment`,
             amount: payment.amount,
@@ -79,13 +69,8 @@ export async function POST(request: Request) {
             approvedAt: approvedAt,
         });
 
-        // REMOVE the payment from pendingPayments entirely — it has been recorded as an
-        // expense above, so there's no need to keep it in the house document.
-        // Keeping it (even as 'approved') causes the document to grow unboundedly.
-        const remainingPayments = pendingPayments.filter((_: PendingPayment, i: number) => i !== paymentIndex);
-        await houseRef.update({
-            pendingPayments: remainingPayments,
-        });
+        // Delete the payment from the subcollection — it's now safely recorded as an expense
+        await paymentRef.delete();
 
         // Notify the sender
         try {
