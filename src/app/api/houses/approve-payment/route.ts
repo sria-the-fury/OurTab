@@ -79,9 +79,12 @@ export async function POST(request: Request) {
             approvedAt: approvedAt,
         });
 
-        // Update the house with the approved payment
+        // REMOVE the payment from pendingPayments entirely — it has been recorded as an
+        // expense above, so there's no need to keep it in the house document.
+        // Keeping it (even as 'approved') causes the document to grow unboundedly.
+        const remainingPayments = pendingPayments.filter((_: PendingPayment, i: number) => i !== paymentIndex);
         await houseRef.update({
-            pendingPayments: updatedPayments,
+            pendingPayments: remainingPayments,
         });
 
         // Notify the sender
