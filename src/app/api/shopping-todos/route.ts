@@ -14,7 +14,7 @@ export async function GET(request: Request) {
             .where('houseId', '==', houseId)
             .get();
 
-        let todos = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as any[];
+        let todos = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as { id: string; isCompleted?: boolean; completedAt?: string; createdAt: string;[key: string]: unknown }[];
 
         // --- Auto-deletion logic (12 hours) ---
         const now = new Date();
@@ -95,7 +95,7 @@ export async function PATCH(request: Request) {
             return NextResponse.json({ error: 'Completed items cannot be unmarked' }, { status: 400 });
         }
 
-        const updates: any = { isCompleted };
+        const updates: { isCompleted: boolean; completedAt?: string; completedBy?: string; expenseId?: string } = { isCompleted };
         if (isCompleted && !currentData.isCompleted) {
             updates.completedAt = new Date().toISOString();
             if (completedBy) updates.completedBy = completedBy;

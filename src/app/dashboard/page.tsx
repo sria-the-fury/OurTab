@@ -1,6 +1,7 @@
 'use client';
 
-import { useEffect, useState, useMemo } from 'react';
+import { useState, useMemo } from 'react';
+import * as React from 'react';
 import Navbar from '@/components/Navbar';
 import Container from '@mui/material/Container';
 import Typography from '@mui/material/Typography';
@@ -15,7 +16,6 @@ import AttachMoneyIcon from '@mui/icons-material/AttachMoney';
 import EuroIcon from '@mui/icons-material/Euro';
 import CurrencyExchangeIcon from '@mui/icons-material/CurrencyExchange';
 import GroupIcon from '@mui/icons-material/Group';
-import ShoppingCartIcon from '@mui/icons-material/ShoppingCart';
 import ArrowBackIosIcon from '@mui/icons-material/ArrowBackIos';
 import ArrowForwardIosIcon from '@mui/icons-material/ArrowForwardIos';
 import ArrowUpwardIcon from '@mui/icons-material/ArrowUpward';
@@ -24,7 +24,6 @@ import ArrowForwardIcon from '@mui/icons-material/ArrowForward';
 import AccountBalanceWalletIcon from '@mui/icons-material/AccountBalanceWallet';
 import AccountBalanceIcon from '@mui/icons-material/AccountBalance';
 import DoneAllIcon from '@mui/icons-material/DoneAll';
-import SellIcon from '@mui/icons-material/Sell';
 import IconButton from '@mui/material/IconButton';
 import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 import Tooltip from '@mui/material/Tooltip';
@@ -43,17 +42,10 @@ import DialogTitle from '@mui/material/DialogTitle';
 import TextField from '@mui/material/TextField';
 import PersonAddIcon from '@mui/icons-material/PersonAdd';
 import PaymentsIcon from '@mui/icons-material/Payments';
-import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
 import HowToVoteIcon from '@mui/icons-material/HowToVote';
 import FormatListBulletedIcon from '@mui/icons-material/FormatListBulleted';
 
-interface House {
-    id: string;
-    name: string;
-    createdBy: string;
-    members?: { email: string; name?: string; photoUrl?: string; iban?: string }[];
-}
 
 interface Expense {
     id: string;
@@ -85,9 +77,6 @@ export default function Dashboard() {
     // Combine loading states
     const loading = authLoading || (!!user && dataLoading && !house && expenses.length === 0);
 
-    const [totalExpenses, setTotalExpenses] = useState(0);
-    const [myExpenses, setMyExpenses] = useState(0);
-
     const currencySymbols: { [key: string]: string } = {
         'USD': '$',
         'EUR': '€',
@@ -96,10 +85,10 @@ export default function Dashboard() {
 
     const [selectedDate, setSelectedDate] = useState(new Date());
 
-    const currencyIcons: { [key: string]: any } = {
+    const currencyIcons: { [key: string]: React.ElementType } = {
         'USD': AttachMoneyIcon,
         'EUR': EuroIcon,
-        'BDT': CurrencyExchangeIcon // Using generic exchange icon for Taka as specific might not exist or use text
+        'BDT': CurrencyExchangeIcon
     };
 
     const CurrencyIcon = currencyIcons[currency] || AttachMoneyIcon;
@@ -110,7 +99,7 @@ export default function Dashboard() {
     const [newMemberEmail, setNewMemberEmail] = useState('');
 
     const [openEditExpense, setOpenEditExpense] = useState(false);
-    const [editingExpenseId, setEditingExpenseId] = useState<string | null>(null);
+    const [editingExpenseId] = useState<string | null>(null);
     const [editAmount, setEditAmount] = useState('');
     const [editDescription, setEditDescription] = useState('');
     const [showAllExpenses, setShowAllExpenses] = useState(false);
@@ -131,7 +120,7 @@ export default function Dashboard() {
     const [openMemberDialog, setOpenMemberDialog] = useState(false);
     const [selectedMember, setSelectedMember] = useState<{ email: string; name?: string; photoUrl?: string; iban?: string } | null>(null);
 
-    const handleMemberClick = (member: any) => {
+    const handleMemberClick = (member: { email: string; name?: string; photoUrl?: string; iban?: string }) => {
         setSelectedMember(member);
         setOpenMemberDialog(true);
     };
@@ -141,27 +130,6 @@ export default function Dashboard() {
         showToast('Copied to clipboard!', 'success');
     };
 
-    // Calculate totals when expenses change
-    useEffect(() => {
-        if (expenses) {
-            const regularExpenses = expenses.filter((e: Expense) => !e.isSettlementPayment);
-            const total = regularExpenses.reduce((sum: number, exp: Expense) => sum + exp.amount, 0);
-            const myTotal = regularExpenses
-                .filter((exp: Expense) => exp.userId === user?.email)
-                .reduce((sum: number, exp: Expense) => sum + exp.amount, 0);
-
-            setTotalExpenses(total);
-            setMyExpenses(myTotal);
-        }
-    }, [expenses, user]);
-
-
-    const handleOpenEdit = (expense: Expense) => {
-        setEditingExpenseId(expense.id);
-        setEditAmount(expense.amount.toString());
-        setEditDescription(expense.description);
-        setOpenEditExpense(true);
-    };
 
     const handleSaveEdit = async () => {
         if (!editingExpenseId || !user) return;
@@ -196,10 +164,8 @@ export default function Dashboard() {
     const [expenseToDelete, setExpenseToDelete] = useState<string | null>(null);
 
     const handleDeleteExpense = (id: string) => {
-        console.log('handleDeleteExpense called with ID:', id);
         setExpenseToDelete(id);
         setOpenDeleteConfirm(true);
-        console.log('Set openDeleteConfirm to true');
     };
 
     const confirmDeleteExpense = async () => {
@@ -245,7 +211,7 @@ export default function Dashboard() {
             } else {
                 showToast(data.error || 'Failed to add member', 'error');
             }
-        } catch (error) {
+        } catch {
             showToast('Error adding member', 'error');
         }
     };
@@ -404,12 +370,16 @@ export default function Dashboard() {
 
     const myDebt = useMemo(() => {
         if (!user?.email || !settlements) return 0;
-        return settlements.filter((s: any) => s.from === user.email).reduce((sum: number, s: any) => sum + s.amount, 0);
+        return settlements
+            .filter(s => s.from === user.email)
+            .reduce((sum: number, s: { from: string; to: string; amount: number }) => sum + s.amount, 0);
     }, [settlements, user]);
 
     const myCredit = useMemo(() => {
         if (!user?.email || !settlements) return 0;
-        return settlements.filter((s: any) => s.to === user.email).reduce((sum: number, s: any) => sum + s.amount, 0);
+        return settlements
+            .filter(s => s.to === user.email)
+            .reduce((sum: number, s: { from: string; to: string; amount: number }) => sum + s.amount, 0);
     }, [settlements, user]);
 
     if (loading) {
@@ -620,7 +590,7 @@ export default function Dashboard() {
                                 <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 1 }}>
                                     {pendingTodos.length === 0 ? (
                                         <Typography color="text.secondary" variant="body2" sx={{ my: 'auto', textAlign: 'center' }}>
-                                            No pending items. You're all caught up! ✨
+                                            No pending items. You&apos;re all caught up! ✨
                                         </Typography>
                                     ) : (
                                         pendingTodos.slice(0, 3).map(todo => (
@@ -743,7 +713,7 @@ export default function Dashboard() {
                                         );
 
                                         // IBAN of receiver (available from member data fetched via my-house API)
-                                        const toUserIban = (toMember as any)?.iban;
+                                        const toUserIban = (toMember as { iban?: string })?.iban;
 
                                         let message;
                                         if (isCurrentUserPayer) {
@@ -836,7 +806,7 @@ export default function Dashboard() {
                             <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
                                 {(() => {
                                     const sortedExpenses = [...filteredExpenses]
-                                        .filter((e: any) => !e.isSettlementPayment)
+                                        .filter((e: Expense) => !e.isSettlementPayment)
                                         .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
                                     const displayedExpenses = showAllExpenses ? sortedExpenses : sortedExpenses.slice(0, 5);
 

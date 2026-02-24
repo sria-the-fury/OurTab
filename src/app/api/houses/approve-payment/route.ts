@@ -1,6 +1,16 @@
 import { NextResponse } from 'next/server';
 import { adminDb } from '@/lib/firebaseAdmin';
-import { FieldValue } from 'firebase-admin/firestore';
+
+interface PendingPayment {
+    id: string;
+    from: string;
+    to: string;
+    amount: number;
+    method?: string;
+    status: string;
+    createdAt?: unknown;
+    approvedAt?: string;
+}
 
 // POST: Approve a pending payment — records it as a settled expense
 export async function POST(request: Request) {
@@ -20,9 +30,9 @@ export async function POST(request: Request) {
         }
 
         const houseData = houseSnap.data()!;
-        const pendingPayments: any[] = houseData.pendingPayments || [];
+        const pendingPayments: PendingPayment[] = houseData.pendingPayments || [];
 
-        const paymentIndex = pendingPayments.findIndex((p: any) => p.id === paymentId);
+        const paymentIndex = pendingPayments.findIndex((p: PendingPayment) => p.id === paymentId);
         if (paymentIndex === -1) {
             return NextResponse.json({ error: 'Payment not found' }, { status: 404 });
         }
@@ -51,10 +61,9 @@ export async function POST(request: Request) {
         // payment.createdAt may be a Firestore Timestamp or an ISO string
         const rawSentAt = payment.createdAt;
         const sentAt = rawSentAt
-            ? (typeof rawSentAt === 'string' ? rawSentAt : rawSentAt.toDate?.().toISOString?.() || approvedAt)
+            ? (typeof rawSentAt === 'string' ? rawSentAt : (rawSentAt as { toDate?: () => { toISOString?: () => string } }).toDate?.()?.toISOString?.() || approvedAt)
             : null;
         console.log('[approve-payment] sentAt:', sentAt, '| approvedAt:', approvedAt);
-        const members = houseData.members || [];
         await adminDb.collection('expenses').add({
             description: `Settlement payment`,
             amount: payment.amount,

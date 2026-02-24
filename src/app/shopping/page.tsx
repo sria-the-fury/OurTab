@@ -32,7 +32,6 @@ import AccordionSummary from '@mui/material/AccordionSummary';
 import AccordionDetails from '@mui/material/AccordionDetails';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import PeopleIcon from '@mui/icons-material/People';
-import RadioButtonUncheckedIcon from '@mui/icons-material/RadioButtonUnchecked';
 import { Contributor } from '@/types/settlement-types';
 
 interface GroceryItem {
@@ -49,6 +48,8 @@ interface Expense {
     houseId: string;
     date: string;
     contributors?: Array<{ email: string; amount: number }>;
+    isSettlementPayment?: boolean;
+    settlementBetween?: string[];
 }
 
 interface HouseMember {
@@ -56,6 +57,7 @@ interface HouseMember {
     name?: string;
     photoUrl?: string;
 }
+
 
 export default function Shopping() {
     const { user, currency, dbUser, house } = useAuth();
@@ -295,36 +297,18 @@ export default function Shopping() {
         });
     };
 
-    // Helper to load local asset
-    const loadLocalAsset = async (path: string): Promise<string | null> => {
-        try {
-            const res = await fetch(path);
-            const blob = await res.blob();
-            return new Promise((resolve) => {
-                const reader = new FileReader();
-                reader.onloadend = () => resolve(reader.result as string);
-                reader.readAsDataURL(blob);
-            });
-        } catch (e) {
-            console.warn('Failed to load local asset:', path);
-            return null;
-        }
-    };
 
     // Fetch expenses and house details for history
     const handleOpenHistory = async () => {
-        if (!user || !house) return; // Need house data
+        if (!user || !house) return;
         setLoading(true);
         try {
-            // House data is already cached in 'house'
-
             if (house.id) {
                 const expensesRes = await fetch(`/api/expenses?houseId=${house.id}`);
                 const expensesData = await expensesRes.json();
 
-                // Group by month
-                const grouped: { [key: string]: any[] } = {};
-                expensesData.forEach((exp: any) => {
+                const grouped: { [key: string]: Expense[] } = {};
+                expensesData.forEach((exp: Expense) => {
                     const date = new Date(exp.date);
                     const monthKey = date.toLocaleString('default', { month: 'long', year: 'numeric' });
                     if (!grouped[monthKey]) grouped[monthKey] = [];
@@ -356,20 +340,17 @@ export default function Shopping() {
             }
 
             // Filter out settlements for table and total
-            const expenses = monthExpenses.filter((e: any) => !e.isSettlementPayment);
+            const expenses = monthExpenses.filter((e: Expense) => !e.isSettlementPayment);
 
             // --- SETTLEMENT LOGIC --- (Follows Dashboard logic using allExpenses)
             const memberBalances: { [email: string]: number } = {};
             const members = currentHouseData?.members || [];
-            members.forEach((m: any) => memberBalances[m.email] = 0);
+            members.forEach((m: HouseMember) => { memberBalances[m.email] = 0; });
 
-            let totalGroupExpense = 0; // For the monthly table total, we will calculate from `expenses` later
+            const totalGroupExpense = expenses.reduce((sum: number, exp: Expense) => sum + exp.amount, 0);
+            void totalGroupExpense;
 
-            expenses.forEach((exp: any) => {
-                totalGroupExpense += exp.amount;
-            });
-
-            allExpenses.forEach((exp: any) => {
+            allExpenses.forEach((exp: Expense) => {
                 const amount = exp.amount;
                 const payer = exp.userId;
 
@@ -384,7 +365,7 @@ export default function Shopping() {
 
                 if (exp.contributors && exp.contributors.length > 0) {
                     let contributorTotal = 0;
-                    exp.contributors.forEach((c: any) => {
+                    exp.contributors.forEach((c: { email: string; amount: number }) => {
                         if (memberBalances[c.email] !== undefined) {
                             memberBalances[c.email] += c.amount;
                         } else {
@@ -401,7 +382,7 @@ export default function Shopping() {
                         }
                     }
                     const sharePerPerson = amount / members.length;
-                    members.forEach((m: any) => memberBalances[m.email] -= sharePerPerson);
+                    members.forEach((m: HouseMember) => { memberBalances[m.email] -= sharePerPerson; });
                 } else {
                     if (memberBalances[payer] !== undefined) {
                         memberBalances[payer] += amount;
@@ -409,7 +390,7 @@ export default function Shopping() {
                         memberBalances[payer] = amount;
                     }
                     const sharePerPerson = amount / members.length;
-                    members.forEach((m: any) => memberBalances[m.email] -= sharePerPerson);
+                    members.forEach((m: HouseMember) => { memberBalances[m.email] -= sharePerPerson; });
                 }
             });
 
@@ -434,8 +415,8 @@ export default function Shopping() {
                 const amount = Math.min(Math.abs(payer.amount), receiver.amount);
 
                 if (amount > 0.01) {
-                    const debtorName = members.find((m: any) => m.email === payer.id)?.name || payer.id.split('@')[0];
-                    const creditorName = members.find((m: any) => m.email === receiver.id)?.name || receiver.id.split('@')[0];
+                    const debtorName = members.find((m: HouseMember) => m.email === payer.id)?.name || payer.id.split('@')[0];
+                    const creditorName = members.find((m: HouseMember) => m.email === receiver.id)?.name || receiver.id.split('@')[0];
 
                     settlements.push({
                         debtorName,
@@ -484,7 +465,7 @@ export default function Shopping() {
             doc.setFont('helvetica', 'normal');
             let leftY = 30;
             if (currentHouseData?.members) {
-                currentHouseData.members.forEach((m: any) => {
+                currentHouseData.members.forEach((m: HouseMember) => {
                     const mName = m.name || m.email.split('@')[0];
                     doc.text(mName, 14, leftY);
                     leftY += 4;
@@ -514,29 +495,27 @@ export default function Shopping() {
             });
 
             const tableData = sortedExpenses.map(exp => {
-                const dateObj = new Date((exp as any).date);
+                const dateObj = new Date(exp.date);
                 const dateStr = `${dateObj.getDate().toString().padStart(2, '0')}/${(dateObj.getMonth() + 1).toString().padStart(2, '0')}/${dateObj.getFullYear()}`;
 
-
-                const member = currentHouseData?.members?.find((m: any) => m.email === (exp as any).userId);
-                // First two names logic (first name + middle/last name)
-                const fullName = member?.name || (exp as any).userId.split('@')[0];
+                const member = currentHouseData?.members?.find((m: HouseMember) => m.email === exp.userId);
+                const fullName = member?.name || exp.userId.split('@')[0];
                 const names = fullName.split(' ');
                 const displayName = names.length >= 2 ? `${names[0]} ${names[1]}` : names[0];
 
                 let userCellContent = '';
-                const contributors = (exp as any).contributors || [];
+                const contribs = exp.contributors || [];
 
-                if (contributors.length > 0) {
-                    const shopperContrib = contributors.find((c: any) => c.email === (exp as any).userId);
+                if (contribs.length > 0) {
+                    const shopperContrib = contribs.find(c => c.email === exp.userId);
                     const shopperAmount = shopperContrib ? shopperContrib.amount : 0;
                     userCellContent = `${displayName} ${getCurrencySymbol()}${shopperAmount.toFixed(2)}`;
 
-                    const others = contributors.filter((c: any) => c.email !== (exp as any).userId);
+                    const others = contribs.filter(c => c.email !== exp.userId);
                     if (others.length > 0) {
                         userCellContent += '\n------------------\n';
-                        userCellContent += others.map((c: any) => {
-                            const otherMember = currentHouseData?.members?.find((m: any) => m.email === c.email);
+                        userCellContent += others.map(c => {
+                            const otherMember = currentHouseData?.members?.find((m: HouseMember) => m.email === c.email);
                             const otherFullName = otherMember?.name || c.email.split('@')[0];
                             const otherNames = otherFullName.split(' ');
                             const otherDisplayName = otherNames.length >= 2 ? `${otherNames[0]} ${otherNames[1]}` : otherNames[0];
@@ -544,22 +523,22 @@ export default function Shopping() {
                         }).join('\n');
                     }
                 } else {
-                    userCellContent = `${displayName} ${getCurrencySymbol()}${(exp as any).amount.toFixed(2)}`;
+                    userCellContent = `${displayName} ${getCurrencySymbol()}${exp.amount.toFixed(2)}`;
                 }
 
                 return [
                     dateStr,
-                    (exp as any).description,
+                    exp.description,
                     {
                         content: userCellContent,
                         styles: { fontSize: 7, valign: 'middle', halign: 'left' }
                     },
-                    `${getCurrencySymbol()}${(exp as any).amount.toFixed(2)}`
+                    `${getCurrencySymbol()}${exp.amount.toFixed(2)}`
                 ];
             });
 
             // Calculate Total
-            const total = expenses.reduce((sum, exp) => sum + (exp as any).amount, 0);
+            const total = expenses.reduce((sum, exp) => sum + exp.amount, 0);
             tableData.push(['', '', 'Total', `${getCurrencySymbol()}${total.toFixed(2)}`]);
 
             autoTable(doc, {
@@ -578,10 +557,10 @@ export default function Shopping() {
             });
 
             // --- SETTLEMENT SECTION ---
-            const finalY = (doc as any).lastAutoTable.finalY + 10;
+            const finalY = (doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 10;
 
             // Function to draw settlement line
-            const drawSettlementLine = (settlement: any, yPosition: number) => {
+            const drawSettlementLine = (settlement: { debtorName: string; creditorName: string; amountStr: string }, yPosition: number) => {
                 let currentX = 14;
                 doc.setFont('helvetica', 'bold');
                 doc.text(settlement.debtorName, currentX, yPosition);
@@ -635,7 +614,7 @@ export default function Shopping() {
             }
 
             // --- FOOTER ---
-            const pageCount = (doc as any).internal.getNumberOfPages();
+            const pageCount = (doc as unknown as { internal: { getNumberOfPages: () => number } }).internal.getNumberOfPages();
             for (let i = 1; i <= pageCount; i++) {
                 doc.setPage(i);
 
@@ -778,7 +757,7 @@ export default function Shopping() {
                                 <AccordionSummary expandIcon={<ExpandMoreIcon />}>
                                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                                         <PeopleIcon color="primary" />
-                                        <Typography variant="h6">Who's Contributing?</Typography>
+                                        <Typography variant="h6">Who&apos;s Contributing?</Typography>
                                     </Box>
                                 </AccordionSummary>
                                 <AccordionDetails>
@@ -853,7 +832,7 @@ export default function Shopping() {
                                                 onClick={handleIPayAll}
                                                 disabled={loading}
                                             >
-                                                I'll Pay All
+                                                I&apos;ll Pay All
                                             </Button>
                                         </Box>
 
@@ -866,7 +845,7 @@ export default function Shopping() {
                                                 </Typography>
                                             </Box>
                                             <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
-                                                <Typography variant="body2">Others' contributions:</Typography>
+                                                <Typography variant="body2">Others&apos; contributions:</Typography>
                                                 <Typography variant="body2">
                                                     {getCurrencySymbol()}{Number(totalContributions).toFixed(2)}
                                                 </Typography>
@@ -899,7 +878,7 @@ export default function Shopping() {
                                         )}
                                         {remaining > 0.01 && (
                                             <Typography variant="caption" color="warning.main" sx={{ mt: 1, display: 'block' }}>
-                                                ℹ️ You'll cover the remaining amount
+                                                ℹ️ You&apos;ll cover the remaining amount
                                             </Typography>
                                         )}
                                     </Box>
@@ -959,7 +938,7 @@ export default function Shopping() {
                                 }>
                                     <ListItemText
                                         primary={month}
-                                        secondary={`Total: ${getCurrencySymbol()}${monthlyExpenses[month].filter((e: any) => !e.isSettlementPayment).reduce((sum, e: any) => sum + e.amount, 0).toFixed(2)}`}
+                                        secondary={`Total: ${getCurrencySymbol()}${monthlyExpenses[month].filter((e: Expense) => !e.isSettlementPayment).reduce((sum, e: Expense) => sum + e.amount, 0).toFixed(2)}`}
                                     />
                                 </ListItem>
                             ))}

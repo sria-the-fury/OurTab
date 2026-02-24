@@ -28,7 +28,7 @@ export default function Navbar({ actions }: NavbarProps) {
                 <Toolbar>
                     <Link href={user ? "/dashboard" : "/"} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'black', textDecoration: 'none', flexGrow: 1 }}>
                         <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                            <img src="/icon.svg" alt="OurTab Icon" style={{ width: 32, height: 32, marginRight: 8, borderRadius: 8 }} />
+                            <Box component="img" src="/icon.svg" alt="OurTab Icon" sx={{ width: 32, height: 32, mr: 1, borderRadius: 1 }} />
                             <Typography variant="h6" component="div" sx={{ fontWeight: 'bold', fontFamily: 'var(--font-abril)', letterSpacing: 1, textShadow: '2px 2px 4px rgba(0,0,0,0.3)' }}>
                                 OurTab
                             </Typography>

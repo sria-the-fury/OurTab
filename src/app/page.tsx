@@ -4,7 +4,6 @@
 import Container from '@mui/material/Container';
 import Typography from '@mui/material/Typography';
 import Box from '@mui/material/Box';
-import LocalGroceryStoreIcon from '@mui/icons-material/LocalGroceryStore';
 import GoogleSignInButton from '@/components/GoogleSignInButton';
 import { useAuth } from '@/components/AuthContext';
 import Loader from '@/components/Loader';

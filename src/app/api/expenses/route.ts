@@ -1,6 +1,5 @@
 import { NextResponse } from 'next/server';
 import { adminDb } from '@/lib/firebaseAdmin';
-import { FieldValue } from 'firebase-admin/firestore';
 
 export async function POST(request: Request) {
     try {
@@ -14,17 +13,24 @@ export async function POST(request: Request) {
         const totalAmount = parseFloat(amount);
 
         if (contributors && Array.isArray(contributors)) {
-            const contributorTotal = contributors.reduce((sum: number, c: any) => sum + parseFloat(c.amount || 0), 0);
+            const contributorTotal = contributors.reduce((sum: number, c: { email: string; amount?: number | string }) => sum + parseFloat(String(c.amount ?? 0)), 0);
             if (contributorTotal > totalAmount) {
                 return NextResponse.json({ error: 'Total contributor amounts cannot exceed expense amount' }, { status: 400 });
             }
-            const validContributors = contributors.every((c: any) => c.email && c.amount !== undefined);
+            const validContributors = contributors.every((c: { email?: string; amount?: unknown }) => c.email && c.amount !== undefined);
             if (!validContributors) {
                 return NextResponse.json({ error: 'Each contributor must have email and amount' }, { status: 400 });
             }
         }
 
-        const expenseData: any = {
+        const expenseData: {
+            amount: number;
+            description: string;
+            userId: string;
+            groupId: string;
+            date: string;
+            contributors?: { email: string; amount: number }[];
+        } = {
             amount: totalAmount,
             description,
             userId,
@@ -33,9 +39,9 @@ export async function POST(request: Request) {
         };
 
         if (contributors && contributors.length > 0) {
-            expenseData.contributors = contributors.map((c: any) => ({
+            expenseData.contributors = contributors.map((c: { email: string; amount: number | string }) => ({
                 email: c.email,
-                amount: parseFloat(c.amount)
+                amount: parseFloat(String(c.amount))
             }));
         }
 
@@ -169,7 +175,7 @@ export async function PATCH(request: Request) {
             return NextResponse.json({ error: 'Cannot edit expense older than 48 hours' }, { status: 403 });
         }
 
-        const updates: any = {};
+        const updates: { amount?: number; description?: string } = {};
         if (amount) updates.amount = parseFloat(amount);
         if (description) updates.description = description;
 

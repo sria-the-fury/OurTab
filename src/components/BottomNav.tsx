@@ -1,5 +1,5 @@
 'use client';
-import { useState, useEffect } from 'react';
+import { useEffect } from 'react';
 import BottomNavigation from '@mui/material/BottomNavigation';
 import BottomNavigationAction from '@mui/material/BottomNavigationAction';
 import Paper from '@mui/material/Paper';
@@ -14,11 +14,10 @@ import Avatar from '@mui/material/Avatar';
 export default function BottomNav() {
     const router = useRouter();
     const pathname = usePathname();
-    const [value, setValue] = useState(pathname);
     const { user } = useAuth();
 
     useEffect(() => {
-        setValue(pathname);
+        // Keep effect for any future pathname-based side effects
     }, [pathname]);
 
     return (
@@ -33,7 +32,8 @@ export default function BottomNav() {
                     background: 'transparent',
                     '& .MuiBottomNavigationAction-root': {
                         minWidth: 'auto',
-                        padding: '6px 0',
+                        padding: '10px 0',
+
                     },
                     '& .Mui-selected': {
                         color: 'primary.main',

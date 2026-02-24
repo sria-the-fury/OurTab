@@ -14,7 +14,15 @@ export async function POST(request: Request) {
         const userRef = adminDb.collection('users').doc(email);
         const userSnap = await userRef.get();
 
-        let userData: { email: any; name?: any; photoUrl?: any; currency?: any; iban?: any } = { email };
+        interface UserRecord {
+            email: string;
+            name?: string;
+            photoUrl?: string;
+            currency?: string;
+            iban?: string;
+        }
+
+        let userData: UserRecord = { email };
 
         if (name !== undefined) userData.name = name;
         if (photoUrl !== undefined) userData.photoUrl = photoUrl;
@@ -53,7 +61,7 @@ export async function GET(request: Request) {
             const users = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
             return NextResponse.json(users);
         }
-    } catch (e) {
+    } catch {
         return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
     }
 }

@@ -1,6 +1,5 @@
 import { NextResponse } from 'next/server';
 import { adminDb } from '@/lib/firebaseAdmin';
-import { FieldValue } from 'firebase-admin/firestore';
 
 async function deleteHouseAndAllData(houseId: string, members: string[]) {
     const batch = adminDb.batch();
@@ -62,12 +61,12 @@ export async function POST(request: Request) {
     }
 }
 
-export async function GET(request: Request) {
+export async function GET() {
     try {
         const snapshot = await adminDb.collection('groups').get();
         const houses = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
         return NextResponse.json(houses);
-    } catch (e) {
+    } catch {
         return NextResponse.json([]);
     }
 }

@@ -19,11 +19,11 @@ export async function POST(request: Request) {
         }
 
         const houseData = houseSnap.data()!;
-        const pendingPayments: any[] = houseData.pendingPayments || [];
+        const pendingPayments: { from: string; to: string; status: string }[] = houseData.pendingPayments || [];
 
         // Check for duplicate pending request
         const alreadyExists = pendingPayments.some(
-            (p: any) => p.from === fromEmail && p.to === toEmail && p.status === 'pending'
+            (p: { from: string; to: string; status: string }) => p.from === fromEmail && p.to === toEmail && p.status === 'pending'
         );
         if (alreadyExists) {
             return NextResponse.json({ error: 'A pending payment request already exists' }, { status: 409 });

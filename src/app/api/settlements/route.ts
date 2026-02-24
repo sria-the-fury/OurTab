@@ -62,6 +62,6 @@ export async function GET(request: Request) {
     }
 }
 
-export async function PATCH(request: Request) {
+export async function PATCH() {
     return NextResponse.json({ error: 'Use POST to update settlements' }, { status: 400 });
 }

@@ -1,6 +1,16 @@
 import { NextResponse } from 'next/server';
 import { adminDb } from '@/lib/firebaseAdmin';
-import { FieldValue } from 'firebase-admin/firestore';
+
+interface PendingPayment {
+    id: string;
+    from: string;
+    to: string;
+    amount: number;
+    method?: string;
+    status: string;
+    createdAt?: unknown;
+    approvedAt?: string;
+}
 
 // POST: Cancel a pending payment — removes it entirely
 export async function POST(request: Request) {
@@ -20,9 +30,9 @@ export async function POST(request: Request) {
         }
 
         const houseData = houseSnap.data()!;
-        const pendingPayments: any[] = houseData.pendingPayments || [];
+        const pendingPayments: PendingPayment[] = houseData.pendingPayments || [];
 
-        const paymentIndex = pendingPayments.findIndex((p: any) => p.id === paymentId);
+        const paymentIndex = pendingPayments.findIndex((p: PendingPayment) => p.id === paymentId);
         if (paymentIndex === -1) {
             return NextResponse.json({ error: 'Payment not found' }, { status: 404 });
         }
@@ -39,7 +49,7 @@ export async function POST(request: Request) {
         }
 
         // Remove the pending payment entirely
-        const updatedPayments = pendingPayments.filter((p: any) => p.id !== paymentId);
+        const updatedPayments = pendingPayments.filter((p: PendingPayment) => p.id !== paymentId);
 
         // Update the house with the removed payment
         await houseRef.update({

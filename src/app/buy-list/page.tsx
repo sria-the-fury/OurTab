@@ -17,7 +17,7 @@ import ShoppingCartIcon from '@mui/icons-material/ShoppingCart';
 import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
 import RadioButtonUncheckedIcon from '@mui/icons-material/RadioButtonUnchecked';
 import DoneAllIcon from '@mui/icons-material/DoneAll';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useAuth } from '@/components/AuthContext';
 import BottomNav from '@/components/BottomNav';
 import AuthGuard from '@/components/AuthGuard';
@@ -65,11 +65,17 @@ export default function Todos() {
         return `${dateStr}, ${timeStr}`;
     };
 
-    const canDeleteCompleted = (todo: any) => {
+    const [now, setNow] = useState(0);
+    useEffect(() => {
+        const timerId = setTimeout(() => setNow(Date.now()), 0);
+        return () => clearTimeout(timerId);
+    }, []);
+
+    const canDeleteCompleted = (todo: { isCompleted?: boolean; completedBy?: string; completedAt?: string; createdAt?: string }) => {
         // Show delete only for manually-marked items within 10 minutes
         if (!todo.isCompleted || todo.completedBy === 'auto') return false;
-        const completedAt = new Date(todo.completedAt || todo.createdAt);
-        return (Date.now() - completedAt.getTime()) < 10 * 60 * 1000;
+        const completedAt = new Date(todo.completedAt || todo.createdAt || 0);
+        return now > 0 && (now - completedAt.getTime()) < 10 * 60 * 1000;
     };
 
     return (
@@ -174,7 +180,7 @@ export default function Todos() {
                                                                 </Typography>
                                                             ) : todo.completedBy ? (
                                                                 (() => {
-                                                                    const { name: completedByName, photoUrl: completedByPhoto } = getMemberInfo(todo.completedBy);
+                                                                    const { name: completedByName } = getMemberInfo(todo.completedBy);
                                                                     return (
                                                                         <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
                                                                             <DoneAllIcon color="success" sx={{ fontSize: 13 }} />

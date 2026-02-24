@@ -18,8 +18,8 @@ interface AuthContextType {
     // Expose cached data
     dbUser: UserData | null;
     house: House | null;
-    mutateUser: () => Promise<any>;
-    mutateHouse: () => Promise<any>;
+    mutateUser: () => Promise<unknown>;
+    mutateHouse: () => Promise<unknown>;
 }
 
 const AuthContext = createContext<AuthContextType>({
@@ -31,8 +31,8 @@ const AuthContext = createContext<AuthContextType>({
     updateCurrency: async () => { },
     dbUser: null,
     house: null,
-    mutateUser: async () => { },
-    mutateHouse: async () => { },
+    mutateUser: async () => undefined,
+    mutateHouse: async () => undefined,
 });
 
 export const useAuth = () => useContext(AuthContext);
@@ -120,11 +120,14 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
             try {
                 // Determine logic based on whether user is in a house or not
                 let url = '/api/users';
-                let body: any = { email: user.email, currency: newCurrency };
+                type UpdateBody =
+                    | { email: string; currency: string }
+                    | { houseId: string; currency: string; userEmail: string };
+                let body: UpdateBody = { email: user.email!, currency: newCurrency };
 
                 if (houseData?.id) {
                     url = '/api/houses/update';
-                    body = { houseId: houseData.id, currency: newCurrency, userEmail: user.email };
+                    body = { houseId: houseData.id, currency: newCurrency, userEmail: user.email! };
                 }
 
                 await fetch(url, {

@@ -51,14 +51,29 @@ export default function Profile() {
 
     // Derived state
     const hasHouse = !!dbUser?.groupId;
-    const houseDetails = house as any;
+    interface HouseDetails {
+        id?: string;
+        name?: string;
+        currency?: string;
+        createdBy?: string;
+        members?: string[];
+        deletionRequest?: {
+            initiatedBy?: string;
+            approvals?: string[];
+        };
+        leaveRequests?: Record<string, {
+            approvals?: string[];
+        }>;
+        pendingPayments?: unknown[];
+    }
+    const houseDetails = house as HouseDetails | null;
     const effectiveCreator = houseDetails?.createdBy || (houseDetails?.members && houseDetails.members[0]);
     const isCreator = effectiveCreator === user?.email;
     const creatorLeft = Boolean(houseDetails?.createdBy && houseDetails?.members && !houseDetails.members.includes(houseDetails.createdBy));
     const canDeleteHouse = isCreator || creatorLeft;
     const deletionRequest = houseDetails?.deletionRequest;
     const memberCount = (houseDetails?.members || []).length;
-    const hasApproved = deletionRequest?.approvals?.includes(user?.email);
+    const hasApproved = deletionRequest?.approvals?.includes(user?.email ?? '');
     const leaveRequests = houseDetails?.leaveRequests || {};
     const myLeaveRequest = leaveRequests[user?.email || ''];
     const otherLeaveRequests = Object.entries(leaveRequests).filter(([email]) => email !== user?.email);
@@ -83,7 +98,7 @@ export default function Profile() {
             } else {
                 showToast('Failed to create house', 'error');
             }
-        } catch (err) {
+        } catch {
             showToast('Error creating house', 'error');
         }
         setLoading(false);
@@ -111,7 +126,7 @@ export default function Profile() {
             } else {
                 showToast('Failed to leave house', 'error');
             }
-        } catch (error) {
+        } catch {
             showToast('Error leaving house', 'error');
         }
         setLoading(false);
@@ -132,7 +147,7 @@ export default function Profile() {
             } else {
                 showToast('Failed to cancel leave', 'error');
             }
-        } catch (error) {
+        } catch {
             showToast('Error cancelling leave', 'error');
         }
         setLoading(false);
@@ -154,7 +169,7 @@ export default function Profile() {
             } else {
                 showToast('Failed to approve leave', 'error');
             }
-        } catch (error) {
+        } catch {
             showToast('Error approving leave', 'error');
         }
         setLoading(false);
@@ -183,7 +198,7 @@ export default function Profile() {
             } else {
                 showToast(data.error || 'Failed to delete house', 'error');
             }
-        } catch (error) {
+        } catch {
             showToast('Error deleting house', 'error');
         }
         setLoading(false);
@@ -206,7 +221,7 @@ export default function Profile() {
             } else {
                 showToast(data.error || 'Failed to approve', 'error');
             }
-        } catch (error) {
+        } catch {
             showToast('Error approving deletion', 'error');
         }
         setLoading(false);
@@ -227,7 +242,7 @@ export default function Profile() {
             } else {
                 showToast('Failed to cancel deletion', 'error');
             }
-        } catch (error) {
+        } catch {
             showToast('Error cancelling deletion', 'error');
         }
         setLoading(false);
@@ -342,14 +357,14 @@ export default function Profile() {
                                     </Alert>
                                 )}
 
-                                {otherLeaveRequests.map(([email, req]: [string, any]) => {
-                                    const hasApprovedLeave = req.approvals?.includes(user?.email);
+                                {otherLeaveRequests.map(([email, req]: [string, { approvals?: string[] }]) => {
+                                    const hasApprovedLeave = req.approvals?.includes(user?.email ?? '');
                                     return (
                                         <Alert key={email} severity="info" action={!hasApprovedLeave ? (
                                             <Button color="inherit" size="small" startIcon={<HowToVoteIcon />} onClick={() => handleApproveLeave(email)} disabled={loading}>Approve</Button>
                                         ) : undefined}>
                                             {hasApprovedLeave
-                                                ? <span>You approved <strong>{email}</strong>'s request. Waiting for others.</span>
+                                                ? <span>You approved <strong>{email}</strong>&apos;s request. Waiting for others.</span>
                                                 : <span><strong>{email}</strong> has requested to leave the house.</span>}
                                         </Alert>
                                     );
@@ -375,7 +390,7 @@ export default function Profile() {
                         ) : (
                             <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
                                 <Typography variant="body2" color="text.secondary">
-                                    You're not in a house yet. Create one below, or share your email — <strong>{user?.email}</strong> — so a housemate can add you.
+                                    You&apos;re not in a house yet. Create one below, or share your email — <strong>{user?.email}</strong> — so a housemate can add you.
                                 </Typography>
                                 <form onSubmit={handleCreateHouse}>
                                     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
