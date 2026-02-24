@@ -531,7 +531,7 @@ export default function Shopping() {
                     exp.description,
                     {
                         content: userCellContent,
-                        styles: { fontSize: 7, valign: 'middle', halign: 'left' }
+                        styles: { fontSize: 7, valign: 'middle' as const, halign: 'left' as const }
                     },
                     `${getCurrencySymbol()}${exp.amount.toFixed(2)}`
                 ];
