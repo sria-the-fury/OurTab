@@ -21,7 +21,7 @@ export default function BottomNav() {
     }, [pathname]);
 
     return (
-        <Paper sx={{ position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 1000 }} elevation={3} className="glass-nav">
+        <Paper sx={{ position: 'fixed', bottom: 0, left: 0, right: 0, zIndex: 1000, pb: 'calc(env(safe-area-inset-bottom) + 8px)' }} elevation={3} className="glass-nav">
             <BottomNavigation
                 showLabels
                 value={pathname}
