@@ -48,16 +48,18 @@ const fetcher = (url: string) => fetch(url).then((res) => res.json());
 export function useHouseData() {
     const { user } = useAuth();
 
-    // 1. Fetch house details
+    // 1. Fetch house details (poll every 5s for real-time payment request updates)
     const { data: house, error: houseError, isLoading: houseLoading, mutate: mutateHouse } = useSWR<House>(
         user?.email ? `/api/houses/my-house?email=${user.email}` : null,
-        fetcher
+        fetcher,
+        { refreshInterval: 5000, revalidateOnFocus: true }
     );
 
-    // 2. Fetch expenses (dependent on house ID)
+    // 2. Fetch expenses (poll every 5s for real-time approval updates)
     const { data: expenses, error: expensesError, isLoading: expensesLoading, mutate: mutateExpenses } = useSWR<Expense[]>(
         house?.id ? `/api/expenses?houseId=${house.id}` : null,
-        fetcher
+        fetcher,
+        { refreshInterval: 5000, revalidateOnFocus: true }
     );
 
     // 3. Fetch Buy List (todos)
