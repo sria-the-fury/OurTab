@@ -159,7 +159,7 @@ export default function NotificationsPage() {
                                                 }
                                             />
                                             {!notification.read && (
-                                                <Box sx={{ width: 10, height: 10, borderRadius: '50%', bgcolor: 'primary.main' }} />
+                                                <Box sx={{ width: 10, height: 10, minWidth: 10, minHeight: 10, borderRadius: '50%', bgcolor: 'primary.main', flexShrink: 0 }} />
                                             )}
                                         </Box>
                                     </ListItem>
