@@ -130,8 +130,8 @@ export default function NotificationsPage() {
                                             <ListItemText
                                                 primary={
                                                     <Typography
-                                                        variant="body1"
-                                                        sx={{ fontWeight: !notification.read ? 600 : 400 }}
+                                                        variant="body2"
+                                                        sx={{ fontWeight: !notification.read ? 600 : 400, fontSize: '0.82rem' }}
                                                     >
                                                         {(() => {
                                                             let displayMessage = notification.message;
@@ -152,7 +152,11 @@ export default function NotificationsPage() {
                                                         })()}
                                                     </Typography>
                                                 }
-                                                secondary={formatTime(notification.createdAt)}
+                                                secondary={
+                                                    <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.72rem' }}>
+                                                        {formatTime(notification.createdAt)}
+                                                    </Typography>
+                                                }
                                             />
                                             {!notification.read && (
                                                 <Box sx={{ width: 10, height: 10, borderRadius: '50%', bgcolor: 'primary.main' }} />
