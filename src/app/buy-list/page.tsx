@@ -59,9 +59,17 @@ export default function Todos() {
         const date = new Date(isoString);
         const now = new Date();
         const isToday = date.toDateString() === now.toDateString();
+        const timeStr = date.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+        if (isToday) return `Today at ${timeStr}`;
+        const dateStr = date.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+        return `${dateStr}, ${timeStr}`;
+    };
 
-        const timeStr = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-        return isToday ? `Today at ${timeStr}` : `${date.toLocaleDateString()} at ${timeStr}`;
+    const canDeleteCompleted = (todo: any) => {
+        // Show delete only for manually-marked items within 10 minutes
+        if (!todo.isCompleted || todo.completedBy === 'auto') return false;
+        const completedAt = new Date(todo.completedAt || todo.createdAt);
+        return (Date.now() - completedAt.getTime()) < 10 * 60 * 1000;
     };
 
     return (
@@ -107,27 +115,29 @@ export default function Todos() {
                                         key={todo.id}
                                         className="glass"
                                         sx={{
-                                            borderRadius: '12px',
-                                            mb: 1,
+                                            borderRadius: '10px',
+                                            py: 0.75,
+                                            px: 1.5,
+                                            mb: 0.75,
                                             background: todo.isCompleted ? 'rgba(0,0,0,0.05)' : 'rgba(255,255,255,0.05)',
                                             transition: 'all 0.2s'
                                         }}
                                         secondaryAction={
-                                            !todo.isCompleted && (
-                                                <IconButton edge="end" onClick={() => deleteTodo(todo.id)}>
-                                                    <DeleteIcon color="error" fontSize="small" />
+                                            (!todo.isCompleted || canDeleteCompleted(todo)) && (
+                                                <IconButton edge="end" size="small" onClick={() => deleteTodo(todo.id)}>
+                                                    <DeleteIcon color="error" sx={{ fontSize: 18 }} />
                                                 </IconButton>
                                             )
                                         }
                                     >
                                         <IconButton
                                             onClick={() => !todo.isCompleted && toggleTodo(todo.id, !todo.isCompleted, user?.email || '')}
-                                            sx={{ mr: 1 }}
+                                            sx={{ mr: 0.5, p: 0.5 }}
                                             disabled={todo.isCompleted}
                                         >
                                             {todo.isCompleted ?
-                                                <CheckCircleOutlineIcon color="success" /> :
-                                                <RadioButtonUncheckedIcon sx={{ opacity: 0.5 }} />
+                                                <CheckCircleOutlineIcon color="success" sx={{ fontSize: 20 }} /> :
+                                                <RadioButtonUncheckedIcon sx={{ opacity: 0.5, fontSize: 20 }} />
                                             }
                                         </IconButton>
 
@@ -135,7 +145,7 @@ export default function Todos() {
                                             secondaryTypographyProps={{ component: 'div' }}
                                             primary={
                                                 <Typography
-                                                    variant="body1"
+                                                    variant="body2"
                                                     sx={{
                                                         textDecoration: todo.isCompleted ? 'line-through' : 'none',
                                                         fontWeight: 500,
@@ -146,22 +156,20 @@ export default function Todos() {
                                                 </Typography>
                                             }
                                             secondary={
-                                                <Box sx={{ mt: 0.5 }}>
-                                                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
-                                                        <Avatar src={photoUrl || ''} sx={{ width: 18, height: 18, fontSize: '10px' }}>
-                                                            {name.charAt(0)}
-                                                        </Avatar>
-                                                        <Typography variant="caption" color="text.secondary">
-                                                            {name}
-                                                        </Typography>
-                                                    </Box>
-                                                    <Typography variant="caption" color="text.disabled" sx={{ display: 'block' }}>
-                                                        {formatTime(todo.createdAt)}
+                                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap', mt: 0.25 }}>
+                                                    <Avatar src={photoUrl || ''} sx={{ width: 14, height: 14, fontSize: '8px' }}>
+                                                        {name.charAt(0)}
+                                                    </Avatar>
+                                                    <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.65rem' }}>
+                                                        {name}
+                                                    </Typography>
+                                                    <Typography variant="caption" color="text.disabled" sx={{ fontSize: '0.65rem' }}>
+                                                        · {formatTime(todo.createdAt)}
                                                     </Typography>
                                                     {todo.isCompleted && (
-                                                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mt: 0.5 }}>
+                                                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
                                                             {todo.completedBy === 'auto' ? (
-                                                                <Typography variant="caption" sx={{ color: 'success.main', fontStyle: 'italic' }}>
+                                                                <Typography variant="caption" sx={{ color: 'success.main', fontStyle: 'italic', fontSize: '0.65rem' }}>
                                                                     ✨ Auto marked
                                                                 </Typography>
                                                             ) : todo.completedBy ? (
@@ -169,11 +177,8 @@ export default function Todos() {
                                                                     const { name: completedByName, photoUrl: completedByPhoto } = getMemberInfo(todo.completedBy);
                                                                     return (
                                                                         <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                                                                            <DoneAllIcon color="success" sx={{ fontSize: 16 }} />
-                                                                            <Avatar src={completedByPhoto || ''} sx={{ width: 14, height: 14, fontSize: '8px' }}>
-                                                                                {completedByName.charAt(0)}
-                                                                            </Avatar>
-                                                                            <Typography variant="caption" color="success.main">
+                                                                            <DoneAllIcon color="success" sx={{ fontSize: 13 }} />
+                                                                            <Typography variant="caption" color="success.main" sx={{ fontSize: '0.65rem' }}>
                                                                                 {completedByName}
                                                                             </Typography>
                                                                         </Box>

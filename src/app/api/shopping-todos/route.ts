@@ -124,9 +124,10 @@ export async function DELETE(request: Request) {
 
         if (todoSnap.exists) {
             const todoData = todoSnap.data()!;
-            if (todoData.isCompleted) {
+            // Block deletion only for auto-marked items (they auto-delete in 12 hours)
+            if (todoData.isCompleted && todoData.completedBy === 'auto') {
                 return NextResponse.json({
-                    error: 'Completed items cannot be deleted manually. They will be removed automatically after 12 hours.'
+                    error: 'Auto-marked items cannot be deleted manually. They will be removed automatically after 12 hours.'
                 }, { status: 400 });
             }
         }
