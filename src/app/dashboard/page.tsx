@@ -1020,8 +1020,17 @@ export default function Dashboard() {
                                         type="number"
                                         fullWidth
                                         value={payAmount}
-                                        onChange={(e) => setPayAmount(e.target.value)}
-                                        inputProps={{ min: 0, step: '0.01' }}
+                                        onChange={(e) => {
+                                            const val = e.target.value;
+                                            const max = paySettlement?.amount ?? Infinity;
+                                            if (val === '' || Number(val) <= max) {
+                                                setPayAmount(val);
+                                            } else {
+                                                setPayAmount(String(max));
+                                            }
+                                        }}
+                                        inputProps={{ min: 0.01, step: '0.01', max: paySettlement?.amount }}
+                                        helperText={`Max: ${displayCurrency}${paySettlement?.amount.toFixed(2)}`}
                                         InputProps={{
                                             startAdornment: (
                                                 <Box component="span" sx={{ mr: 0.5, color: 'text.secondary' }}>{displayCurrency}</Box>
@@ -1065,7 +1074,7 @@ export default function Dashboard() {
                             variant="contained"
                             color="success"
                             startIcon={<PaymentsIcon />}
-                            disabled={!payAmount || Number(payAmount) <= 0}
+                            disabled={!payAmount || Number(payAmount) <= 0 || Number(payAmount) > (paySettlement?.amount ?? Infinity)}
                             onClick={async () => {
                                 if (!paySettlement || !house || !user?.email) return;
                                 try {

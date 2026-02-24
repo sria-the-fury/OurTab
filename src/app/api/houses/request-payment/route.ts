@@ -12,6 +12,11 @@ export async function POST(request: Request) {
             return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
         }
 
+        const numAmount = Number(amount);
+        if (isNaN(numAmount) || numAmount <= 0) {
+            return NextResponse.json({ error: 'Amount must be greater than 0' }, { status: 400 });
+        }
+
         const paymentsRef = adminDb
             .collection('groups')
             .doc(houseId)
