@@ -8,6 +8,24 @@ import { useRouter } from 'next/navigation';
 import { useNotifications } from '@/hooks/useNotifications';
 import { playNotificationSound } from '@/utils/notificationSound';
 
+async function requestBrowserPermission() {
+    if (typeof window === 'undefined' || !('Notification' in window)) return;
+    if (Notification.permission === 'default') {
+        await Notification.requestPermission();
+    }
+}
+
+function showBrowserNotification(senderName?: string, message?: string, icon?: string) {
+    if (typeof window === 'undefined' || !('Notification' in window)) return;
+    if (Notification.permission !== 'granted') return;
+    if (document.visibilityState === 'visible') return; // Only alert when tab is in background
+
+    const title = senderName ? `${senderName} — OurTab` : 'OurTab';
+    const body = message || 'You have a new notification.';
+    const n = new Notification(title, { body, icon: icon || '/favicon.ico', silent: true });
+    setTimeout(() => n.close(), 6000);
+}
+
 export default function NotificationBell() {
     const router = useRouter();
     const { unreadCount, notifications } = useNotifications();
@@ -16,15 +34,21 @@ export default function NotificationBell() {
 
     useEffect(() => {
         setMounted(true);
+        requestBrowserPermission();
     }, []);
 
     useEffect(() => {
-        if (mounted && unreadCount > prevCountRef.current) {
+        if (!mounted) return;
+        if (unreadCount > prevCountRef.current) {
             // New notification arrived
             playNotificationSound();
+
+            // Browser notification (shown when tab is in background)
+            const latest = notifications.find(n => !n.read);
+            showBrowserNotification(latest?.senderName, latest?.message, latest?.senderPhotoUrl);
         }
         prevCountRef.current = unreadCount;
-    }, [unreadCount, mounted]);
+    }, [unreadCount, mounted, notifications]);
 
     if (!mounted) return null;
 
