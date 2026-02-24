@@ -253,7 +253,7 @@ export default function Profile() {
                                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mt: 0.5 }}>
                                         <HomeIcon sx={{ fontSize: 14, color: 'primary.main' }} />
                                         <Typography variant="caption" color="text.secondary">
-                                            <Box component="span" sx={{ fontWeight: 'bold', color: 'primary.main' }}>
+                                            <Box component="span" sx={{ fontWeight: 'bold', color: 'primary.main', fontFamily: 'var(--font-abril)' }}>
                                                 {houseDetails.name}
                                             </Box>
                                             {' '}[{houseDetails.currency === 'EUR' ? '€' : houseDetails.currency === 'BDT' ? '৳' : '$'}]
