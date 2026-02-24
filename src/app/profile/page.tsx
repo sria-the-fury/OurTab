@@ -27,6 +27,8 @@ import AccountBalanceIcon from '@mui/icons-material/AccountBalance';
 import HowToVoteIcon from '@mui/icons-material/HowToVote';
 import CancelIcon from '@mui/icons-material/Cancel';
 import DirectionsRunIcon from '@mui/icons-material/DirectionsRun';
+import FeedbackIcon from '@mui/icons-material/Feedback';
+import SendIcon from '@mui/icons-material/Send';
 import { useRouter } from 'next/navigation';
 import Dialog from '@mui/material/Dialog';
 import DialogTitle from '@mui/material/DialogTitle';
@@ -45,6 +47,9 @@ export default function Profile() {
     const [savingIban, setSavingIban] = useState(false);
     const [openDeleteDialog, setOpenDeleteDialog] = useState(false);
     const [openLeaveDialog, setOpenLeaveDialog] = useState(false);
+    const [feedbackSubject, setFeedbackSubject] = useState('');
+    const [feedbackMessage, setFeedbackMessage] = useState('');
+    const [openFeedbackDialog, setOpenFeedbackDialog] = useState(false);
     const { showToast } = useToast();
     // Derived state
     const hasHouse = !!dbUser?.groupId;
@@ -509,6 +514,72 @@ export default function Profile() {
                         <Button onClick={() => setOpenLeaveDialog(false)}>Cancel</Button>
                         <Button onClick={confirmLeaveHouse} color="warning" variant="contained">
                             Leave House
+                        </Button>
+                    </DialogActions>
+                </Dialog>
+
+                {/* Feedback & Suggestions — clickable trigger */}
+                <Box sx={{ textAlign: 'center', mb: 2 }}>
+                    <Typography
+                        variant="body2"
+                        color="primary"
+                        sx={{ cursor: 'pointer', textDecoration: 'underline', display: 'inline-flex', alignItems: 'center', gap: 0.5 }}
+                        onClick={() => setOpenFeedbackDialog(true)}
+                    >
+                        <FeedbackIcon sx={{ fontSize: 16 }} />
+                        Send Feedback & Suggestions
+                    </Typography>
+                </Box>
+
+                {/* Feedback Modal */}
+                <Dialog open={openFeedbackDialog} onClose={() => setOpenFeedbackDialog(false)} fullWidth maxWidth="xs">
+                    <DialogTitle sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                        <FeedbackIcon color="primary" fontSize="small" /> Feedback & Suggestions
+                    </DialogTitle>
+                    <DialogContent>
+                        <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                            Have an idea or found a bug? We read every email.
+                        </Typography>
+                        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                            <TextField
+                                label="Subject"
+                                size="small"
+                                fullWidth
+                                value={feedbackSubject}
+                                onChange={(e) => setFeedbackSubject(e.target.value)}
+                                placeholder="e.g. Feature request: dark mode"
+                            />
+                            <TextField
+                                label="Message"
+                                size="small"
+                                fullWidth
+                                multiline
+                                rows={4}
+                                value={feedbackMessage}
+                                onChange={(e) => setFeedbackMessage(e.target.value)}
+                                placeholder="Tell us what you think..."
+                            />
+                        </Box>
+                    </DialogContent>
+                    <DialogActions>
+                        <Button onClick={() => setOpenFeedbackDialog(false)}>Cancel</Button>
+                        <Button
+                            variant="contained"
+                            startIcon={<SendIcon />}
+                            disabled={!feedbackSubject.trim() || !feedbackMessage.trim()}
+                            onClick={() => {
+                                const subject = encodeURIComponent(feedbackSubject.trim());
+                                const body = encodeURIComponent(
+                                    `${feedbackMessage.trim()}\n\n— Sent by ${user?.displayName || user?.email}`
+                                );
+                                window.open(`mailto:jakariamsria@gmail.com?subject=${subject}&body=${body}`, '_blank');
+                                setFeedbackSubject('');
+                                setFeedbackMessage('');
+                                setOpenFeedbackDialog(false);
+                                showToast('Opening your email client…', 'success');
+                            }}
+                        >
+                            Send
                         </Button>
                     </DialogActions>
                 </Dialog>
