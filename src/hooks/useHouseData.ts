@@ -27,6 +27,9 @@ export interface Expense {
     date: string;
     contributors?: Array<{ email: string; amount: number }>;
     isSettlementPayment?: boolean;
+    method?: 'bank' | 'cash';
+    createdAt?: string;
+    approvedAt?: string;
     settlementBetween?: string[];
 }
 

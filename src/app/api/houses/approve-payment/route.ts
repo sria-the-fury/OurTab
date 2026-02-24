@@ -47,19 +47,26 @@ export async function POST(request: Request) {
         // By splitting only between the two, the receiver's debt drops by the amount, and the payer's balance increases correctly.
         // We record it as: payer paid, only payer+receiver are split (i.e. it's a transfer).
         // Actually simplest: we create a "settlement" expense where the contributor is the payer and we mark it as a payment.
-        const now = new Date().toISOString();
+        const approvedAt = new Date().toISOString();
+        // payment.createdAt may be a Firestore Timestamp or an ISO string
+        const rawSentAt = payment.createdAt;
+        const sentAt = rawSentAt
+            ? (typeof rawSentAt === 'string' ? rawSentAt : rawSentAt.toDate?.().toISOString?.() || approvedAt)
+            : null;
+        console.log('[approve-payment] sentAt:', sentAt, '| approvedAt:', approvedAt);
         const members = houseData.members || [];
         await adminDb.collection('expenses').add({
             description: `Settlement payment`,
             amount: payment.amount,
             userId: payment.from,
             groupId: houseId,
-            date: now,
+            date: approvedAt,
             isSettlementPayment: true,
             method: payment.method || 'bank',
             settlementBetween: [payment.from, payment.to],
             contributors: [{ email: payment.from, amount: payment.amount }],
-            createdAt: now,
+            createdAt: sentAt || approvedAt,
+            approvedAt: approvedAt,
         });
 
         // Update the house with the approved payment

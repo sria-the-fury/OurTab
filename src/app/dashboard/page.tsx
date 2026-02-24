@@ -20,7 +20,11 @@ import ArrowBackIosIcon from '@mui/icons-material/ArrowBackIos';
 import ArrowForwardIosIcon from '@mui/icons-material/ArrowForwardIos';
 import ArrowUpwardIcon from '@mui/icons-material/ArrowUpward';
 import ArrowDownwardIcon from '@mui/icons-material/ArrowDownward';
+import ArrowForwardIcon from '@mui/icons-material/ArrowForward';
 import AccountBalanceWalletIcon from '@mui/icons-material/AccountBalanceWallet';
+import AccountBalanceIcon from '@mui/icons-material/AccountBalance';
+import DoneAllIcon from '@mui/icons-material/DoneAll';
+import SellIcon from '@mui/icons-material/Sell';
 import IconButton from '@mui/material/IconButton';
 import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 import Tooltip from '@mui/material/Tooltip';
@@ -60,6 +64,9 @@ interface Expense {
     date: string;
     contributors?: Array<{ email: string; amount: number }>;
     isSettlementPayment?: boolean;
+    method?: 'bank' | 'cash';
+    createdAt?: string;
+    approvedAt?: string;
     settlementBetween?: string[];
 }
 
@@ -113,6 +120,12 @@ export default function Dashboard() {
     const [paySettlement, setPaySettlement] = useState<{ from: string; to: string; amount: number } | null>(null);
     const [payAmount, setPayAmount] = useState('');
     const [payMethod, setPayMethod] = useState<'cash' | 'bank'>('bank');
+
+    // Settlement History Dialog State
+    const [openHistoryDialog, setOpenHistoryDialog] = useState(false);
+
+    // Cancel Payment State
+    const [cancelPaymentId, setCancelPaymentId] = useState<string | null>(null);
 
     // Member Details Dialog State
     const [openMemberDialog, setOpenMemberDialog] = useState(false);
@@ -474,9 +487,17 @@ export default function Dashboard() {
                                 height: '100%',
                                 position: 'relative',
                                 overflow: 'hidden',
+                                cursor: 'pointer',
+                                transition: 'transform 0.2s, box-shadow 0.2s',
                                 bgcolor: 'rgba(0, 191, 165, 0.08)',
-                                border: '1px solid rgba(0, 191, 165, 0.2)'
-                            }}>
+                                border: '1px solid rgba(0, 191, 165, 0.2)',
+                                '&:hover': {
+                                    transform: 'translateY(-2px)',
+                                    boxShadow: '0 8px 24px rgba(0,0,0,0.1)'
+                                },
+                            }}
+                                onClick={() => setOpenHistoryDialog(true)}
+                            >
                                 <Box sx={{ position: 'absolute', top: -10, right: -10, opacity: 0.15, color: 'secondary.main' }}>
                                     <AccountBalanceWalletIcon sx={{ fontSize: 100 }} />
                                 </Box>
@@ -763,7 +784,21 @@ export default function Dashboard() {
                                                             </Typography>
                                                             {isCurrentUserPayer && (
                                                                 hasPendingRequest ? (
-                                                                    <Chip label="Pending approval" size="small" color="warning" variant="outlined" />
+                                                                    <Button
+                                                                        variant="outlined"
+                                                                        size="small"
+                                                                        color="warning"
+                                                                        onClick={() => {
+                                                                            const pendingReq = (house.pendingPayments || []).find(
+                                                                                p => p.from === settlement.from && p.to === settlement.to && p.status === 'pending'
+                                                                            );
+                                                                            if (pendingReq) {
+                                                                                setCancelPaymentId(pendingReq.id);
+                                                                            }
+                                                                        }}
+                                                                    >
+                                                                        Cancel Request
+                                                                    </Button>
                                                                 ) : (
                                                                     <Button
                                                                         variant="contained"
@@ -951,6 +986,47 @@ export default function Dashboard() {
                     </DialogActions>
                 </Dialog>
 
+                {/* Cancel Payment Confirmation Dialog */}
+                <Dialog open={!!cancelPaymentId} onClose={() => setCancelPaymentId(null)} fullWidth maxWidth="xs">
+                    <DialogTitle>Cancel Payment Request</DialogTitle>
+                    <DialogContent>
+                        <Typography>Are you sure you want to cancel this payment request? The receiver will no longer be able to approve it.</Typography>
+                    </DialogContent>
+                    <DialogActions>
+                        <Button onClick={() => setCancelPaymentId(null)}>Back</Button>
+                        <Button
+                            variant="contained"
+                            color="error"
+                            onClick={async () => {
+                                if (!cancelPaymentId || !house || !user) return;
+                                try {
+                                    const res = await fetch('/api/houses/cancel-payment', {
+                                        method: 'POST',
+                                        headers: { 'Content-Type': 'application/json' },
+                                        body: JSON.stringify({
+                                            houseId: house.id,
+                                            paymentId: cancelPaymentId,
+                                            cancellerEmail: user.email,
+                                        }),
+                                    });
+                                    if (res.ok) {
+                                        showToast('Payment request cancelled.', 'success');
+                                        mutateHouse();
+                                        setCancelPaymentId(null);
+                                    } else {
+                                        const d = await res.json();
+                                        showToast(d.error || 'Failed to cancel', 'error');
+                                    }
+                                } catch {
+                                    showToast('Error cancelling request', 'error');
+                                }
+                            }}
+                        >
+                            Cancel Request
+                        </Button>
+                    </DialogActions>
+                </Dialog>
+
                 {/* Pay Now Confirmation Dialog */}
                 <Dialog open={openPayDialog} onClose={() => setOpenPayDialog(false)} fullWidth maxWidth="xs">
                     <DialogTitle>Confirm Payment</DialogTitle>
@@ -1083,6 +1159,92 @@ export default function Dashboard() {
                     </DialogContent>
                     <DialogActions>
                         <Button onClick={() => setOpenMemberDialog(false)}>Close</Button>
+                    </DialogActions>
+                </Dialog>
+
+                {/* Settlement History Dialog */}
+                <Dialog open={openHistoryDialog} onClose={() => setOpenHistoryDialog(false)} maxWidth="sm" fullWidth>
+                    <DialogTitle>Settlement History</DialogTitle>
+                    <DialogContent>
+                        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, mt: 1 }}>
+                            {expenses.filter(exp => exp.isSettlementPayment && (exp.userId === user?.email || exp.settlementBetween?.includes(user?.email || ''))).length === 0 ? (
+                                <Typography color="text.secondary" textAlign="center" sx={{ py: 4 }}>No past settlements found.</Typography>
+                            ) : (
+                                expenses
+                                    .filter(exp => exp.isSettlementPayment && (exp.userId === user?.email || exp.settlementBetween?.includes(user?.email || '')))
+                                    .sort((a, b) => new Date(b.createdAt || b.date).getTime() - new Date(a.createdAt || a.date).getTime())
+                                    .map(exp => {
+                                        const fromEmail = exp.userId;
+                                        const toEmail = exp.settlementBetween?.find((e: string) => e !== fromEmail) || '';
+                                        const fromMember = house?.members?.find(m => m.email === fromEmail);
+                                        const toMember = house?.members?.find(m => m.email === toEmail);
+                                        const createdDate = new Date(exp.createdAt || exp.date);
+                                        const approvedDate = exp.approvedAt ? new Date(exp.approvedAt) : createdDate;
+                                        const dateOptions: Intl.DateTimeFormatOptions = { day: 'numeric', month: 'short', year: 'numeric' };
+                                        const timeOptions: Intl.DateTimeFormatOptions = { hour: '2-digit', minute: '2-digit' };
+                                        const formattedCreatedDate = `${createdDate.toLocaleDateString('en-GB', dateOptions)}, ${createdDate.toLocaleTimeString('en-GB', timeOptions)}`;
+                                        const formattedApprovedDate = `${approvedDate.toLocaleDateString('en-GB', dateOptions)}, ${approvedDate.toLocaleTimeString('en-GB', timeOptions)}`;
+
+                                        return (
+                                            <Paper key={exp.id} sx={{
+                                                p: 2,
+                                                position: 'relative',
+                                                overflow: 'hidden',
+                                                border: '1px solid rgba(0,0,0,0.08)',
+                                                bgcolor: 'rgba(0,0,0,0.02)'
+                                            }}>
+                                                {/* Watermark Tag */}
+                                                <Box sx={{
+                                                    position: 'absolute',
+                                                    right: -10,
+                                                    top: 10,
+                                                    opacity: 0.05,
+                                                    transform: 'rotate(-15deg)'
+                                                }}>
+                                                    {exp.method === 'cash' ? (
+                                                        <PaymentsIcon sx={{ fontSize: 80, color: 'text.primary' }} />
+                                                    ) : (
+                                                        <AccountBalanceIcon sx={{ fontSize: 80, color: 'text.primary' }} />
+                                                    )}
+                                                </Box>
+
+                                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2, position: 'relative', zIndex: 1 }}>
+                                                    <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                                                        <Avatar src={fromMember?.photoUrl} alt={fromMember?.name} sx={{ width: 40, height: 40 }} />
+                                                        <Typography variant="caption" noWrap sx={{ maxWidth: 60 }}>
+                                                            {fromEmail === user?.email ? 'You' : (fromMember?.name?.split(' ')[0] || fromEmail.split('@')[0])}
+                                                        </Typography>
+                                                    </Box>
+                                                    <ArrowForwardIosIcon color="action" sx={{ fontSize: 16 }} />
+                                                    <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                                                        <Avatar src={toMember?.photoUrl} alt={toMember?.name} sx={{ width: 40, height: 40 }} />
+                                                        <Typography variant="caption" noWrap sx={{ maxWidth: 60 }}>
+                                                            {toEmail === user?.email ? 'You' : (toMember?.name?.split(' ')[0] || toEmail.split('@')[0])}
+                                                        </Typography>
+                                                    </Box>
+                                                    <Box sx={{ flex: 1, textAlign: 'right' }}>
+                                                        <Typography variant="h6" color="success.main" fontWeight="bold">
+                                                            {displayCurrency}{exp.amount.toFixed(2)}
+                                                        </Typography>
+                                                    </Box>
+                                                </Box>
+
+                                                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderTop: '1px dashed rgba(0,0,0,0.1)', pt: 1, position: 'relative', zIndex: 1 }}>
+                                                    <Typography variant="caption" color="text.secondary" sx={{ display: 'flex', alignItems: 'center', gap: 0.5, fontSize: '0.65rem' }}>
+                                                        <ArrowForwardIcon sx={{ fontSize: 13 }} /> {formattedCreatedDate}
+                                                    </Typography>
+                                                    <Typography variant="caption" color="success.main" sx={{ display: 'flex', alignItems: 'center', gap: 0.5, fontSize: '0.65rem' }}>
+                                                        <DoneAllIcon sx={{ fontSize: 13 }} /> {formattedApprovedDate}
+                                                    </Typography>
+                                                </Box>
+                                            </Paper>
+                                        );
+                                    })
+                            )}
+                        </Box>
+                    </DialogContent>
+                    <DialogActions>
+                        <Button onClick={() => setOpenHistoryDialog(false)}>Close</Button>
                     </DialogActions>
                 </Dialog>
             </main>
