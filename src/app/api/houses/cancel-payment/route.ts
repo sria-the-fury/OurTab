@@ -12,7 +12,7 @@ export async function POST(request: Request) {
         }
 
         const paymentRef = adminDb
-            .collection('groups')
+            .collection('houses')
             .doc(houseId)
             .collection('pendingPayments')
             .doc(paymentId);

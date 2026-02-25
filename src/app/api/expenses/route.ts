@@ -28,14 +28,14 @@ export async function POST(request: Request) {
             amount: number;
             description: string;
             userId: string;
-            groupId: string;
+            houseId: string;
             date: string;
             contributors?: { email: string; amount: number }[];
         } = {
             amount: totalAmount,
             description,
             userId,
-            groupId: houseId, // Still stored as groupId in Firestore
+            houseId,
             date: new Date().toISOString()
         };
 
@@ -50,7 +50,7 @@ export async function POST(request: Request) {
 
         // --- Notify other house members ---
         try {
-            const houseSnap = await adminDb.collection('groups').doc(houseId).get();
+            const houseSnap = await adminDb.collection('houses').doc(houseId).get();
             const houseData = houseSnap.data();
 
             // Find the sender (current user) to get their info
@@ -160,7 +160,7 @@ export async function GET(request: Request) {
         let query = adminDb.collection('expenses') as FirebaseFirestore.Query;
 
         if (houseId) {
-            query = query.where('groupId', '==', houseId);
+            query = query.where('houseId', '==', houseId);
         } else if (userId) {
             query = query.where('userId', '==', userId);
         }

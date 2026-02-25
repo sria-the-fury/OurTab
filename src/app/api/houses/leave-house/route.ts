@@ -11,7 +11,7 @@ export async function POST(request: Request) {
             return NextResponse.json({ error: 'HouseId and UserEmail required' }, { status: 400 });
         }
 
-        const houseRef = adminDb.collection('groups').doc(houseId);
+        const houseRef = adminDb.collection('houses').doc(houseId);
         const houseSnap = await houseRef.get();
 
         if (!houseSnap.exists) {
@@ -34,9 +34,9 @@ export async function POST(request: Request) {
             // Update house document
             batch.update(houseRef, { members });
 
-            // Remove groupId from user document
+            // Remove houseId from user document
             const userRef = adminDb.collection('users').doc(userEmail);
-            batch.update(userRef, { groupId: null });
+            batch.update(userRef, { houseId: null });
 
             await batch.commit();
 

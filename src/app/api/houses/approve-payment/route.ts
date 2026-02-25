@@ -24,7 +24,7 @@ export async function POST(request: Request) {
         }
 
         const paymentRef = adminDb
-            .collection('groups')
+            .collection('houses')
             .doc(houseId)
             .collection('pendingPayments')
             .doc(paymentId);
@@ -59,7 +59,7 @@ export async function POST(request: Request) {
             description: `Settlement payment`,
             amount: payment.amount,
             userId: payment.from,
-            groupId: houseId,
+            houseId: houseId,
             date: approvedAt,
             isSettlementPayment: true,
             method: payment.method || 'bank',

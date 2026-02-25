@@ -18,7 +18,7 @@ export interface SettlementItem {
 
 export interface Settlement {
     id?: string;
-    groupId: string;
+    houseId: string;
     month: number; // 0-11
     year: number;
     settlements: SettlementItem[];
@@ -31,7 +31,7 @@ export interface ExpenseWithContributors {
     amount: number;
     description: string;
     userId: string;
-    groupId: string;
+    houseId: string;
     date: string;
     contributors?: Contributor[];
 }

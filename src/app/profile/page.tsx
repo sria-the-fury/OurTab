@@ -38,6 +38,7 @@ import AuthGuard from '@/components/AuthGuard';
 export default function Profile() {
     const { user, currency, updateCurrency, loading: authLoading, dbUser, house, mutateUser, mutateHouse } = useAuth();
     const [houseName, setHouseName] = useState('');
+    const [newHouseCurrency, setNewHouseCurrency] = useState('USD'); // local picker for Create House form
     const [loading, setLoading] = useState(false);
     const [ibanValue, setIbanValue] = useState('');
     const [editingIban, setEditingIban] = useState(false);
@@ -50,7 +51,7 @@ export default function Profile() {
     const { showToast } = useToast();
 
     // Derived state
-    const hasHouse = !!dbUser?.groupId;
+    const hasHouse = !!dbUser?.houseId;
     interface HouseDetails {
         id?: string;
         name?: string;
@@ -89,7 +90,7 @@ export default function Profile() {
             const res = await fetch('/api/houses', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ name: houseName, createdBy: user?.email, currency })
+                body: JSON.stringify({ name: houseName, createdBy: user?.email, currency: newHouseCurrency })
             });
             if (res.ok) {
                 showToast('House created successfully!', 'success');
@@ -413,7 +414,7 @@ export default function Profile() {
                                 <form onSubmit={handleCreateHouse}>
                                     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
                                         <TextField label="House Name" fullWidth size="small" value={houseName} onChange={(e) => setHouseName(e.target.value)} required />
-                                        <TextField select label="Default Currency" value={currency} onChange={handleCurrencyChange} fullWidth size="small">
+                                        <TextField select label="Default Currency" value={newHouseCurrency} onChange={(e) => setNewHouseCurrency(e.target.value)} fullWidth size="small">
                                             <MenuItem value="USD">Dollar ($)</MenuItem>
                                             <MenuItem value="EUR">Euro (€)</MenuItem>
                                             <MenuItem value="BDT">Bangladeshi Taka (৳)</MenuItem>

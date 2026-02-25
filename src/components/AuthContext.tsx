@@ -52,16 +52,15 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         fetcher
     );
 
-    // 2. Fetch House Data
-    // We only fetch house if we have a user (and ideally if we know they have a house, but we can just try fetching)
-    // Actually, relying on userData.groupId is better to avoid 404s, but initially fetching is fine too.
+    // 2. Fetch House Data (fetches via email; server handles no-house case)
     const { data: houseData, mutate: mutateHouse } = useSWR<House>(
         user?.email ? `/api/houses/my-house?email=${user.email}` : null,
         fetcher
     );
 
     // Derived state
-    const currency = houseData?.currency || userData?.currency || 'USD';
+    // Currency always comes from the house; default to USD before joining one
+    const currency = houseData?.currency || 'USD';
 
     // Overall loading state: Auth is initial load, but we might want to wait for data?
     // Usually only wait for Auth (user presence). Data can pop in.
@@ -116,32 +115,16 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     };
 
     const updateCurrency = async (newCurrency: string) => {
-        if (user?.email) {
+        if (user?.email && houseData?.id) {
             try {
-                // Determine logic based on whether user is in a house or not
-                let url = '/api/users';
-                type UpdateBody =
-                    | { email: string; currency: string }
-                    | { houseId: string; currency: string; userEmail: string };
-                let body: UpdateBody = { email: user.email!, currency: newCurrency };
-
-                if (houseData?.id) {
-                    url = '/api/houses/update';
-                    body = { houseId: houseData.id, currency: newCurrency, userEmail: user.email! };
-                }
-
-                await fetch(url, {
+                await fetch('/api/houses/update', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(body)
+                    body: JSON.stringify({ houseId: houseData.id, currency: newCurrency, userEmail: user.email })
                 });
-
-                // Mutate to update UI instantly
-                mutateUser();
                 mutateHouse();
-
             } catch (error) {
-                console.error("Failed to sync currency preference", error);
+                console.error('Failed to update house currency', error);
             }
         }
     };

@@ -10,7 +10,7 @@ export async function POST(request: Request) {
             return NextResponse.json({ error: 'HouseId, Currency and UserEmail are required' }, { status: 400 });
         }
 
-        const houseRef = adminDb.collection('groups').doc(houseId);
+        const houseRef = adminDb.collection('houses').doc(houseId);
         const houseSnap = await houseRef.get();
 
         if (!houseSnap.exists) {

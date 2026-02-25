@@ -9,7 +9,7 @@ export async function GET() {
     }
 
     try {
-        const housesSnap = await adminDb.collection('groups').get();
+        const housesSnap = await adminDb.collection('houses').get();
         let totalCleaned = 0;
 
         for (const houseDoc of housesSnap.docs) {

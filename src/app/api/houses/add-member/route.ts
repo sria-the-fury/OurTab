@@ -19,16 +19,16 @@ export async function POST(request: Request) {
         }
 
         const userData = userSnap.data()!;
-        if (userData.groupId) {
+        if (userData.houseId || userData.groupId) {
             return NextResponse.json({ error: 'User is already in a house.' }, { status: 400 });
         }
 
-        const houseRef = adminDb.collection('groups').doc(houseId);
+        const houseRef = adminDb.collection('houses').doc(houseId);
         await houseRef.update({
             members: FieldValue.arrayUnion(email)
         });
 
-        await userRef.update({ groupId: houseId });
+        await userRef.update({ houseId: houseId });
 
         return NextResponse.json({ success: true });
     } catch (error) {

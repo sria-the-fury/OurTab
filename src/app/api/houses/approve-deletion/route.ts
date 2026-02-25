@@ -5,7 +5,7 @@ async function deleteHouseAndAllData(houseId: string, members: string[]) {
     const batch = adminDb.batch();
 
     for (const email of members) {
-        batch.update(adminDb.collection('users').doc(email), { groupId: null });
+        batch.update(adminDb.collection('users').doc(email), { houseId: null });
     }
 
     const expensesSnap = await adminDb.collection('expenses').where('houseId', '==', houseId).get();
@@ -17,7 +17,7 @@ async function deleteHouseAndAllData(houseId: string, members: string[]) {
     const settlementsSnap = await adminDb.collection('settlements').where('houseId', '==', houseId).get();
     settlementsSnap.docs.forEach(d => batch.delete(d.ref));
 
-    batch.delete(adminDb.collection('groups').doc(houseId));
+    batch.delete(adminDb.collection('houses').doc(houseId));
 
     await batch.commit();
 }
@@ -30,7 +30,7 @@ export async function POST(request: Request) {
             return NextResponse.json({ error: 'houseId and userEmail are required' }, { status: 400 });
         }
 
-        const houseRef = adminDb.collection('groups').doc(houseId);
+        const houseRef = adminDb.collection('houses').doc(houseId);
         const houseSnap = await houseRef.get();
 
         if (!houseSnap.exists) {

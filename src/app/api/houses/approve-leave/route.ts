@@ -11,7 +11,7 @@ export async function POST(request: Request) {
             return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
         }
 
-        const houseRef = adminDb.collection('groups').doc(houseId);
+        const houseRef = adminDb.collection('houses').doc(houseId);
         const houseSnap = await houseRef.get();
 
         if (!houseSnap.exists) {
@@ -43,12 +43,19 @@ export async function POST(request: Request) {
             batch.update(houseRef, { members: newMembers, leaveRequests });
 
             const userRef = adminDb.collection('users').doc(userToApprove);
-            batch.update(userRef, { groupId: null });
+            batch.update(userRef, { houseId: null });
 
             await batch.commit();
 
             // Notify fully approved
             try {
+                // Fetch the departing user's name/photo
+                const leaverSnap = await adminDb.collection('users').doc(userToApprove).get();
+                const leaverName = leaverSnap.exists
+                    ? (leaverSnap.data()?.name || userToApprove.split('@')[0])
+                    : userToApprove.split('@')[0];
+                const leaverPhotoUrl = leaverSnap.exists ? leaverSnap.data()?.photoUrl : undefined;
+
                 await createNotification({
                     userId: userToApprove,
                     type: 'house',
@@ -57,7 +64,9 @@ export async function POST(request: Request) {
                 const otherNots = newMembers.map((m: string) => createNotification({
                     userId: m,
                     type: 'house',
-                    message: `${userToApprove} has left the house.`
+                    message: `has left the house.`,
+                    senderName: leaverName,
+                    senderPhotoUrl: leaverPhotoUrl
                 }));
                 await Promise.all(otherNots);
             } catch (e) { console.error('Error notif fully approved', e); }

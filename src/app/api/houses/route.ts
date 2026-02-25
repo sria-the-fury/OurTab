@@ -5,9 +5,9 @@ import { createNotification } from '@/lib/notifications';
 async function deleteHouseAndAllData(houseId: string, members: string[]) {
     const batch = adminDb.batch();
 
-    // 1. Clear groupId from all members
+    // 1. Clear houseId from all members
     for (const email of members) {
-        batch.update(adminDb.collection('users').doc(email), { groupId: null });
+        batch.update(adminDb.collection('users').doc(email), { houseId: null });
     }
 
     // 2. Delete all expenses for this house
@@ -23,7 +23,7 @@ async function deleteHouseAndAllData(houseId: string, members: string[]) {
     settlementsSnap.docs.forEach(d => batch.delete(d.ref));
 
     // 5. Delete the house doc
-    batch.delete(adminDb.collection('groups').doc(houseId));
+    batch.delete(adminDb.collection('houses').doc(houseId));
 
     await batch.commit();
 }
@@ -39,12 +39,12 @@ export async function POST(request: Request) {
 
         // 1. Check if user is already in a house
         const userSnap = await adminDb.collection('users').doc(createdBy).get();
-        if (userSnap.exists && userSnap.data()?.groupId) {
+        if (userSnap.exists && userSnap.data()?.houseId) {
             return NextResponse.json({ error: 'User is already in a house' }, { status: 400 });
         }
 
-        // 2. Create House Doc (Still in 'groups' collection for data persistence)
-        const houseRef = await adminDb.collection('groups').add({
+        // 2. Create House Doc in 'houses' collection
+        const houseRef = await adminDb.collection('houses').add({
             name,
             createdBy,
             members: [createdBy],
@@ -52,8 +52,8 @@ export async function POST(request: Request) {
             createdAt: new Date().toISOString()
         });
 
-        // 3. Update User Doc with houseId (stored as groupId in DB)
-        await adminDb.collection('users').doc(createdBy).set({ groupId: houseRef.id }, { merge: true });
+        // 3. Update User Doc with houseId
+        await adminDb.collection('users').doc(createdBy).set({ houseId: houseRef.id }, { merge: true });
 
         return NextResponse.json({ id: houseRef.id, name, createdBy });
     } catch (error) {
@@ -64,7 +64,7 @@ export async function POST(request: Request) {
 
 export async function GET() {
     try {
-        const snapshot = await adminDb.collection('groups').get();
+        const snapshot = await adminDb.collection('houses').get();
         const houses = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
         return NextResponse.json(houses);
     } catch {
@@ -81,7 +81,7 @@ export async function DELETE(request: Request) {
             return NextResponse.json({ error: 'HouseId and UserEmail required' }, { status: 400 });
         }
 
-        const houseRef = adminDb.collection('groups').doc(houseId);
+        const houseRef = adminDb.collection('houses').doc(houseId);
         const houseSnap = await houseRef.get();
 
         if (!houseSnap.exists) {

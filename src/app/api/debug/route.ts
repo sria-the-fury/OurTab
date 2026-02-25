@@ -10,7 +10,7 @@ export async function GET(request: Request) {
     try {
         const userSnap = await adminDb.collection('users').doc(email).get();
         if (!userSnap.exists) return NextResponse.json({ error: 'User not found' }, { status: 404 });
-        const houseId = userSnap.data()?.groupId;
+        const houseId = userSnap.data()?.houseId || userSnap.data()?.groupId;
 
         const expensesSnap = await adminDb.collection('expenses').where('houseId', '==', houseId).get();
         const expenses = expensesSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));

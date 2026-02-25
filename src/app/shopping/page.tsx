@@ -198,11 +198,11 @@ export default function Shopping() {
             console.log('Starting expense submission for user:', user.email);
 
             // Use cached dbUser
-            if (!dbUser || !dbUser.groupId) {
+            if (!dbUser || !dbUser.houseId) {
                 console.log('User has no houseId in cache');
                 // Fallback check or just error?
                 // If cache is consistent, this should be enough.
-                if (!dbUser?.groupId) {
+                if (!dbUser?.houseId) {
                     showToast('You must belong to a house to add expenses.', 'error');
                     setLoading(false);
                     return;
@@ -240,7 +240,7 @@ export default function Shopping() {
                     amount: total.toString(),
                     description,
                     userId: user.email, // Use email as ID concept
-                    houseId: dbUser.groupId,
+                    houseId: dbUser.houseId,
                     contributors: contributorsList.length > 0 ? contributorsList : undefined
                 })
             });

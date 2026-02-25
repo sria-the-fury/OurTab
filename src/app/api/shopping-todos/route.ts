@@ -79,7 +79,7 @@ export async function POST(request: Request) {
 
         // Notify other house members (once for the whole batch)
         try {
-            const houseSnap = await adminDb.collection('groups').doc(houseId).get();
+            const houseSnap = await adminDb.collection('houses').doc(houseId).get();
             const houseData = houseSnap.data();
 
             console.log('--- DEBUG NOTIFICATIONS ---');

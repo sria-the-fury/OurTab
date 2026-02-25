@@ -10,7 +10,7 @@ export async function GET(request: Request) {
     }
 
     try {
-        // 1. Get User to find houseId (stored as groupId)
+        // 1. Get User to find houseId
         const userSnap = await adminDb.collection('users').doc(email).get();
 
         if (!userSnap.exists) {
@@ -18,11 +18,12 @@ export async function GET(request: Request) {
         }
 
         const userData = userSnap.data()!;
-        if (!userData.groupId) {
+        const resolvedHouseId = userData.houseId || userData.groupId; // support old field during migration
+        if (!resolvedHouseId) {
             return NextResponse.json(null); // No house
         }
 
-        const houseRef = adminDb.collection('groups').doc(userData.groupId);
+        const houseRef = adminDb.collection('houses').doc(resolvedHouseId);
 
         // 2. Fetch house data, members, and pendingPayments subcollection in parallel
         const [houseSnap, , pendingPaymentsSnap] = await Promise.all([

@@ -5,8 +5,8 @@ export interface UserData {
     email: string;
     name?: string;
     photoUrl?: string;
-    currency?: string;
-    groupId?: string; // Stored as groupId in Firestore, but conceptually houseId
+    // currency is stored on the house, not on the user
+    houseId?: string;
     iban?: string;
 }
 
