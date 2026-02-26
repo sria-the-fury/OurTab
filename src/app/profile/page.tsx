@@ -1,5 +1,6 @@
 'use client';
 
+import React, { useState } from 'react';
 import Navbar from '@/components/Navbar';
 import Container from '@mui/material/Container';
 import Typography from '@mui/material/Typography';
@@ -11,7 +12,6 @@ import TextField from '@mui/material/TextField';
 import MenuItem from '@mui/material/MenuItem';
 import { useAuth } from '@/components/AuthContext';
 import { useToast } from '@/components/ToastContext';
-import { useState } from 'react';
 import BottomNav from '@/components/BottomNav';
 import Loader from '@/components/Loader';
 import Paper from '@mui/material/Paper';
@@ -37,8 +37,10 @@ import AuthGuard from '@/components/AuthGuard';
 
 export default function Profile() {
     const { user, currency, updateCurrency, loading: authLoading, dbUser, house, mutateUser, mutateHouse } = useAuth();
-    const [houseName, setHouseName] = useState('');
     const [newHouseCurrency, setNewHouseCurrency] = useState('USD'); // local picker for Create House form
+    const [typeOfHouse, setTypeOfHouse] = useState<'expenses' | 'meals_and_expenses'>('expenses');
+    const [mealsPerDay, setMealsPerDay] = useState<2 | 3>(3);
+    const [houseName, setHouseName] = useState('');
     const [loading, setLoading] = useState(false);
     const [ibanValue, setIbanValue] = useState('');
     const [editingIban, setEditingIban] = useState(false);
@@ -48,6 +50,23 @@ export default function Profile() {
     const [feedbackSubject, setFeedbackSubject] = useState('');
     const [feedbackMessage, setFeedbackMessage] = useState('');
     const [openFeedbackDialog, setOpenFeedbackDialog] = useState(false);
+
+    // Member Settings Edit State
+    const [editingMember, setEditingMember] = useState<string | null>(null);
+    const [editRole, setEditRole] = useState<'manager' | 'member'>('member');
+    const [editRent, setEditRent] = useState<number | string>(0);
+
+    // Meal window settings
+    const [mealWindowStart, setMealWindowStart] = useState('20:00');
+    const [mealWindowEnd, setMealWindowEnd] = useState('05:00');
+    const [savingMealWindow, setSavingMealWindow] = useState(false);
+
+    // Sync meal window state with house data
+    React.useEffect(() => {
+        if (house?.mealUpdateWindowStart) setMealWindowStart(house.mealUpdateWindowStart);
+        if (house?.mealUpdateWindowEnd) setMealWindowEnd(house.mealUpdateWindowEnd);
+    }, [house?.mealUpdateWindowStart, house?.mealUpdateWindowEnd]);
+
     const { showToast } = useToast();
 
     // Derived state
@@ -57,7 +76,14 @@ export default function Profile() {
         name?: string;
         currency?: string;
         createdBy?: string;
-        members?: { email: string; name?: string; photoUrl?: string; }[];
+        typeOfHouse?: 'expenses' | 'meals_and_expenses';
+        members?: {
+            email: string;
+            name?: string;
+            photoUrl?: string;
+            role?: 'manager' | 'member';
+            rentAmount?: number;
+        }[];
         deletionRequest?: {
             initiatedBy?: string;
             approvals?: string[];
@@ -70,6 +96,7 @@ export default function Profile() {
     const houseDetails = house as HouseDetails | null;
     const effectiveCreator = houseDetails?.createdBy || (houseDetails?.members && houseDetails.members[0]?.email);
     const isCreator = effectiveCreator === user?.email;
+    const isManager = isCreator || (houseDetails?.members?.find(m => m.email === user?.email)?.role === 'manager');
     const creatorLeft = Boolean(houseDetails?.createdBy && houseDetails?.members && !houseDetails.members.some(m => m.email === houseDetails.createdBy));
     const canDeleteHouse = isCreator || creatorLeft;
     const deletionRequest = houseDetails?.deletionRequest;
@@ -87,10 +114,20 @@ export default function Profile() {
         e.preventDefault();
         setLoading(true);
         try {
+            const bodyData: any = {
+                name: houseName,
+                createdBy: user?.email,
+                currency: newHouseCurrency,
+                typeOfHouse
+            };
+            if (typeOfHouse === 'meals_and_expenses') {
+                bodyData.mealsPerDay = mealsPerDay;
+            }
+
             const res = await fetch('/api/houses', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ name: houseName, createdBy: user?.email, currency: newHouseCurrency })
+                body: JSON.stringify(bodyData)
             });
             if (res.ok) {
                 showToast('House created successfully!', 'success');
@@ -249,6 +286,34 @@ export default function Profile() {
         setLoading(false);
     };
 
+    const handleUpdateMemberSettings = async (targetEmail: string) => {
+        if (!houseDetails?.id || !user?.email) return;
+        setLoading(true);
+        try {
+            const res = await fetch('/api/houses/update-member', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    houseId: houseDetails.id,
+                    userEmail: user.email,
+                    targetEmail,
+                    role: editRole,
+                    rentAmount: editRent === '' ? 0 : Number(editRent)
+                })
+            });
+            if (res.ok) {
+                showToast('Member settings updated', 'success');
+                mutateHouse();
+                setEditingMember(null);
+            } else {
+                showToast('Failed to update member settings', 'error');
+            }
+        } catch {
+            showToast('Error updating member', 'error');
+        }
+        setLoading(false);
+    };
+
     if (authLoading) return <Loader />;
     if (!user) return null;
 
@@ -329,25 +394,142 @@ export default function Profile() {
 
                     {/* ── Card 3: House Management ── */}
                     <Paper className="glass" sx={{ p: 3, background: 'transparent' }}>
-                        <Typography variant="subtitle2" color="text.secondary" sx={{ mb: 2, textTransform: 'uppercase', letterSpacing: 1, fontSize: '0.7rem' }}>
-                            House Management
-                        </Typography>
 
                         {hasHouse && houseDetails ? (
                             <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
-                                {/* Action buttons */}
+
+                                {/* Manager Settings (Only for meals_and_expenses) */}
+                                {houseDetails.typeOfHouse === 'meals_and_expenses' && (
+                                    <Box sx={{ mt: 2 }}>
+                                        <Typography variant="subtitle2" sx={{ mb: 1.5, fontWeight: 'bold' }}>Member Settings</Typography>
+                                        {houseDetails.members?.map((member) => (
+                                            <Paper key={member.email} variant="outlined" sx={{ p: 1.5, mb: 1, display: 'flex', flexDirection: 'column', gap: 1 }}>
+                                                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                                                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                                        <Avatar src={member.photoUrl} sx={{ width: 24, height: 24 }} />
+                                                        <Typography variant="body2"><strong>{member.name || member.email.split('@')[0]}</strong></Typography>
+                                                    </Box>
+                                                    {isManager && editingMember !== member.email && (
+                                                        <IconButton size="small" onClick={() => {
+                                                            setEditingMember(member.email);
+                                                            setEditRole(member.role || 'member');
+                                                            setEditRent(member.rentAmount || 0);
+                                                        }}>
+                                                            <EditIcon sx={{ fontSize: 16 }} />
+                                                        </IconButton>
+                                                    )}
+                                                </Box>
+
+                                                {editingMember === member.email ? (
+                                                    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1, mt: 1 }}>
+                                                        <TextField
+                                                            select label="Role" size="small"
+                                                            value={editRole} onChange={(e) => setEditRole(e.target.value as 'manager' | 'member')}
+                                                            disabled={member.email === houseDetails.createdBy} // Creator is always manager
+                                                        >
+                                                            <MenuItem value="manager">Manager</MenuItem>
+                                                            <MenuItem value="member">Member</MenuItem>
+                                                        </TextField>
+                                                        <TextField
+                                                            type="number" label="Monthly Rent" size="small"
+                                                            value={editRent} onChange={(e) => setEditRent(e.target.value === '' ? '' : Number(e.target.value))}
+                                                        />
+                                                        <Box sx={{ display: 'flex', gap: 1, justifyContent: 'flex-end' }}>
+                                                            <Button size="small" onClick={() => setEditingMember(null)}>Cancel</Button>
+                                                            <Button size="small" variant="contained" onClick={() => handleUpdateMemberSettings(member.email)} disabled={loading}>Save</Button>
+                                                        </Box>
+                                                    </Box>
+                                                ) : (
+                                                    <Box sx={{ display: 'flex', gap: 2, typography: 'caption', color: 'text.secondary' }}>
+                                                        <span>Role: <Box component="span" sx={{ color: member.role === 'manager' || member.email === houseDetails.createdBy ? 'primary.main' : 'inherit', fontWeight: member.role === 'manager' || member.email === houseDetails.createdBy ? 'bold' : 'normal' }}>{member.email === houseDetails.createdBy ? 'Creator (Manager)' : member.role || 'Member'}</Box></span>
+                                                        <span>Rent: <strong>{member.rentAmount || 0}</strong> {houseDetails.currency}</span>
+                                                    </Box>
+                                                )}
+                                            </Paper>
+                                        ))}
+                                    </Box>
+                                )}
+
+                                {/* Meal Update Window Settings (Manager only, meals_and_expenses) */}
+                                {houseDetails.typeOfHouse === 'meals_and_expenses' && isManager && (
+                                    <Box sx={{ mt: 2 }}>
+                                        <Typography variant="subtitle2" sx={{ mb: 1.5, fontWeight: 'bold' }}>Meal Update Window</Typography>
+                                        <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1.5 }}>
+                                            Members can opt out of next day&apos;s meals during this time window.
+                                        </Typography>
+                                        <Box sx={{ display: 'flex', gap: 2, alignItems: 'center', flexWrap: 'wrap' }}>
+                                            <TextField
+                                                label="Window Opens (Today)"
+                                                type="time"
+                                                size="small"
+                                                value={mealWindowStart}
+                                                onChange={(e) => setMealWindowStart(e.target.value)}
+                                                InputLabelProps={{ shrink: true }}
+                                                sx={{ width: 180 }}
+                                            />
+                                            <TextField
+                                                label="Window Closes (Next Morning)"
+                                                type="time"
+                                                size="small"
+                                                value={mealWindowEnd}
+                                                onChange={(e) => setMealWindowEnd(e.target.value)}
+                                                InputLabelProps={{ shrink: true }}
+                                                sx={{ width: 180 }}
+                                            />
+                                            <Button
+                                                variant="contained"
+                                                size="small"
+                                                disabled={savingMealWindow || (mealWindowStart === (houseDetails?.mealUpdateWindowStart || '20:00') && mealWindowEnd === (houseDetails?.mealUpdateWindowEnd || '05:00'))}
+                                                onClick={async () => {
+                                                    setSavingMealWindow(true);
+                                                    try {
+                                                        const res = await fetch('/api/houses', {
+                                                            method: 'PATCH',
+                                                            headers: { 'Content-Type': 'application/json' },
+                                                            body: JSON.stringify({
+                                                                houseId: houseDetails.id,
+                                                                mealUpdateWindowStart: mealWindowStart,
+                                                                mealUpdateWindowEnd: mealWindowEnd,
+                                                                updatedBy: user.email
+                                                            })
+                                                        });
+                                                        if (res.ok) {
+                                                            showToast('Meal window saved!', 'success');
+                                                            mutateHouse();
+                                                        } else {
+                                                            showToast('Failed to save', 'error');
+                                                        }
+                                                    } catch {
+                                                        showToast('Error saving meal window', 'error');
+                                                    } finally {
+                                                        setSavingMealWindow(false);
+                                                    }
+                                                }}
+                                            >
+                                                Save Window
+                                            </Button>
+                                        </Box>
+                                    </Box>
+                                )}
+
+                                {/* Action buttons moved to bottom */}
                                 {!deletionRequest && otherLeaveRequests.length === 0 && (
-                                    <Box sx={{ display: 'flex', gap: 1.5, flexWrap: 'wrap' }}>
-                                        {memberCount > 1 && !myLeaveRequest && (
-                                            <Button variant="outlined" color="warning" size="small" startIcon={<DirectionsRunIcon />} onClick={() => setOpenLeaveDialog(true)} disabled={loading}>
-                                                Leave House
-                                            </Button>
-                                        )}
-                                        {canDeleteHouse && !myLeaveRequest && (
-                                            <Button variant="outlined" color="error" size="small" startIcon={<DeleteForeverIcon />} onClick={() => setOpenDeleteDialog(true)} disabled={loading}>
-                                                {memberCount > 1 ? 'Request House Deletion' : 'Delete House'}
-                                            </Button>
-                                        )}
+                                    <Box sx={{ mt: 3, pt: 2, borderTop: '1px solid rgba(255,255,255,0.05)' }}>
+                                        <Typography variant="subtitle2" color="text.secondary" sx={{ mb: 2, textTransform: 'uppercase', letterSpacing: 1, fontSize: '0.7rem' }}>
+                                            House Management
+                                        </Typography>
+                                        <Box sx={{ display: 'flex', gap: 1.5, flexWrap: 'wrap' }}>
+                                            {memberCount > 1 && !myLeaveRequest && (
+                                                <Button variant="outlined" color="warning" size="small" startIcon={<DirectionsRunIcon />} onClick={() => setOpenLeaveDialog(true)} disabled={loading}>
+                                                    Leave House
+                                                </Button>
+                                            )}
+                                            {canDeleteHouse && !myLeaveRequest && (
+                                                <Button variant="outlined" color="error" size="small" startIcon={<DeleteForeverIcon />} onClick={() => setOpenDeleteDialog(true)} disabled={loading}>
+                                                    {memberCount > 1 ? 'Request House Deletion' : 'Delete House'}
+                                                </Button>
+                                            )}
+                                        </Box>
                                     </Box>
                                 )}
 
@@ -414,6 +596,16 @@ export default function Profile() {
                                 <form onSubmit={handleCreateHouse}>
                                     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
                                         <TextField label="House Name" fullWidth size="small" value={houseName} onChange={(e) => setHouseName(e.target.value)} required />
+                                        <TextField select label="House Type" value={typeOfHouse} onChange={(e) => setTypeOfHouse(e.target.value as 'expenses' | 'meals_and_expenses')} fullWidth size="small">
+                                            <MenuItem value="expenses">Expenses Tracking Only</MenuItem>
+                                            <MenuItem value="meals_and_expenses">Meal and Expenses Tracking</MenuItem>
+                                        </TextField>
+                                        {typeOfHouse === 'meals_and_expenses' && (
+                                            <TextField select label="Meals Per Day" value={mealsPerDay} onChange={(e) => setMealsPerDay(e.target.value as any)} fullWidth size="small">
+                                                <MenuItem value={2}>Two Meals (Lunch, Dinner)</MenuItem>
+                                                <MenuItem value={3}>Three Meals (Breakfast, Lunch, Dinner)</MenuItem>
+                                            </TextField>
+                                        )}
                                         <TextField select label="Default Currency" value={newHouseCurrency} onChange={(e) => setNewHouseCurrency(e.target.value)} fullWidth size="small">
                                             <MenuItem value="USD">Dollar ($)</MenuItem>
                                             <MenuItem value="EUR">Euro (€)</MenuItem>
@@ -514,6 +706,6 @@ export default function Profile() {
                     <BottomNav />
                 </Box>
             </main>
-        </AuthGuard>
+        </AuthGuard >
     );
 }

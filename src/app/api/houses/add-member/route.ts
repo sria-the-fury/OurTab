@@ -25,7 +25,11 @@ export async function POST(request: Request) {
 
         const houseRef = adminDb.collection('houses').doc(houseId);
         await houseRef.update({
-            members: FieldValue.arrayUnion(email)
+            members: FieldValue.arrayUnion(email),
+            [`memberDetails.${email}`]: {
+                role: 'member',
+                rentAmount: 0
+            }
         });
 
         await userRef.update({ houseId: houseId });

@@ -22,12 +22,12 @@ export async function GET(request: Request) {
         })) as AppNotification[];
 
         const now = new Date();
-        const threeDaysAgo = new Date(now.getTime() - 3 * 24 * 60 * 60 * 1000);
+        const twoDaysAgo = new Date(now.getTime() - 2 * 24 * 60 * 60 * 1000);
 
         const notificationsToDelete = notifications.filter(n => {
             if (!n.read) return false;
             const createdDate = new Date(n.createdAt!);
-            return createdDate < threeDaysAgo;
+            return createdDate < twoDaysAgo;
         });
 
         if (notificationsToDelete.length > 0) {

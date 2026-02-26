@@ -5,8 +5,20 @@ export interface House {
     id: string;
     name: string;
     createdBy: string;
+    createdAt?: string;
     currency?: string;
-    members?: { email: string; name?: string; photoUrl?: string }[];
+    typeOfHouse?: 'expenses' | 'meals_and_expenses';
+    mealsPerDay?: 2 | 3;
+    mealUpdateWindowStart?: string; // e.g. "20:00" — when members can start updating next day meals
+    mealUpdateWindowEnd?: string;   // e.g. "05:00" — when the update window closes (next morning)
+    members?: {
+        email: string;
+        name?: string;
+        photoUrl?: string;
+        role?: 'manager' | 'member';
+        rentAmount?: number;
+    }[];
+    memberDetails?: Record<string, { role: 'manager' | 'member', rentAmount: number }>;
     pendingPayments?: {
         id: string;
         from: string;
@@ -25,6 +37,7 @@ export interface Expense {
     userId: string;
     houseId: string;
     date: string;
+    category?: string;
     contributors?: Array<{ email: string; amount: number }>;
     isSettlementPayment?: boolean;
     method?: 'bank' | 'cash';
@@ -41,6 +54,21 @@ export interface Todo {
     houseId: string;
     createdAt: string;
     completedAt?: string;
+}
+
+export interface Settlement {
+    id?: string;
+    houseId: string;
+    month: number; // 0-11
+    year: number;
+    settlements: {
+        from: string; // email
+        to: string; // email
+        amount: number;
+        paid: boolean;
+    }[];
+    createdAt: string;
+    updatedAt: string;
 }
 
 const fetcher = (url: string) => fetch(url).then((res) => res.json());
@@ -68,14 +96,38 @@ export function useHouseData() {
         fetcher
     );
 
+    // 4. Fetch Fund Deposits
+    const { data: fundDeposits, error: fundDepositsError, isLoading: fundDepositsLoading, mutate: mutateFundDeposits } = useSWR<any[]>(
+        house?.id ? `/api/fund-deposits?houseId=${house.id}` : null,
+        fetcher
+    );
+
+    // 5. Fetch Meal Statuses
+    const { data: meals, error: mealsError, isLoading: mealsLoading, mutate: mutateMeals } = useSWR<any[]>(
+        house?.typeOfHouse === 'meals_and_expenses' ? `/api/meals?houseId=${house.id}` : null,
+        fetcher
+    );
+
+    // 6. Fetch Settlements
+    const { data: settlements, error: settlementsError, isLoading: settlementsLoading, mutate: mutateSettlements } = useSWR<Settlement[]>(
+        house?.id ? `/api/settlements?houseId=${house.id}` : null,
+        fetcher
+    );
+
     return {
         house,
-        expenses: expenses || [],
-        todos: todos || [],
-        loading: houseLoading || (!!house?.id && (expensesLoading || todosLoading)),
-        error: houseError || expensesError || todosError,
+        expenses: Array.isArray(expenses) ? expenses : [],
+        todos: Array.isArray(todos) ? todos : [],
+        fundDeposits: Array.isArray(fundDeposits) ? fundDeposits : [],
+        meals: Array.isArray(meals) ? meals : [],
+        settlements: Array.isArray(settlements) ? settlements : [],
+        loading: houseLoading || (!!house?.id && (expensesLoading || todosLoading || fundDepositsLoading || mealsLoading || settlementsLoading)),
+        error: houseError || expensesError || todosError || fundDepositsError || mealsError || settlementsError,
         mutateHouse,
         mutateExpenses,
-        mutateTodos
+        mutateTodos,
+        mutateFundDeposits,
+        mutateMeals,
+        mutateSettlements
     };
 }

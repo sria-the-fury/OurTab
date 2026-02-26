@@ -7,14 +7,17 @@ import ShoppingCartIcon from '@mui/icons-material/ShoppingCart';
 import PersonIcon from '@mui/icons-material/Person';
 import DashboardIcon from '@mui/icons-material/Dashboard';
 import FormatListBulletedIcon from '@mui/icons-material/FormatListBulleted';
+import RestaurantMenuIcon from '@mui/icons-material/RestaurantMenu';
 import { useRouter, usePathname } from 'next/navigation';
 import { useAuth } from '@/components/AuthContext';
+import { useHouseData } from '@/hooks/useHouseData';
 import Avatar from '@mui/material/Avatar';
 
 export default function BottomNav() {
     const router = useRouter();
     const pathname = usePathname();
     const { user } = useAuth();
+    const { house } = useHouseData();
 
     useEffect(() => {
         // Keep effect for any future pathname-based side effects
@@ -42,6 +45,9 @@ export default function BottomNav() {
             >
                 <BottomNavigationAction label="Dashboard" value="/dashboard" icon={<DashboardIcon />} />
                 <BottomNavigationAction label="Buy List" value="/buy-list" icon={<FormatListBulletedIcon />} />
+                {house?.typeOfHouse === 'meals_and_expenses' && (
+                    <BottomNavigationAction label="Meals" value="/meals" icon={<RestaurantMenuIcon />} />
+                )}
                 <BottomNavigationAction label="Shopping" value="/shopping" icon={<ShoppingCartIcon />} />
                 <BottomNavigationAction
                     label="Profile"

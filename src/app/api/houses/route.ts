@@ -31,7 +31,7 @@ async function deleteHouseAndAllData(houseId: string, members: string[]) {
 export async function POST(request: Request) {
     try {
         const body = await request.json();
-        const { name, createdBy, currency } = body;
+        const { name, createdBy, currency, typeOfHouse, mealsPerDay } = body;
 
         if (!name || !createdBy) {
             return NextResponse.json({ error: 'Name and CreatedBy are required' }, { status: 400 });
@@ -44,13 +44,26 @@ export async function POST(request: Request) {
         }
 
         // 2. Create House Doc in 'houses' collection
-        const houseRef = await adminDb.collection('houses').add({
+        const houseData: any = {
             name,
             createdBy,
-            members: [createdBy],
+            members: [createdBy], // Keeping array of emails for backward compatibility and fast querying
+            memberDetails: { // Adding detailed map of members
+                [createdBy]: {
+                    role: 'manager',
+                    rentAmount: 0 // Default rent is 0
+                }
+            },
             currency: currency || 'USD',
+            typeOfHouse: typeOfHouse || 'expenses',
             createdAt: new Date().toISOString()
-        });
+        };
+
+        if (typeOfHouse === 'meals_and_expenses') {
+            houseData.mealsPerDay = mealsPerDay || 3;
+        }
+
+        const houseRef = await adminDb.collection('houses').add(houseData);
 
         // 3. Update User Doc with houseId
         await adminDb.collection('users').doc(createdBy).set({ houseId: houseRef.id }, { merge: true });
@@ -130,5 +143,78 @@ export async function DELETE(request: Request) {
     } catch (error) {
         console.error('Delete house error', error);
         return NextResponse.json({ error: 'Failed to delete house' }, { status: 500 });
+    }
+}
+
+function formatTime(timeStr: string) {
+    if (!timeStr) return '';
+    const [hours, minutes] = timeStr.split(':');
+    const h = parseInt(hours);
+    const m = parseInt(minutes);
+    const ampm = h >= 12 ? 'PM' : 'AM';
+    const displayHours = h % 12 || 12;
+    return `${displayHours}:${m.toString().padStart(2, '0')} ${ampm}`;
+}
+
+export async function PATCH(request: Request) {
+    try {
+        const body = await request.json();
+        const { houseId, updatedBy, ...updates } = body;
+
+        if (!houseId) {
+            return NextResponse.json({ error: 'houseId is required' }, { status: 400 });
+        }
+
+        const houseRef = adminDb.collection('houses').doc(houseId);
+        const houseSnap = await houseRef.get();
+        if (!houseSnap.exists) {
+            return NextResponse.json({ error: 'House not found' }, { status: 404 });
+        }
+
+        const houseData = houseSnap.data()!;
+
+        // Whitelist allowed update fields
+        const allowedFields = ['mealUpdateWindowStart', 'mealUpdateWindowEnd', 'mealsPerDay', 'currency', 'name'];
+        const safeUpdates: Record<string, any> = {};
+        for (const key of allowedFields) {
+            if (key in updates) safeUpdates[key] = updates[key];
+        }
+
+        if (Object.keys(safeUpdates).length === 0) {
+            return NextResponse.json({ error: 'No valid fields to update' }, { status: 400 });
+        }
+
+        await houseRef.update(safeUpdates);
+
+        // Notify members if meal window changed
+        if (updatedBy && (safeUpdates.mealUpdateWindowStart || safeUpdates.mealUpdateWindowEnd)) {
+            try {
+                const userSnap = await adminDb.collection('users').doc(updatedBy).get();
+                const userName = userSnap.exists ? (userSnap.data()?.name || updatedBy.split('@')[0]) : updatedBy.split('@')[0];
+                const userPhotoUrl = userSnap.exists ? userSnap.data()?.photoUrl : undefined;
+
+                const start = safeUpdates.mealUpdateWindowStart || houseData.mealUpdateWindowStart || '20:00';
+                const end = safeUpdates.mealUpdateWindowEnd || houseData.mealUpdateWindowEnd || '05:00';
+
+                const members: string[] = houseData.members || [];
+                const notifications = members.map((m: string) =>
+                    createNotification({
+                        userId: m,
+                        type: 'house',
+                        message: `${userName} has been updated the meal window time ${formatTime(start)} to ${formatTime(end)}. You can updated your upcoming meals between in this time.`,
+                        senderName: userName,
+                        senderPhotoUrl: userPhotoUrl
+                    })
+                );
+                await Promise.all(notifications);
+            } catch (err) {
+                console.error('Error sending meal window notifications:', err);
+            }
+        }
+
+        return NextResponse.json({ success: true });
+    } catch (error) {
+        console.error('Error updating house:', error);
+        return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
     }
 }

@@ -2,6 +2,10 @@
 
 import Navbar from '@/components/Navbar';
 import Container from '@mui/material/Container';
+import Select from '@mui/material/Select';
+import MenuItem from '@mui/material/MenuItem';
+import InputLabel from '@mui/material/InputLabel';
+import FormControl from '@mui/material/FormControl';
 import Typography from '@mui/material/Typography';
 import Box from '@mui/material/Box';
 import TextField from '@mui/material/TextField';
@@ -25,6 +29,7 @@ import { useRouter } from 'next/navigation';
 import BottomNav from '@/components/BottomNav';
 import AuthGuard from '@/components/AuthGuard';
 import { useToast } from '@/components/ToastContext';
+import { calculateMemberFundAccounting } from '@/utils/accounting';
 import Checkbox from '@mui/material/Checkbox';
 import FormControlLabel from '@mui/material/FormControlLabel';
 import Accordion from '@mui/material/Accordion';
@@ -47,6 +52,7 @@ interface Expense {
     userId: string;
     houseId: string;
     date: string;
+    category?: string;
     contributors?: Array<{ email: string; amount: number }>;
     isSettlementPayment?: boolean;
     settlementBetween?: string[];
@@ -56,6 +62,8 @@ interface HouseMember {
     email: string;
     name?: string;
     photoUrl?: string;
+    role?: 'manager' | 'member';
+    rentAmount?: number;
 }
 
 
@@ -75,9 +83,11 @@ export default function Shopping() {
     const [note, setNote] = useState('');
 
     const [loading, setLoading] = useState(false);
+    const [fundDeposits, setFundDeposits] = useState<any[]>([]);
+    const [meals, setMeals] = useState<any[]>([]);
+    const [expenseCategory, setExpenseCategory] = useState<string>('groceries');
 
-    // Contributor state
-    // Use cached house members directly
+    // House Members state from useHouseData hooked house members directly
     const houseMembers = house?.members || [];
 
     const [contributors, setContributors] = useState<{ [email: string]: string }>({});
@@ -239,6 +249,7 @@ export default function Shopping() {
                 body: JSON.stringify({
                     amount: total.toString(),
                     description,
+                    category: house?.typeOfHouse === 'meals_and_expenses' ? expenseCategory : 'groceries',
                     userId: user.email, // Use email as ID concept
                     houseId: dbUser.houseId,
                     contributors: contributorsList.length > 0 ? contributorsList : undefined
@@ -307,6 +318,19 @@ export default function Shopping() {
                 const expensesRes = await fetch(`/api/expenses?houseId=${house.id}`);
                 const expensesData = await expensesRes.json();
 
+                if (house.typeOfHouse === 'meals_and_expenses') {
+                    const [depositsRes, mealsRes] = await Promise.all([
+                        fetch(`/api/fund-deposits?houseId=${house.id}`),
+                        fetch(`/api/meals?houseId=${house.id}`)
+                    ]);
+                    const [depositsData, mealsData] = await Promise.all([
+                        depositsRes.json(),
+                        mealsRes.json()
+                    ]);
+                    setFundDeposits(depositsData || []);
+                    setMeals(mealsData || []);
+                }
+
                 const grouped: { [key: string]: Expense[] } = {};
                 expensesData.forEach((exp: Expense) => {
                     const date = new Date(exp.date);
@@ -333,6 +357,10 @@ export default function Shopping() {
             console.log('Starting PDF generation for:', month);
             const currentHouseData = house;
 
+            // Define a safe currency string for jsPDF Helvetica (Latin-1)
+            // '৳' is not supported and renders as 'ó'.
+            const pdfCurrency = currency === 'BDT' ? 'Tk ' : currency === 'EUR' ? 'EUR ' : '$';
+
             const monthExpenses = monthlyExpenses[month];
             if (!monthExpenses) {
                 console.error('No expenses found for month:', month);
@@ -342,57 +370,157 @@ export default function Shopping() {
             // Filter out settlements for table and total
             const expenses = monthExpenses.filter((e: Expense) => !e.isSettlementPayment);
 
-            // --- SETTLEMENT LOGIC --- (Follows Dashboard logic using allExpenses)
             const memberBalances: { [email: string]: number } = {};
             const members = currentHouseData?.members || [];
-            members.forEach((m: HouseMember) => { memberBalances[m.email] = 0; });
 
             const totalGroupExpense = expenses.reduce((sum: number, exp: Expense) => sum + exp.amount, 0);
             void totalGroupExpense;
 
-            allExpenses.forEach((exp: Expense) => {
-                const amount = exp.amount;
-                const payer = exp.userId;
+            // --- SETTLEMENT LOGIC --- (Follows Dashboard logic using allExpenses)
+            if (currentHouseData?.typeOfHouse !== 'meals_and_expenses') {
+                members.forEach((m: HouseMember) => { memberBalances[m.email] = 0; });
+                allExpenses.forEach((exp: Expense) => {
+                    const amount = exp.amount;
+                    const payer = exp.userId;
 
-                if (exp.isSettlementPayment && exp.settlementBetween && exp.settlementBetween.length === 2) {
-                    const [p, r] = [exp.userId, exp.settlementBetween.find((e: string) => e !== exp.userId)!];
-                    if (memberBalances[p] !== undefined) memberBalances[p] += amount;
-                    else memberBalances[p] = amount;
-                    if (memberBalances[r] !== undefined) memberBalances[r] -= amount;
-                    else memberBalances[r] = -amount;
-                    return;
-                }
-
-                if (exp.contributors && exp.contributors.length > 0) {
-                    let contributorTotal = 0;
-                    exp.contributors.forEach((c: { email: string; amount: number }) => {
-                        if (memberBalances[c.email] !== undefined) {
-                            memberBalances[c.email] += c.amount;
-                        } else {
-                            memberBalances[c.email] = c.amount;
-                        }
-                        contributorTotal += c.amount;
-                    });
-                    const remainder = amount - contributorTotal;
-                    if (remainder > 0.01) {
-                        if (memberBalances[payer] !== undefined) {
-                            memberBalances[payer] += remainder;
-                        } else {
-                            memberBalances[payer] = remainder;
-                        }
+                    if (exp.isSettlementPayment && exp.settlementBetween && exp.settlementBetween.length === 2) {
+                        const [p, r] = [exp.userId, exp.settlementBetween.find((e: string) => e !== exp.userId)!];
+                        if (memberBalances[p] !== undefined) memberBalances[p] += amount;
+                        else memberBalances[p] = amount;
+                        if (memberBalances[r] !== undefined) memberBalances[r] -= amount;
+                        else memberBalances[r] = -amount;
+                        return;
                     }
-                    const sharePerPerson = amount / members.length;
-                    members.forEach((m: HouseMember) => { memberBalances[m.email] -= sharePerPerson; });
-                } else {
-                    if (memberBalances[payer] !== undefined) {
-                        memberBalances[payer] += amount;
+
+                    if (exp.contributors && exp.contributors.length > 0) {
+                        let contributorTotal = 0;
+                        exp.contributors.forEach((c: { email: string; amount: number }) => {
+                            if (memberBalances[c.email] !== undefined) {
+                                memberBalances[c.email] += c.amount;
+                            } else {
+                                memberBalances[c.email] = c.amount;
+                            }
+                            contributorTotal += c.amount;
+                        });
+                        const remainder = amount - contributorTotal;
+                        if (remainder > 0.01) {
+                            if (memberBalances[payer] !== undefined) {
+                                memberBalances[payer] += remainder;
+                            } else {
+                                memberBalances[payer] = remainder;
+                            }
+                        }
+                        const sharePerPerson = amount / members.length;
+                        members.forEach((m: HouseMember) => { memberBalances[m.email] -= sharePerPerson; });
                     } else {
-                        memberBalances[payer] = amount;
+                        if (memberBalances[payer] !== undefined) {
+                            memberBalances[payer] += amount;
+                        } else {
+                            memberBalances[payer] = amount;
+                        }
+                        const sharePerPerson = amount / members.length;
+                        members.forEach((m: HouseMember) => { memberBalances[m.email] -= sharePerPerson; });
                     }
-                    const sharePerPerson = amount / members.length;
-                    members.forEach((m: HouseMember) => { memberBalances[m.email] -= sharePerPerson; });
+                });
+            }
+            else {
+                // Determine the month matching exactly the pdf bounds
+                const mealsRes = await fetch(`/api/meals?houseId=${currentHouseData.id}`);
+                const mealsList = await mealsRes.json();
+
+                const fundsRes = await fetch(`/api/fund-deposits?houseId=${currentHouseData.id}`);
+                const fundsList = await fundsRes.json();
+
+                const getYYYYMM = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+                // 'month' is formatted as "October 2025", so we parse it:
+                const parsedDate = new Date(`${month} 1`);
+                const targetMonth = getYYYYMM(parsedDate);
+
+                const months = new Set<string>();
+                allExpenses.forEach((e: Expense) => months.add(getYYYYMM(new Date(e.date))));
+
+                if (Array.isArray(fundsList)) {
+                    fundsList.filter((d: any) => d.status === 'approved').forEach((d: any) => {
+                        months.add(getYYYYMM(new Date(d.createdAt)));
+                    });
                 }
-            });
+                if (Array.isArray(mealsList)) {
+                    mealsList.forEach((m: any) => months.add(m.date.substring(0, 7)));
+                }
+
+                months.add(targetMonth);
+                const sortedMonths = Array.from(months).sort();
+
+                members.forEach((m: HouseMember) => {
+                    memberBalances[m.email] = 0;
+                });
+
+                for (const monthStr of sortedMonths) {
+                    if (monthStr > targetMonth) break;
+
+                    const mealsPerDay = currentHouseData.mealsPerDay || 3;
+                    let monthlyMealsConsumed = 0;
+                    const monthlyMemberMeals: { [key: string]: number } = {};
+                    members.forEach((m: HouseMember) => monthlyMemberMeals[m.email] = 0);
+
+                    if (Array.isArray(mealsList) && mealsList.length > 0) {
+                        mealsList.filter((m: any) => m.date.startsWith(monthStr)).forEach((dayRecord: any) => {
+                            members.forEach((m: HouseMember) => {
+                                const mMeals = dayRecord.meals?.[m.email] || {};
+                                if (mealsPerDay === 3 && (mMeals.breakfast ?? true)) monthlyMemberMeals[m.email]++;
+                                if (mMeals.lunch ?? true) monthlyMemberMeals[m.email]++;
+                                if (mMeals.dinner ?? true) monthlyMemberMeals[m.email]++;
+                            });
+                        });
+                    }
+
+                    monthlyMealsConsumed = Object.values(monthlyMemberMeals).reduce((sum, count) => sum + count, 0);
+
+                    if (Array.isArray(fundsList)) {
+                        fundsList
+                            .filter((d: any) => d.status === 'approved' && getYYYYMM(new Date(d.createdAt)) === monthStr)
+                            .forEach((d: any) => {
+                                if (memberBalances[d.email] !== undefined) memberBalances[d.email] += d.amount;
+                            });
+                    }
+
+                    members.forEach((m: HouseMember) => {
+                        const rent = m.rentAmount || 0;
+                        memberBalances[m.email] -= rent;
+                    });
+
+                    let monthlyGroceries = 0;
+                    let monthlyOther = 0;
+
+                    allExpenses
+                        .filter((e: Expense) => getYYYYMM(new Date(e.date)) === monthStr)
+                        .forEach((exp: Expense) => {
+                            if (exp.isSettlementPayment && exp.settlementBetween && exp.settlementBetween.length === 2) {
+                                const [payer, receiver] = [exp.userId, exp.settlementBetween.find(e => e !== exp.userId)!];
+                                if (memberBalances[payer] !== undefined) memberBalances[payer] += exp.amount;
+                                else memberBalances[payer] = exp.amount;
+                                if (memberBalances[receiver] !== undefined) memberBalances[receiver] -= exp.amount;
+                                else memberBalances[receiver] = -exp.amount;
+                                return;
+                            }
+
+                            if (exp.category === 'groceries' || !exp.category) {
+                                monthlyGroceries += exp.amount;
+                            } else {
+                                monthlyOther += exp.amount;
+                            }
+                        });
+
+                    const otherSharePerPerson = members.length > 0 ? (monthlyOther / members.length) : 0;
+                    const mealUnitPrice = monthlyMealsConsumed > 0 ? (monthlyGroceries / monthlyMealsConsumed) : 0;
+
+                    members.forEach((m: HouseMember) => {
+                        memberBalances[m.email] -= otherSharePerPerson;
+                        const memberGroceryCost = monthlyMemberMeals[m.email] * mealUnitPrice;
+                        memberBalances[m.email] -= memberGroceryCost;
+                    });
+                }
+            }
 
             const netBalances: { id: string, amount: number }[] = [];
             Object.keys(memberBalances).forEach(email => {
@@ -421,7 +549,7 @@ export default function Shopping() {
                     settlements.push({
                         debtorName,
                         creditorName,
-                        amountStr: `${getCurrencySymbol()}${amount.toFixed(2)}`
+                        amountStr: `${pdfCurrency}${amount.toFixed(2)}`
                     });
                 }
 
@@ -472,6 +600,14 @@ export default function Shopping() {
                 });
             }
 
+            // Subtitle: House Type
+            doc.setFontSize(10);
+            doc.setFont('helvetica', 'italic');
+            const houseTypeStr = currentHouseData?.typeOfHouse === 'meals_and_expenses'
+                ? 'Meals and Expenses Tracking'
+                : 'Shared Expenses Tracking';
+            doc.text(houseTypeStr, pageWidth / 2, 26, { align: 'center' });
+
             // Right: Generation Info
             doc.setFontSize(8);
             doc.setFont('helvetica', 'normal');
@@ -505,41 +641,42 @@ export default function Shopping() {
 
                 let userCellContent = '';
                 const contribs = exp.contributors || [];
+                const isMealsHouse = currentHouseData?.typeOfHouse === 'meals_and_expenses';
 
                 if (contribs.length > 0) {
                     const shopperContrib = contribs.find(c => c.email === exp.userId);
                     const shopperAmount = shopperContrib ? shopperContrib.amount : 0;
-                    userCellContent = `${displayName} ${getCurrencySymbol()}${shopperAmount.toFixed(2)}`;
+                    userCellContent = isMealsHouse ? displayName : `${displayName} ${pdfCurrency}${shopperAmount.toFixed(2)}`;
 
                     const others = contribs.filter(c => c.email !== exp.userId);
                     if (others.length > 0) {
-                        userCellContent += '\n------------------\n';
+                        userCellContent += isMealsHouse ? '' : '\n------------------\n';
                         userCellContent += others.map(c => {
                             const otherMember = currentHouseData?.members?.find((m: HouseMember) => m.email === c.email);
                             const otherFullName = otherMember?.name || c.email.split('@')[0];
                             const otherNames = otherFullName.split(' ');
                             const otherDisplayName = otherNames.length >= 2 ? `${otherNames[0]} ${otherNames[1]}` : otherNames[0];
-                            return `${otherDisplayName} ${getCurrencySymbol()}${c.amount.toFixed(2)}`;
-                        }).join('\n');
+                            return isMealsHouse ? `, ${otherDisplayName}` : `${otherDisplayName} ${pdfCurrency}${c.amount.toFixed(2)}`;
+                        }).join(isMealsHouse ? '' : '\n');
                     }
                 } else {
-                    userCellContent = `${displayName} ${getCurrencySymbol()}${exp.amount.toFixed(2)}`;
+                    userCellContent = isMealsHouse ? displayName : `${displayName} ${pdfCurrency}${exp.amount.toFixed(2)}`;
                 }
 
                 return [
                     dateStr,
-                    exp.description,
+                    exp.description.replace(/[৳৳৳৳]/g, '').split(' Tk')[0].split(' ó')[0].trim(),
                     {
                         content: userCellContent,
                         styles: { fontSize: 7, valign: 'middle' as const, halign: 'left' as const }
                     },
-                    `${getCurrencySymbol()}${exp.amount.toFixed(2)}`
+                    `${pdfCurrency}${exp.amount.toFixed(2)}`
                 ];
             });
 
             // Calculate Total
             const total = expenses.reduce((sum, exp) => sum + exp.amount, 0);
-            tableData.push(['', '', 'Total', `${getCurrencySymbol()}${total.toFixed(2)}`]);
+            tableData.push(['', '', 'Total', `${pdfCurrency}${total.toFixed(2)}`]);
 
             autoTable(doc, {
                 head: [['Date', 'Description', 'User', 'Amount']],
@@ -556,61 +693,117 @@ export default function Shopping() {
                 }
             });
 
-            // --- SETTLEMENT SECTION ---
-            const finalY = (doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 10;
+            // --- HOUSE FUND - MEMBER BREAKDOWN SECTION (For Meals and Expenses Houses) ---
+            if (currentHouseData?.typeOfHouse === 'meals_and_expenses') {
+                const accountingResult = calculateMemberFundAccounting(currentHouseData, allExpenses, fundDeposits, meals);
+                const accounting = accountingResult.members;
+                const summary = accountingResult.summary;
+                const finalY = (doc as any).lastAutoTable?.finalY || titleY + 20;
 
-            // Function to draw settlement line
-            const drawSettlementLine = (settlement: { debtorName: string; creditorName: string; amountStr: string }, yPosition: number) => {
-                let currentX = 14;
-                doc.setFont('helvetica', 'bold');
-                doc.text(settlement.debtorName, currentX, yPosition);
-                currentX += doc.getTextWidth(settlement.debtorName) + 1;
-
-                doc.setFont('helvetica', 'normal');
-                doc.text("pays", currentX, yPosition);
-                currentX += doc.getTextWidth("pays") + 1;
-
-                doc.setFont('helvetica', 'bold');
-                doc.text(settlement.creditorName + ":", currentX, yPosition);
-                currentX += doc.getTextWidth(settlement.creditorName + ":") + 1;
-
-                doc.setFont('helvetica', 'normal');
-                doc.text(settlement.amountStr, currentX, yPosition);
-            };
-
-            // Check if we need a new page
-            if (finalY > doc.internal.pageSize.height - 40) {
                 doc.addPage();
-                doc.setFontSize(12);
-                doc.setFont('helvetica', 'bold');
-                doc.text("Settlement Plan", 14, 20);
-                let currentY = 30;
+                doc.setFontSize(16);
+                doc.setFont('abril', 'bold');
+                doc.text("House Fund — Member Breakdown", pageWidth / 2, 20, { align: 'center' });
                 doc.setFontSize(10);
-                if (settlements.length === 0) {
-                    doc.setFont('helvetica', 'normal');
-                    doc.text(activeMemberCount === 0 ? "No members to split expenses." : (allExpenses.length > 0 ? "All settled! Everyone paid their share." : ""), 14, currentY);
-                } else {
-                    settlements.forEach(settlement => {
-                        drawSettlementLine(settlement, currentY);
-                        currentY += 6;
-                    });
-                }
-            } else {
+                doc.setFont('helvetica', 'normal');
+                doc.text(`Report Period: ${month}`, pageWidth / 2, 28, { align: 'center' });
+
+                const fundTableData: any[] = [];
+                currentHouseData.members?.forEach((m: HouseMember) => {
+                    const stats = accounting[m.email];
+                    if (stats) {
+                        const netBalance = stats.deposits - (stats.rent + stats.utilities + stats.wage + stats.mealCost);
+                        fundTableData.push([
+                            m.name || m.email.split('@')[0],
+                            `${pdfCurrency}${stats.deposits.toFixed(2)}`,
+                            `- ${pdfCurrency}${stats.rent.toFixed(2)}`,
+                            `- ${pdfCurrency}${stats.utilities.toFixed(2)}`,
+                            {
+                                content: `(${stats.mealCount}) - ${pdfCurrency}${stats.mealCost.toFixed(2)}`,
+                                styles: { halign: 'right' }
+                            },
+                            {
+                                content: `${pdfCurrency}${netBalance.toFixed(2)}`,
+                                styles: { fontStyle: 'bold', textColor: netBalance >= 0 ? [0, 100, 0] : [150, 0, 0] }
+                            }
+                        ]);
+                    }
+                });
+
+                autoTable(doc, {
+                    head: [['Member', 'Deposits', 'Rent', 'Utils/Wage', 'Meals Count: Cost', 'Net Balance']],
+                    body: fundTableData,
+                    startY: 35,
+                    theme: 'grid',
+                    styles: { fontSize: 8, cellPadding: 4, valign: 'middle' },
+                    headStyles: { fillColor: [76, 175, 80] }, // Greenish header
+                    columnStyles: {
+                        0: { fontStyle: 'bold', cellWidth: 'auto' },
+                        1: { halign: 'right', cellWidth: 25 },
+                        2: { halign: 'right', cellWidth: 25 },
+                        3: { halign: 'right', cellWidth: 25 },
+                        4: { halign: 'right', cellWidth: 35 },
+                        5: { halign: 'right', cellWidth: 25 }
+                    }
+                });
+
+                const tableFinalY = (doc as any).lastAutoTable?.finalY + 15;
+
+                // House Totals Summary Section in PDF
+                doc.setFontSize(14);
+                doc.setFont('abril', 'bold');
+                doc.text("House Totals Summary", 14, tableFinalY);
+
+                doc.setFontSize(10);
+                doc.setFont('helvetica', 'normal');
+                let summaryY = tableFinalY + 8;
+
+                const summaryItems = [
+                    { label: "Previous Months Remaining", value: `${pdfCurrency}${summary.previousMonthsRemaining.toFixed(2)}`, color: summary.previousMonthsRemaining >= 0 ? [0, 100, 0] : [150, 0, 0] },
+                    { label: "Total Fund Collected", value: `${pdfCurrency}${summary.totalDeposits.toFixed(2)}`, color: [0, 100, 0] },
+                    { label: "Total Rent Deducted", value: `- ${pdfCurrency}${summary.totalRent.toFixed(2)}`, color: [150, 0, 0] },
+                    { label: "Total Utilities", value: `- ${pdfCurrency}${summary.totalUtilities.toFixed(2)}`, color: [150, 0, 0] },
+                    { label: "Total Worker Wage", value: `- ${pdfCurrency}${summary.totalWages.toFixed(2)}`, color: [150, 0, 0] },
+                    { label: "Total Grocery Cost", value: `- ${pdfCurrency}${summary.totalGroceries.toFixed(2)}`, color: [150, 0, 0] },
+                    { label: "Total Meals (Accumulated)", value: `${summary.totalMeals}`, color: [0, 0, 0] },
+                    { label: "Cost per Meal", value: `${pdfCurrency}${summary.costPerMeal.toFixed(2)}`, color: [0, 0, 150] },
+                ];
+
+                summaryItems.forEach(item => {
+                    doc.setTextColor(0, 0, 0);
+                    doc.text(item.label, 14, summaryY);
+                    doc.setTextColor(item.color[0], item.color[1], item.color[2]);
+                    doc.text(String(item.value), pageWidth - 14, summaryY, { align: 'right' });
+                    summaryY += 6;
+                });
+
+                doc.setDrawColor(200, 200, 200);
+                doc.line(14, summaryY + 2, pageWidth - 14, summaryY + 2);
+                summaryY += 10;
+
                 doc.setFontSize(12);
-                doc.setFont('helvetica', 'bold');
+                doc.setFont('abril', 'bold');
+                doc.setTextColor(0, 100, 0);
+                doc.text("Remaining House Fund", 14, summaryY);
+                doc.text(`${pdfCurrency}${summary.remainingFund.toFixed(2)}`, pageWidth - 14, summaryY, { align: 'right' });
+            }
+
+            // --- SETTLEMENT SECTION (For Standard Shared Houses) ---
+            if (currentHouseData?.typeOfHouse !== 'meals_and_expenses') {
+                const finalY = (doc as any).lastAutoTable?.finalY + 10;
+
+                // For shared houses, we use the settlements calculated by simulateBalances or similar logic
+                // But for now, let's just show a note as per instructions "In user col -> there no need to mention the money for the 'Meals and Expenses' beacuse the money will spend from the central fund."
+                // Standard houses don't have central fund, so they still need settlements.
+                // However, the user specifically asked to show "House fund..." calculation exactly same formate for "Meals and Expneses Tracking"
+
+                doc.setFontSize(14);
+                doc.setFont('abril', 'bold');
                 doc.text("Settlement Plan", 14, finalY);
 
                 doc.setFontSize(10);
-                let currentY = finalY + 8;
-                if (settlements.length === 0) {
-                    doc.setFont('helvetica', 'normal');
-                    doc.text(activeMemberCount === 0 ? "No members to split expenses." : (allExpenses.length > 0 ? "All settled! Everyone paid their share." : ""), 14, currentY);
-                } else {
-                    settlements.forEach(settlement => {
-                        drawSettlementLine(settlement, currentY);
-                        currentY += 6;
-                    });
-                }
+                doc.setFont('helvetica', 'normal');
+                doc.text("All settled! Everyone paid their share.", 14, finalY + 8);
             }
 
             // --- FOOTER ---
@@ -688,38 +881,56 @@ export default function Shopping() {
 
 
                     {/* Add Item Form */}
-                    <Paper className="glass" sx={{ p: 3, mb: 3, background: 'transparent', boxShadow: 'none' }}>
-                        <Typography variant="h6" gutterBottom>Add Item</Typography>
+                    <Paper className="glass" sx={{ p: 2, mb: 2, background: 'rgba(255, 255, 255, 0.5)', backdropFilter: 'blur(10px)', borderRadius: 2, boxShadow: '0 4px 12px rgba(0,0,0,0.05)' }}>
                         <Box component="form" onSubmit={handleAddItem}>
-                            <TextField
-                                label="Item Name"
-                                fullWidth
-                                required
-                                margin="normal"
-                                value={itemName}
-                                onChange={(e) => {
-                                    const value = e.target.value;
-                                    setItemName(value ? value.charAt(0).toUpperCase() + value.slice(1) : '');
-                                }}
-                                disabled={loading}
-                                placeholder="e.g., Milk, Bread, Eggs"
-                            />
-                            <TextField
-                                label={`Price (${getCurrencySymbol()})`}
-                                type="number"
-                                fullWidth
-                                required
-                                margin="normal"
-                                value={itemPrice}
-                                onChange={(e) => setItemPrice(e.target.value)}
-                                disabled={loading}
-                                inputProps={{ step: '0.01', min: '0' }}
-                            />
+                            {house?.typeOfHouse === 'meals_and_expenses' && (
+                                <FormControl fullWidth size="small" sx={{ mb: 2 }}>
+                                    <InputLabel id="category-label">Category</InputLabel>
+                                    <Select
+                                        labelId="category-label"
+                                        value={expenseCategory}
+                                        label="Category"
+                                        onChange={(e) => setExpenseCategory(e.target.value)}
+                                        disabled={loading}
+                                    >
+                                        <MenuItem value="groceries">Groceries</MenuItem>
+                                        <MenuItem value="utilities">Utilities</MenuItem>
+                                        <MenuItem value="wage">Wage</MenuItem>
+                                        <MenuItem value="other">Other</MenuItem>
+                                    </Select>
+                                </FormControl>
+                            )}
+                            <Box sx={{ display: 'flex', gap: 1.5, alignItems: 'flex-start' }}>
+                                <TextField
+                                    label="Item Name"
+                                    required
+                                    size="small"
+                                    value={itemName}
+                                    onChange={(e) => {
+                                        const value = e.target.value;
+                                        setItemName(value ? value.charAt(0).toUpperCase() + value.slice(1) : '');
+                                    }}
+                                    disabled={loading}
+                                    placeholder="Milk, Bread..."
+                                    sx={{ flexGrow: 2 }}
+                                />
+                                <TextField
+                                    label={`Price (${getCurrencySymbol()})`}
+                                    type="number"
+                                    required
+                                    size="small"
+                                    value={itemPrice}
+                                    onChange={(e) => setItemPrice(e.target.value)}
+                                    disabled={loading}
+                                    inputProps={{ step: '0.01', min: '0' }}
+                                    sx={{ width: '100px' }}
+                                />
+                            </Box>
                             <Button
                                 type="submit"
-                                variant="outlined"
+                                variant="contained"
                                 fullWidth
-                                sx={{ mt: 2 }}
+                                sx={{ mt: 2, borderRadius: 2, textTransform: 'none', fontWeight: 'bold' }}
                                 disabled={loading}
                             >
                                 Add to List
@@ -729,41 +940,41 @@ export default function Shopping() {
 
                     {/* Items List */}
                     {items.length > 0 && (
-                        <Paper className="glass" sx={{ p: 3, mb: 3, background: 'transparent', boxShadow: 'none' }}>
-                            <Typography variant="h6" gutterBottom>Items ({items.length})</Typography>
-                            <List>
+                        <Paper className="glass" sx={{ p: 2, mb: 2, background: 'rgba(255, 255, 255, 0.5)', backdropFilter: 'blur(10px)', borderRadius: 2, boxShadow: '0 4px 12px rgba(0,0,0,0.05)' }}>
+                            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1 }}>
+                                <Typography variant="subtitle1" fontWeight="bold">Cart ({items.length})</Typography>
+                                <Typography variant="subtitle1" color="primary" fontWeight="bold">
+                                    {getCurrencySymbol()}{Number(total).toFixed(2)}
+                                </Typography>
+                            </Box>
+                            <List disablePadding>
                                 {items.map((item, index) => (
                                     <div key={item.id}>
                                         <ListItem
+                                            disableGutters
+                                            sx={{ py: 0.5 }}
                                             secondaryAction={
-                                                <IconButton edge="end" onClick={() => handleRemoveItem(item.id)} disabled={loading}>
-                                                    <DeleteIcon />
+                                                <IconButton edge="end" size="small" onClick={() => handleRemoveItem(item.id)} disabled={loading} color="error">
+                                                    <DeleteIcon fontSize="small" />
                                                 </IconButton>
                                             }
                                         >
                                             <ListItemText
-                                                primary={item.name}
-                                                secondary={`${getCurrencySymbol()}${Number(item.price).toFixed(2)}`}
+                                                primary={<Typography variant="body2" fontWeight="medium">{item.name}</Typography>}
+                                                secondary={<Typography variant="caption" color="text.secondary">{getCurrencySymbol()}{Number(item.price).toFixed(2)}</Typography>}
                                             />
                                         </ListItem>
-                                        {index < items.length - 1 && <Divider />}
+                                        {index < items.length - 1 && <Divider component="li" />}
                                     </div>
                                 ))}
                             </List>
-                            <Divider sx={{ my: 2 }} />
-                            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                <Typography variant="h6">Total:</Typography>
-                                <Typography variant="h6" color="primary">
-                                    {getCurrencySymbol()}{Number(total).toFixed(2)}
-                                </Typography>
-                            </Box>
                         </Paper>
                     )}
 
                     {/* Contributor Selection */}
-                    {items.length > 0 && houseMembers.length > 1 && (
-                        <Paper className="glass" sx={{ p: 3, mb: 3, background: 'transparent', boxShadow: 'none' }}>
-                            <Accordion defaultExpanded>
+                    {items.length > 0 && houseMembers.length > 1 && house?.typeOfHouse !== 'meals_and_expenses' && (
+                        <Paper className="glass" sx={{ mb: 2, background: 'rgba(255, 255, 255, 0.5)', backdropFilter: 'blur(10px)', borderRadius: 2, boxShadow: '0 4px 12px rgba(0,0,0,0.05)', overflow: 'hidden' }}>
+                            <Accordion defaultExpanded sx={{ background: 'transparent', boxShadow: 'none', '&:before': { display: 'none' } }}>
                                 <AccordionSummary expandIcon={<ExpandMoreIcon />}>
                                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                                         <PeopleIcon color="primary" />
@@ -894,12 +1105,12 @@ export default function Shopping() {
 
                     {/* Submit Form */}
                     {items.length > 0 && (
-                        <Paper className="glass" sx={{ p: 3, background: 'transparent', boxShadow: 'none' }}>
-                            <Box component="form" onSubmit={handleSubmit}>
+                        <Paper className="glass" sx={{ p: 2, background: 'rgba(255, 255, 255, 0.5)', backdropFilter: 'blur(10px)', borderRadius: 2, boxShadow: '0 4px 12px rgba(0,0,0,0.05)' }}>
+                            <Box component="form" onSubmit={handleSubmit} sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
                                 <TextField
                                     label="Note (Optional)"
                                     fullWidth
-                                    margin="normal"
+                                    size="small"
                                     value={note}
                                     onChange={(e) => setNote(e.target.value)}
                                     disabled={loading}
@@ -908,11 +1119,12 @@ export default function Shopping() {
                                 <Button
                                     type="submit"
                                     variant="contained"
+                                    color="success"
                                     fullWidth
-                                    sx={{ mt: 2 }}
+                                    sx={{ borderRadius: 2, textTransform: 'none', fontWeight: 'bold' }}
                                     disabled={loading}
                                 >
-                                    {loading ? 'Submitting...' : 'Submit Shopping List'}
+                                    {loading ? 'Submitting...' : 'Complete Purchase'}
                                 </Button>
                             </Box>
                         </Paper>

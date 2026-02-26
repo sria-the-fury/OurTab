@@ -5,7 +5,7 @@ import { createNotification } from '@/lib/notifications';
 export async function POST(request: Request) {
     try {
         const body = await request.json();
-        const { amount, description, userId, houseId, contributors } = body;
+        const { amount, description, category, userId, houseId, contributors } = body;
 
         if (!amount || !description || !userId || !houseId) {
             return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
@@ -27,6 +27,7 @@ export async function POST(request: Request) {
         const expenseData: {
             amount: number;
             description: string;
+            category?: string;
             userId: string;
             houseId: string;
             date: string;
@@ -38,6 +39,10 @@ export async function POST(request: Request) {
             houseId,
             date: new Date().toISOString()
         };
+
+        if (category) {
+            expenseData.category = category;
+        }
 
         if (contributors && contributors.length > 0) {
             expenseData.contributors = contributors.map((c: { email: string; amount: number | string }) => ({
