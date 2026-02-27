@@ -30,15 +30,16 @@ export async function GET(request: Request) {
                     const currentYear = now.getFullYear();
 
                     for (const member of members) {
-                        if (member.email === userId) continue; // Don't notify self
+                        const memberEmail = typeof member === 'string' ? member : member.email;
+                        if (memberEmail === userId) continue; // Don't notify self
 
                         // Fetch member's data for birthday
-                        const memberSnap = await adminDb.collection('users').doc(member.email).get();
+                        const memberSnap = await adminDb.collection('users').doc(memberEmail).get();
                         if (memberSnap.exists) {
                             const memberData = memberSnap.data()!;
                             if (memberData.birthday === tomorrowStr) {
                                 // Check if notification already exists for THIS YEAR's birthday
-                                const notifId = `birthday-${member.email}-${currentYear}-${userId}`;
+                                const notifId = `birthday-${memberEmail}-${currentYear}-${userId}`;
                                 const notifRef = adminDb.collection('notifications').doc(notifId);
                                 const notifSnap = await notifRef.get();
 

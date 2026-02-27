@@ -77,52 +77,73 @@ export default function NotificationsPage() {
 
     return (
         <AuthGuard>
-            <main style={{ minHeight: '100vh', position: 'relative', overflowX: 'hidden' }}>
+            <main style={{ minHeight: '100vh', position: 'relative' }}>
                 <Container maxWidth="sm" sx={{ mt: 3, mb: 20, position: 'relative', zIndex: 1 }}>
                     {/* --- Header Section --- */}
-                    <Box sx={{ mb: 6, display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', animation: 'fadeInDown 0.8s ease-out' }}>
-                        <Box>
-                            <Typography
-                                variant="h4"
-                                component="h1"
-                                sx={{
-                                    fontWeight: 900,
-                                    background: 'linear-gradient(45deg, #6C63FF 30%, #FF6584 90%)',
-                                    WebkitBackgroundClip: 'text',
-                                    WebkitTextFillColor: 'transparent',
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    gap: 2,
-                                    mb: 0.5,
-                                    letterSpacing: '-0.02em',
-                                    fontFamily: 'var(--font-abril)'
-                                }}
-                            >
+                    <Box className="glass-nav" sx={{
+                        position: 'sticky',
+                        top: 0,
+                        zIndex: 1100,
+                        py: 2,
+                        mb: 2,
+                        mx: { xs: -2, sm: -3 },
+                        px: { xs: 2, sm: 3 },
+                        animation: 'fadeInDown 0.8s ease-out',
+
+                        backgroundColor: 'transparent !important',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: 1,
+
+                    }}>
+                        <Box sx={{
+                            display: 'flex',
+
+                            justifyContent: 'space-between',
+                            alignItems: 'center',
+                        }}>
+                            <Typography variant="h4" component="h1" sx={{
+                                fontWeight: 800,
+                                borderRadius: '12px',
+                                padding: '4px',
+                                backdropFilter: 'blur(20px)',
+                                background: 'linear-gradient(45deg, #6C63FF 30%, #FF6584 90%)',
+                                WebkitBackgroundClip: 'text',
+                                WebkitTextFillColor: 'transparent',
+                                lineHeight: 1.2,
+                                letterSpacing: '-0.02em',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: 1
+                            }}>
                                 <NotificationsIcon sx={{ fontSize: 32, color: '#6C63FF' }} />
                                 Alerts
                             </Typography>
-                            <Typography variant="body2" sx={{ color: 'text.secondary', fontWeight: 600, letterSpacing: '0.05em', textTransform: 'uppercase', fontSize: '0.7rem', opacity: 0.7 }}>
-                                Stay updated with your house
-                            </Typography>
+
+                            {notifications.length > 0 && notifications.some(n => !n.read) && (
+                                <Button
+                                    variant="text"
+                                    size="small"
+                                    startIcon={<DoneAllIcon />}
+                                    onClick={() => markAllAsRead()}
+                                    sx={{
+                                        borderRadius: '12px',
+                                        fontWeight: 700,
+                                        backdropFilter: 'blur(20px)',
+                                        textTransform: 'none',
+                                        color: 'primary.main',
+                                        '&:hover': { background: 'rgba(108, 99, 255, 0.05)' }
+                                    }}
+                                >
+                                    Mark all as read
+                                </Button>
+                            )}
                         </Box>
-                        {notifications.length > 0 && notifications.some(n => !n.read) && (
-                            <Button
-                                variant="text"
-                                size="small"
-                                startIcon={<DoneAllIcon />}
-                                onClick={() => markAllAsRead()}
-                                sx={{
-                                    borderRadius: '12px',
-                                    fontWeight: 700,
-                                    textTransform: 'none',
-                                    color: 'primary.main',
-                                    '&:hover': { background: 'rgba(108, 99, 255, 0.05)' }
-                                }}
-                            >
-                                Mark all as read
-                            </Button>
-                        )}
+
                     </Box>
+                    <Typography variant="body2" sx={{ color: 'text.secondary', marginBottom: 2, fontWeight: 600, letterSpacing: '0.05em', textTransform: 'uppercase', fontSize: '0.7rem', opacity: 0.7 }}>
+                        Stay updated with your house
+                    </Typography>
 
                     {/* --- Notifications Content --- */}
                     {isLoading ? (
