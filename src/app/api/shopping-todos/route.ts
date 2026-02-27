@@ -173,11 +173,31 @@ export async function PATCH(request: Request) {
         }
 
         const currentData = todoSnap.data()!;
+
+        // --- Unmarking Logic ---
         if (currentData.isCompleted && isCompleted === false) {
-            return NextResponse.json({ error: 'Completed items cannot be unmarked' }, { status: 400 });
+            // Rule: Allow unmarking within 5 minutes if manually marked
+            const now = new Date();
+            const completedAt = new Date(currentData.completedAt || 0);
+            const fiveMinutesAgo = new Date(now.getTime() - 5 * 60 * 1000);
+
+            if (currentData.completedBy === 'auto') {
+                return NextResponse.json({ error: 'Auto-marked items cannot be unmarked' }, { status: 400 });
+            }
+            if (completedAt < fiveMinutesAgo) {
+                return NextResponse.json({ error: 'Items can only be unmarked within 5 minutes of completion' }, { status: 400 });
+            }
+
+            // Allow unmarking
+            await todoRef.update({
+                isCompleted: false,
+                completedAt: null,
+                completedBy: null
+            });
+            return NextResponse.json({ success: true, isCompleted: false });
         }
 
-        const updates: { isCompleted: boolean; completedAt?: string; completedBy?: string; expenseId?: string } = { isCompleted };
+        const updates: { isCompleted: boolean; completedAt?: string | null; completedBy?: string | null; expenseId?: string } = { isCompleted };
         if (isCompleted && !currentData.isCompleted) {
             updates.completedAt = new Date().toISOString();
             if (completedBy) updates.completedBy = completedBy;
@@ -206,11 +226,28 @@ export async function DELETE(request: Request) {
 
         if (todoSnap.exists) {
             const todoData = todoSnap.data()!;
-            // Block deletion only for auto-marked items (they auto-delete in 12 hours)
+
+            // Rule: Auto-marked items (they auto-delete in 12 hours)
             if (todoData.isCompleted && todoData.completedBy === 'auto') {
                 return NextResponse.json({
                     error: 'Auto-marked items cannot be deleted manually. They will be removed automatically after 12 hours.'
                 }, { status: 400 });
+            }
+
+            // --- DELETION RULES ---
+            const now = new Date();
+            const completedAt = todoData.completedAt ? new Date(todoData.completedAt) : null;
+            const tenMinutesAgo = new Date(now.getTime() - 10 * 60 * 1000);
+
+            if (!todoData.isCompleted) {
+                // Rule: Active item can be deleted ONLY by the person who added it
+                // We'd ideally check the requesting user's email, but for now we trust the client or expect it in params if auth is handled differently.
+                // Since this API uses doc ID directly, we'll assume the client-side check is the primary guard but we can add a check if we had user info.
+            } else {
+                // Rule: Manual mark can be deleted within 10 min
+                if (completedAt && completedAt < tenMinutesAgo) {
+                    return NextResponse.json({ error: 'Completed items can only be deleted within 10 minutes' }, { status: 400 });
+                }
             }
         }
 

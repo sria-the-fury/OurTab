@@ -21,7 +21,7 @@ import { useState, useEffect } from 'react';
 import { useAuth } from '@/components/AuthContext';
 import BottomNav from '@/components/BottomNav';
 import AuthGuard from '@/components/AuthGuard';
-import { useShoppingTodos } from '@/hooks/useShoppingTodos';
+import { useShoppingTodos, ShoppingTodo } from '@/hooks/useShoppingTodos';
 import Loader from '@/components/Loader';
 
 export default function Todos() {
@@ -78,17 +78,29 @@ export default function Todos() {
         return `${dateStr}, ${timeStr}`;
     };
 
-    const [now, setNow] = useState(0);
+    const [now, setNow] = useState(Date.now());
     useEffect(() => {
-        const timerId = setTimeout(() => setNow(Date.now()), 0);
-        return () => clearTimeout(timerId);
+        const timerId = setInterval(() => setNow(Date.now()), 10000); // Update every 10 seconds
+        return () => clearInterval(timerId);
     }, []);
 
-    const canDeleteCompleted = (todo: { isCompleted?: boolean; completedBy?: string; completedAt?: string; createdAt?: string }) => {
-        // Show delete only for manually-marked items within 10 minutes
+    const canUnmark = (todo: ShoppingTodo) => {
         if (!todo.isCompleted || todo.completedBy === 'auto') return false;
         const completedAt = new Date(todo.completedAt || todo.createdAt || 0);
-        return now > 0 && (now - completedAt.getTime()) < 10 * 60 * 1000;
+        return now > 0 && (now - completedAt.getTime()) < 5 * 60 * 1000;
+    };
+
+    const canDeleteItem = (todo: ShoppingTodo) => {
+        if (!todo.isCompleted) {
+            // Rule: Active item can be deleted ONLY by the person who added it
+            return todo.addedBy === user?.email;
+        }
+        // Rule: Manual mark can be deleted within 10 min by the person who added it
+        if (todo.completedBy !== 'auto' && todo.addedBy === user?.email) {
+            const completedAt = new Date(todo.completedAt || todo.createdAt || 0);
+            return now > 0 && (now - completedAt.getTime()) < 10 * 60 * 1000;
+        }
+        return false;
     };
 
     const activeTodos = todos.filter(t => !t.isCompleted);
@@ -282,15 +294,17 @@ export default function Todos() {
                                                             </Box>
                                                         </Box>
 
-                                                        <IconButton
-                                                            edge="end"
-                                                            size="small"
-                                                            className="delete-btn"
-                                                            onClick={() => deleteTodo(todo.id)}
-                                                            sx={{ opacity: { xs: 1, sm: 0 }, mr: 1, transition: 'opacity 0.2s', color: 'text.disabled', '&:hover': { color: 'error.main' } }}
-                                                        >
-                                                            <DeleteIcon fontSize="small" />
-                                                        </IconButton>
+                                                        {canDeleteItem(todo) && (
+                                                            <IconButton
+                                                                edge="end"
+                                                                size="small"
+                                                                className="delete-btn"
+                                                                onClick={() => deleteTodo(todo.id)}
+                                                                sx={{ opacity: { xs: 1, sm: 0 }, mr: 1, transition: 'opacity 0.2s', color: 'text.disabled', '&:hover': { color: 'error.main' } }}
+                                                            >
+                                                                <DeleteIcon fontSize="small" />
+                                                            </IconButton>
+                                                        )}
                                                     </Box>
                                                 </Paper>
                                             );
@@ -325,16 +339,25 @@ export default function Todos() {
                                                         opacity: 0.7
                                                     }}
                                                 >
-                                                    <Box sx={{
-                                                        width: 32,
-                                                        height: 32,
-                                                        borderRadius: '10px',
-                                                        display: 'flex',
-                                                        alignItems: 'center',
-                                                        justifyContent: 'center',
-                                                        background: 'rgba(16, 185, 129, 0.05)',
-                                                        border: '1px solid rgba(16, 185, 129, 0.1)'
-                                                    }}>
+                                                    <Box
+                                                        onClick={() => {
+                                                            if (canUnmark(todo)) {
+                                                                toggleTodo(todo.id, false, user?.email || '');
+                                                            }
+                                                        }}
+                                                        sx={{
+                                                            width: 32,
+                                                            height: 32,
+                                                            borderRadius: '10px',
+                                                            display: 'flex',
+                                                            alignItems: 'center',
+                                                            justifyContent: 'center',
+                                                            background: 'rgba(16, 185, 129, 0.05)',
+                                                            border: '1px solid rgba(16, 185, 129, 0.1)',
+                                                            cursor: canUnmark(todo) ? 'pointer' : 'default',
+                                                            '&:hover': canUnmark(todo) ? { background: 'rgba(16, 185, 129, 0.1)' } : {}
+                                                        }}
+                                                    >
                                                         <CheckCircleOutlineIcon sx={{ fontSize: 18, color: 'success.main' }} />
                                                     </Box>
                                                     <Box sx={{ flex: 1 }}>
@@ -343,9 +366,10 @@ export default function Todos() {
                                                         </Typography>
                                                         <Typography variant="caption" sx={{ color: 'success.dark', fontWeight: 700, fontSize: '0.65rem', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
                                                             {todo.completedBy === 'auto' ? '⚡ Auto-verified' : `By ${completedByName}`}
+                                                            {canUnmark(todo) && ' • Click to unmark'}
                                                         </Typography>
                                                     </Box>
-                                                    {canDeleteCompleted(todo) && (
+                                                    {canDeleteItem(todo) && (
                                                         <IconButton size="small" onClick={() => deleteTodo(todo.id)} sx={{ color: 'text.disabled', '&:hover': { color: 'error.main' } }}>
                                                             <DeleteIcon sx={{ fontSize: 16 }} />
                                                         </IconButton>
