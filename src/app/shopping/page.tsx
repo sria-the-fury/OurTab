@@ -356,9 +356,6 @@ export default function Shopping() {
             console.log('Starting PDF generation for:', month);
             const currentHouseData = house;
 
-            // Define a safe currency string for jsPDF Helvetica (Latin-1)
-            // '৳' is not supported and renders as 'ó'.
-            const pdfCurrency = currency === 'BDT' ? 'Tk ' : currency === 'EUR' ? 'EUR ' : '$';
 
             const monthExpenses = monthlyExpenses[month];
             if (!monthExpenses) {
@@ -548,7 +545,7 @@ export default function Shopping() {
                     settlements.push({
                         debtorName,
                         creditorName,
-                        amountStr: `${pdfCurrency}${amount.toFixed(2)}`
+                        amountStr: `${amount.toFixed(2)}`
                     });
                 }
 
@@ -607,6 +604,11 @@ export default function Shopping() {
                 : 'Shared Expenses Tracking';
             doc.text(houseTypeStr, pageWidth / 2, 26, { align: 'center' });
 
+            //house currency
+            doc.setFontSize(10);
+            doc.setFont('helvetica', 'normal');
+            doc.text(`Currency: ${currentHouseData?.currency}`, pageWidth / 2, 32, { align: 'center' });
+
             // Right: Generation Info
             doc.setFontSize(8);
             doc.setFont('helvetica', 'normal');
@@ -645,7 +647,7 @@ export default function Shopping() {
                 if (contribs.length > 0) {
                     const shopperContrib = contribs.find(c => c.email === exp.userId);
                     const shopperAmount = shopperContrib ? shopperContrib.amount : 0;
-                    userCellContent = isMealsHouse ? displayName : `${displayName} ${pdfCurrency}${shopperAmount.toFixed(2)}`;
+                    userCellContent = isMealsHouse ? displayName : `${displayName} ${shopperAmount.toFixed(2)}`;
 
                     const others = contribs.filter(c => c.email !== exp.userId);
                     if (others.length > 0) {
@@ -655,11 +657,11 @@ export default function Shopping() {
                             const otherFullName = otherMember?.name || c.email.split('@')[0];
                             const otherNames = otherFullName.split(' ');
                             const otherDisplayName = otherNames.length >= 2 ? `${otherNames[0]} ${otherNames[1]}` : otherNames[0];
-                            return isMealsHouse ? `, ${otherDisplayName}` : `${otherDisplayName} ${pdfCurrency}${c.amount.toFixed(2)}`;
+                            return isMealsHouse ? `, ${otherDisplayName}` : `${otherDisplayName} ${c.amount.toFixed(2)}`;
                         }).join(isMealsHouse ? '' : '\n');
                     }
                 } else {
-                    userCellContent = isMealsHouse ? displayName : `${displayName} ${pdfCurrency}${exp.amount.toFixed(2)}`;
+                    userCellContent = isMealsHouse ? displayName : `${displayName} ${exp.amount.toFixed(2)}`;
                 }
 
                 return [
@@ -669,16 +671,16 @@ export default function Shopping() {
                         content: userCellContent,
                         styles: { fontSize: 7, valign: 'middle' as const, halign: 'left' as const }
                     },
-                    `${pdfCurrency}${exp.amount.toFixed(2)}`
+                    `${exp.amount.toFixed(2)}`
                 ];
             });
 
             // Calculate Total
             const total = expenses.reduce((sum, exp) => sum + exp.amount, 0);
-            tableData.push(['', '', 'Total', `${pdfCurrency}${total.toFixed(2)}`]);
+            tableData.push(['', '', 'Total', `${total.toFixed(2)}`]);
 
             autoTable(doc, {
-                head: [['Date', 'Description', 'User', 'Amount']],
+                head: [['Date', 'Description', 'Spender', 'Amount']],
                 body: tableData,
                 startY: titleY + 5,
                 theme: 'grid',
@@ -714,15 +716,16 @@ export default function Shopping() {
                         const netBalance = stats.deposits - (stats.rent + stats.utilities + stats.wage + stats.mealCost);
                         fundTableData.push([
                             m.name || m.email.split('@')[0],
-                            `${pdfCurrency}${stats.deposits.toFixed(2)}`,
-                            `- ${pdfCurrency}${stats.rent.toFixed(2)}`,
-                            `- ${pdfCurrency}${stats.utilities.toFixed(2)}`,
+                            `${stats.deposits.toFixed(2)}`,
+                            `- ${stats.rent.toFixed(2)}`,
+                            `- ${stats.utilities.toFixed(2)}`,
+                            `- ${stats.wage.toFixed(2)}`,
                             {
-                                content: `(${stats.mealCount}) - ${pdfCurrency}${stats.mealCost.toFixed(2)}`,
+                                content: `(${stats.mealCount}) - ${stats.mealCost.toFixed(2)}`,
                                 styles: { halign: 'right' }
                             },
                             {
-                                content: `${pdfCurrency}${netBalance.toFixed(2)}`,
+                                content: `${netBalance.toFixed(2)}`,
                                 styles: { fontStyle: 'bold', textColor: netBalance >= 0 ? [0, 100, 0] : [150, 0, 0] }
                             }
                         ]);
@@ -730,7 +733,7 @@ export default function Shopping() {
                 });
 
                 autoTable(doc, {
-                    head: [['Member', 'Deposits', 'Rent', 'Utils/Wage', 'Meals Count: Cost', 'Net Balance']],
+                    head: [['Member', 'Deposits', 'Rent', 'Utils', 'Wage', 'Meals Count: Cost', 'Balance']],
                     body: fundTableData,
                     startY: 35,
                     theme: 'grid',
@@ -738,11 +741,12 @@ export default function Shopping() {
                     headStyles: { fillColor: [76, 175, 80] }, // Greenish header
                     columnStyles: {
                         0: { fontStyle: 'bold', cellWidth: 'auto' },
-                        1: { halign: 'right', cellWidth: 25 },
-                        2: { halign: 'right', cellWidth: 25 },
-                        3: { halign: 'right', cellWidth: 25 },
-                        4: { halign: 'right', cellWidth: 35 },
-                        5: { halign: 'right', cellWidth: 25 }
+                        1: { halign: 'right', cellWidth: 20 },
+                        2: { halign: 'right', cellWidth: 20 },
+                        3: { halign: 'right', cellWidth: 20 },
+                        4: { halign: 'right', cellWidth: 20 },
+                        5: { halign: 'right', cellWidth: 25 },
+                        6: { halign: 'right', cellWidth: 20 }
                     }
                 });
 
@@ -758,14 +762,14 @@ export default function Shopping() {
                 let summaryY = tableFinalY + 8;
 
                 const summaryItems = [
-                    { label: "Previous Months Remaining", value: `${pdfCurrency}${summary.previousMonthsRemaining.toFixed(2)}`, color: summary.previousMonthsRemaining >= 0 ? [0, 100, 0] : [150, 0, 0] },
-                    { label: "Total Fund Collected", value: `${pdfCurrency}${summary.totalDeposits.toFixed(2)}`, color: [0, 100, 0] },
-                    { label: "Total Rent Deducted", value: `- ${pdfCurrency}${summary.totalRent.toFixed(2)}`, color: [150, 0, 0] },
-                    { label: "Total Utilities", value: `- ${pdfCurrency}${summary.totalUtilities.toFixed(2)}`, color: [150, 0, 0] },
-                    { label: "Total Worker Wage", value: `- ${pdfCurrency}${summary.totalWages.toFixed(2)}`, color: [150, 0, 0] },
-                    { label: "Total Grocery Cost", value: `- ${pdfCurrency}${summary.totalGroceries.toFixed(2)}`, color: [150, 0, 0] },
+                    { label: "Previous Months Remaining", value: `${summary.previousMonthsRemaining.toFixed(2)}`, color: summary.previousMonthsRemaining >= 0 ? [0, 100, 0] : [150, 0, 0] },
+                    { label: "Total Fund Collected", value: `${summary.totalDeposits.toFixed(2)}`, color: [0, 100, 0] },
+                    { label: "Total Rent Deducted", value: `- ${summary.totalRent.toFixed(2)}`, color: [150, 0, 0] },
+                    { label: "Total Utilities", value: `- ${summary.totalUtilities.toFixed(2)}`, color: [150, 0, 0] },
+                    { label: "Total Worker Wage", value: `- ${summary.totalWages.toFixed(2)}`, color: [150, 0, 0] },
+                    { label: "Total Grocery Cost", value: `- ${summary.totalGroceries.toFixed(2)}`, color: [150, 0, 0] },
                     { label: "Total Meals (Accumulated)", value: `${summary.totalMeals}`, color: [0, 0, 0] },
-                    { label: "Cost per Meal", value: `${pdfCurrency}${summary.costPerMeal.toFixed(2)}`, color: [0, 0, 150] },
+                    { label: "Cost per Meal", value: `${summary.costPerMeal.toFixed(2)}`, color: [0, 0, 150] },
                 ];
 
                 summaryItems.forEach(item => {
@@ -784,7 +788,7 @@ export default function Shopping() {
                 doc.setFont('abril', 'bold');
                 doc.setTextColor(0, 100, 0);
                 doc.text("Remaining House Fund", 14, summaryY);
-                doc.text(`${pdfCurrency}${summary.remainingFund.toFixed(2)}`, pageWidth - 14, summaryY, { align: 'right' });
+                doc.text(`${summary.remainingFund.toFixed(2)}`, pageWidth - 14, summaryY, { align: 'right' });
             }
 
             // --- SETTLEMENT SECTION (For Standard Shared Houses) ---
