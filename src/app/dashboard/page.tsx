@@ -1193,7 +1193,7 @@ export default function Dashboard() {
                                         }}>
                                             <TimerOffIcon sx={{ color: 'text.disabled' }} />
                                             <Typography variant="body2" color="text.secondary">
-                                                Meal window closed. opens at {windowStart}
+                                                Meal window closed. Opens at {windowStart}
                                             </Typography>
                                         </Paper>
                                     );
@@ -1460,7 +1460,7 @@ export default function Dashboard() {
                     {house?.typeOfHouse === 'meals_and_expenses' && (
                         <Box sx={{ mt: 6 }}>
                             <Typography variant="h6" sx={{ fontWeight: 800, mb: 3, display: 'flex', alignItems: 'center', gap: 1 }}>
-                                <AccountBalanceWalletIcon color="primary" /> House Fund & Meal Summary
+                                <AccountBalanceWalletIcon color="primary" /> Monthly Summary
                             </Typography>
                             <Paper className="glass" sx={{ p: 3, borderRadius: 4, background: 'rgba(255, 255, 255, 0.02)', border: '1px solid rgba(255,255,255,0.1)' }}>
                                 <Grid container spacing={4}>
@@ -1484,19 +1484,19 @@ export default function Dashboard() {
                                     <Grid size={{ xs: 12, md: 8 }}>
                                         <Typography variant="subtitle2" color="text.secondary" sx={{ textTransform: 'uppercase', mb: 2, fontWeight: 700 }}>Meal Accounting</Typography>
                                         <Box sx={{ overflowX: 'auto' }}>
-                                            <Box sx={{ minWidth: 400, display: 'flex', flexDirection: 'column', gap: 1.5 }}>
+                                            <Box sx={{ minWidth: 400, display: 'flex', flexDirection: 'column', gap: 1 }}>
                                                 <Box sx={{ display: 'flex', borderBottom: '1px solid rgba(0,0,0,0.05)', pb: 1 }}>
-                                                    <Typography variant="caption" sx={{ flex: 2, fontWeight: 800 }}>Member</Typography>
-                                                    <Typography variant="caption" sx={{ flex: 1, fontWeight: 800, textAlign: 'center' }}>Meals Taken</Typography>
-                                                    <Typography variant="caption" sx={{ flex: 1, fontWeight: 800, textAlign: 'center' }}>Total Cost</Typography>
-                                                    <Typography variant="caption" sx={{ flex: 1, fontWeight: 800, textAlign: 'right' }}>Net Balance</Typography>
+                                                    <Typography variant="caption" sx={{ flex: 1, fontWeight: 800 }}>Member</Typography>
+                                                    <Typography variant="caption" sx={{ flex: 1, fontWeight: 800, textAlign: 'center' }}>Meals</Typography>
+                                                    <Typography variant="caption" sx={{ flex: 1, fontWeight: 800, textAlign: 'center' }}>Meal Cost</Typography>
+                                                    <Typography variant="caption" sx={{ flex: 1, fontWeight: 800, textAlign: 'right' }}>Balance</Typography>
                                                 </Box>
                                                 {(house.members || []).map(member => {
                                                     const mStats = memberFundAccounting[member.email] || { deposits: 0, rent: 0, utilities: 0, wage: 0, mealCount: 0, mealCost: 0 };
                                                     const remaining = mStats.deposits - mStats.rent - mStats.utilities - mStats.wage - mStats.mealCost;
                                                     return (
                                                         <Box key={member.email} sx={{ display: 'flex', alignItems: 'center' }}>
-                                                            <Box sx={{ flex: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
+                                                            <Box sx={{ flex: 1, display: 'flex', alignItems: 'center', gap: 1 }}>
                                                                 <Avatar src={member.photoUrl} sx={{ width: 24, height: 24, fontSize: '0.7rem' }}>{member.name?.[0]}</Avatar>
                                                                 <Typography variant="body2" sx={{ fontWeight: 600 }}>{member.name?.split(' ')[0]}</Typography>
                                                             </Box>
@@ -1509,7 +1509,7 @@ export default function Dashboard() {
                                                     );
                                                 })}
                                                 <Box sx={{ display: 'flex', mt: 1, pt: 1, borderTop: '1px dashed rgba(0,0,0,0.1)' }}>
-                                                    <Typography variant="body2" sx={{ flex: 2, fontWeight: 800 }}>Total</Typography>
+                                                    <Typography variant="body2" sx={{ flex: 1, fontWeight: 800 }}>Total</Typography>
                                                     <Typography variant="body2" sx={{ flex: 1, textAlign: 'center', fontWeight: 800 }}>{houseFundStatsResult.totalMeals}</Typography>
                                                     <Typography variant="body2" sx={{ flex: 1, textAlign: 'center', fontWeight: 800 }}>{displayCurrency}{houseFundStatsResult.totalGroceries.toFixed(0)}</Typography>
                                                     <Typography variant="body2" sx={{ flex: 1, textAlign: 'right', fontWeight: 800, color: 'primary.main' }}>
