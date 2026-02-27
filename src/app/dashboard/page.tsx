@@ -229,9 +229,29 @@ export default function Dashboard() {
 
     // Member Details Dialog State
     const [openMemberDialog, setOpenMemberDialog] = useState(false);
-    const [selectedMember, setSelectedMember] = useState<{ email: string; name?: string; photoUrl?: string; iban?: string } | null>(null);
+    const [selectedMember, setSelectedMember] = useState<{
+        email: string;
+        name?: string;
+        photoUrl?: string;
+        iban?: string;
+        profession?: string;
+        birthday?: string;
+        whatsapp?: string;
+        messenger?: string;
+        wallet?: string;
+    } | null>(null);
 
-    const handleMemberClick = (member: { email: string; name?: string; photoUrl?: string; iban?: string }) => {
+    const handleMemberClick = (member: {
+        email: string;
+        name?: string;
+        photoUrl?: string;
+        iban?: string;
+        profession?: string;
+        birthday?: string;
+        whatsapp?: string;
+        messenger?: string;
+        wallet?: string;
+    }) => {
         setSelectedMember(member);
         setOpenMemberDialog(true);
     };

@@ -11,6 +11,7 @@ import IconButton from '@mui/material/IconButton';
 import TextField from '@mui/material/TextField';
 import MenuItem from '@mui/material/MenuItem';
 import { useAuth } from '@/components/AuthContext';
+import { useUserData, UserData } from '@/hooks/useUserData';
 import { useToast } from '@/components/ToastContext';
 import BottomNav from '@/components/BottomNav';
 import Loader from '@/components/Loader';
@@ -677,7 +678,7 @@ export default function Profile() {
                                 }}>
                                     <WhatsAppIcon sx={{ color: '#25D366', fontSize: 24 }} />
                                     <Typography variant="caption" sx={{ fontWeight: 800, opacity: 0.5 }}>WhatsApp</Typography>
-                                    <Typography variant="body2" sx={{ fontWeight: 700, noWrap: true }}>
+                                    <Typography variant="body2" noWrap sx={{ fontWeight: 700 }}>
                                         {dbUser?.whatsapp ? (
                                             <a href={`https://wa.me/${dbUser.whatsapp.replace(/\D/g, '')}`} target="_blank" rel="noopener noreferrer" style={{ textDecoration: 'none', color: 'inherit' }}>
                                                 {dbUser.whatsapp}
@@ -699,7 +700,7 @@ export default function Profile() {
                                 }}>
                                     <FacebookIcon sx={{ color: '#0084FF', fontSize: 24 }} />
                                     <Typography variant="caption" sx={{ fontWeight: 800, opacity: 0.5 }}>Messenger</Typography>
-                                    <Typography variant="body2" sx={{ fontWeight: 700, noWrap: true }}>
+                                    <Typography variant="body2" noWrap sx={{ fontWeight: 700 }}>
                                         {dbUser?.messenger ? (
                                             <a href={dbUser.messenger.startsWith('http') ? dbUser.messenger : `https://${dbUser.messenger}`} target="_blank" rel="noopener noreferrer" style={{ textDecoration: 'none', color: 'inherit' }}>
                                                 Open Chat

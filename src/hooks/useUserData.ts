@@ -12,6 +12,7 @@ export interface UserData {
     messenger?: string;
     iban?: string;
     birthday?: string; // Format: "MM-DD"
+    wallet?: string;
 }
 
 const fetcher = (url: string) => fetch(url).then((res) => {

@@ -31,7 +31,7 @@ export interface HouseAccountingResult {
 }
 
 export function calculateMemberFundAccounting(
-    house: House | null,
+    house: House | null | undefined,
     expenses: Expense[],
     fundDeposits: FundDeposit[],
     meals: MealStatus[]

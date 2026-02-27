@@ -17,6 +17,12 @@ export interface House {
         photoUrl?: string;
         role?: 'manager' | 'member';
         rentAmount?: number;
+        profession?: string;
+        birthday?: string;
+        whatsapp?: string;
+        messenger?: string;
+        iban?: string;
+        wallet?: string;
     }[];
     memberDetails?: Record<string, { role: 'manager' | 'member', rentAmount: number }>;
     pendingPayments?: {
