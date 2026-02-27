@@ -145,9 +145,7 @@ export default function Todos() {
                             </Box>
                             Buy List
                         </Typography>
-                        <Typography variant="body2" sx={{ color: 'text.secondary', fontWeight: 600, letterSpacing: '0.05em', textTransform: 'uppercase', fontSize: '0.7rem', opacity: 0.7 }}>
-                            Precision Shopping for your House
-                        </Typography>
+
                     </Box>
 
                     {/* --- Shopping List Items --- */}
@@ -308,7 +306,7 @@ export default function Todos() {
                                         variant="overline"
                                         sx={{ px: 2, mb: 2, display: 'block', fontWeight: 900, letterSpacing: 2, opacity: 0.5, fontSize: '0.7rem', color: 'text.secondary' }}
                                     >
-                                        Procured Items
+                                        Items need to buy
                                     </Typography>
                                     <List sx={{ display: 'flex', flexDirection: 'column', gap: 1.5, p: 0 }}>
                                         {completedTodos.map((todo) => {
