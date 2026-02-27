@@ -924,7 +924,7 @@ export default function Dashboard() {
 
                                         <Box sx={{ display: 'flex', flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 1, mb: 3 }}>
                                             {house.members?.map((member) => (
-                                                <Tooltip key={member.email} title={member.email}>
+                                                <Tooltip key={member.email} title={member.name || member.email}>
                                                     <Avatar
                                                         alt={member.name}
                                                         src={member.photoUrl}
