@@ -162,27 +162,16 @@ export default function MealsPage() {
                                 background: 'linear-gradient(45deg, #6C63FF 30%, #FF6584 90%)',
                                 WebkitBackgroundClip: 'text',
                                 WebkitTextFillColor: 'transparent',
+                                backdropFilter: 'blur(20px)',
+                                borderRadius: '12px',
+                                padding: '4px',
                                 mb: 0.5,
                                 letterSpacing: '-0.02em'
                             }}>
                                 Meal Tracking
                             </Typography>
                         </Box>
-                        <Box sx={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: 1.5,
-                            bgcolor: 'rgba(108, 99, 255, 0.08)',
-                            px: 2,
-                            py: 1,
-                            borderRadius: 3,
-                            border: '1px solid rgba(108, 99, 255, 0.2)'
-                        }}>
-                            <RestaurantMenuIcon sx={{ color: 'primary.main' }} />
-                            <Typography variant="subtitle2" sx={{ fontWeight: 'bold', color: 'primary.main' }}>
-                                {house.name}
-                            </Typography>
-                        </Box>
+
                     </Box>
                     <Typography variant="body1" color="text.secondary" sx={{ opacity: 0.8, fontWeight: 500 }}>
                         View and monitor household meal consumption

@@ -658,6 +658,9 @@ export default function Dashboard() {
                             WebkitBackgroundClip: 'text',
                             WebkitTextFillColor: 'transparent',
                             lineHeight: 1.2,
+                            backdropFilter: 'blur(20px)',
+                            borderRadius: '12px',
+                            padding: '4px',
                             letterSpacing: '-0.02em'
                         }}>
                             Dashboard

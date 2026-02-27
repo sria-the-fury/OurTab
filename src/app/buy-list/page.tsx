@@ -110,8 +110,7 @@ export default function Todos() {
         <AuthGuard>
             <main style={{
                 minHeight: '100vh',
-                position: 'relative',
-                overflowX: 'hidden'
+                position: 'relative'
             }}>
 
                 <Container maxWidth="sm" sx={{ mt: 3, mb: 20, position: 'relative', zIndex: 1 }}>
@@ -140,6 +139,9 @@ export default function Todos() {
                                 WebkitTextFillColor: 'transparent',
                                 display: 'flex',
                                 alignItems: 'center',
+                                backdropFilter: 'blur(20px)',
+                                borderRadius: '12px',
+                                padding: '4px',
                                 justifyContent: 'center',
                                 gap: 2,
                                 mb: 1,

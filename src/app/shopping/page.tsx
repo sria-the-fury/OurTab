@@ -878,6 +878,9 @@ export default function Shopping() {
                     }}>
                         <Typography variant="h4" component="h1" sx={{
                             fontWeight: 800,
+                            backdropFilter: 'blur(20px)',
+                            borderRadius: '12px',
+                            padding: "4px",
                             background: 'linear-gradient(45deg, #6C63FF 30%, #FF6584 90%)',
                             WebkitBackgroundClip: 'text',
                             WebkitTextFillColor: 'transparent',
