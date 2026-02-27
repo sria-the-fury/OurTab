@@ -1122,7 +1122,7 @@ export default function Dashboard() {
                     {house?.typeOfHouse === 'meals_and_expenses' && (
                         <Grid container spacing={3} sx={{ mt: 2 }}>
                             {/* Tomorrow's Meal Opt-Out Card */}
-                            <Grid size={{ xs: 12, md: 5 }}>
+                            <Grid size={{ xs: 12, md: 6 }}>
                                 {(() => {
                                     const windowStart = house.mealUpdateWindowStart || '20:00';
                                     const windowEnd = house.mealUpdateWindowEnd || '05:00';
@@ -1168,21 +1168,21 @@ export default function Dashboard() {
 
                                     return (
                                         <Paper className="glass" sx={{
-                                            p: 2,
+                                            p: 3,
+                                            height: '100%',
                                             bgcolor: 'rgba(76,175,80,0.06)',
                                             border: '1px solid rgba(76,175,80,0.15)',
                                             display: 'flex',
                                             flexDirection: 'column',
-                                            justifyContent: 'center'
                                         }}>
-                                            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1.5 }}>
-                                                <Typography variant="subtitle2" sx={{ fontWeight: 'bold', color: 'success.main', display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                                                    <RestaurantIcon sx={{ fontSize: 16 }} /> Tomorrow&apos;s Meal
+                                            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
+                                                <Typography variant="subtitle2" sx={{ fontWeight: 800, color: 'success.main', display: 'flex', alignItems: 'center', gap: 1, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                                                    <RestaurantIcon sx={{ fontSize: 18 }} /> Tomorrow&apos;s Meal
                                                 </Typography>
-                                                <Chip label={`Closes at ${windowEnd}`} size="small" variant="outlined" sx={{ height: 20, fontSize: '0.65rem', color: 'success.main', borderColor: 'rgba(76,175,80,0.3)' }} />
+                                                <Chip label={`Closes at ${windowEnd}`} size="small" variant="outlined" sx={{ height: 24, fontSize: '0.7rem', fontWeight: 700, color: 'success.main', borderColor: 'rgba(76,175,80,0.3)', bgcolor: 'rgba(76,175,80,0.05)' }} />
                                             </Box>
 
-                                            <Box sx={{ display: 'flex', gap: 1 }}>
+                                            <Box sx={{ display: 'flex', gap: 2, flexGrow: 1, alignItems: 'stretch' }}>
                                                 {[
                                                     { id: 'breakfast', label: 'B', full: 'Breakfast', checked: myMeals.breakfast ?? true },
                                                     { id: 'lunch', label: 'L', full: 'Lunch', checked: myMeals.lunch ?? true },
@@ -1192,16 +1192,29 @@ export default function Dashboard() {
                                                         key={meal.id}
                                                         onClick={() => handleTomorrowMeal(meal.id as any, meal.checked)}
                                                         sx={{
-                                                            flex: 1, p: 1, borderRadius: 1.5, cursor: 'pointer',
-                                                            display: 'flex', flexDirection: 'column', alignItems: 'center',
-                                                            bgcolor: meal.checked ? 'success.main' : 'rgba(0,0,0,0.05)',
+                                                            flex: 1,
+                                                            py: 2.5,
+                                                            px: 1.5,
+                                                            borderRadius: 4,
+                                                            cursor: 'pointer',
+                                                            display: 'flex',
+                                                            flexDirection: 'column',
+                                                            alignItems: 'center',
+                                                            bgcolor: meal.checked ? 'success.main' : 'rgba(0,0,0,0.06)',
                                                             color: meal.checked ? 'white' : 'text.secondary',
-                                                            transition: 'all 0.2s',
-                                                            '&:hover': { transform: 'scale(1.05)', bgcolor: meal.checked ? 'success.dark' : 'rgba(0,0,0,0.1)' }
+                                                            border: '1px solid',
+                                                            borderColor: meal.checked ? 'success.dark' : 'rgba(0,0,0,0.1)',
+                                                            boxShadow: meal.checked ? '0 6px 18px rgba(76, 175, 80, 0.3)' : '0 2px 8px rgba(0,0,0,0.05)',
+                                                            transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                                                            '&:hover': {
+                                                                transform: 'translateY(-4px)',
+                                                                bgcolor: meal.checked ? 'success.dark' : 'rgba(0,0,0,0.08)',
+                                                                boxShadow: meal.checked ? '0 8px 20px rgba(76, 175, 80, 0.4)' : '0 6px 12px rgba(0,0,0,0.1)'
+                                                            }
                                                         }}
                                                     >
-                                                        <Typography variant="h6" sx={{ lineHeight: 1, mb: 0.25 }}>{meal.label}</Typography>
-                                                        <Typography variant="caption" sx={{ fontSize: '0.6rem', opacity: 0.8 }}>{meal.full}</Typography>
+                                                        <Typography variant="h4" sx={{ fontWeight: 900, lineHeight: 1, mb: 0.5 }}>{meal.label}</Typography>
+                                                        <Typography variant="body2" sx={{ fontSize: '0.75rem', fontWeight: 700, textTransform: 'uppercase', opacity: 0.9 }}>{meal.full}</Typography>
                                                     </Box>
                                                 ))}
                                             </Box>
@@ -1211,7 +1224,7 @@ export default function Dashboard() {
                             </Grid>
 
                             {/* Active Meal Summary */}
-                            <Grid size={{ xs: 12, md: 7 }}>
+                            <Grid size={{ xs: 12, md: 6 }}>
                                 {(() => {
                                     const windowStart = house.mealUpdateWindowStart || '20:00';
                                     const now = new Date();
@@ -1226,14 +1239,18 @@ export default function Dashboard() {
 
                                     return (
                                         <Paper className="glass" sx={{
-                                            p: 2, bgcolor: 'rgba(108, 99, 255, 0.04)', border: '1px solid rgba(108, 99, 255, 0.15)',
-                                            height: '100%', display: 'flex', flexDirection: 'column'
+                                            p: 3,
+                                            bgcolor: 'rgba(108, 99, 255, 0.04)',
+                                            border: '1px solid rgba(108, 99, 255, 0.15)',
+                                            height: '100%',
+                                            display: 'flex',
+                                            flexDirection: 'column'
                                         }}>
-                                            <Typography variant="subtitle2" sx={{ fontWeight: 'bold', mb: 1.5, color: 'primary.main', display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                                                <GroupIcon sx={{ fontSize: 16 }} /> Meal Summary — {summaryLabel}
+                                            <Typography variant="subtitle2" sx={{ fontWeight: 800, mb: 3, color: 'primary.main', display: 'flex', alignItems: 'center', gap: 1, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                                                <GroupIcon sx={{ fontSize: 18 }} /> Meal Summary — {summaryLabel}
                                             </Typography>
 
-                                            <Box sx={{ display: 'flex', gap: 1, overflowX: 'auto', pb: 0.5, '::-webkit-scrollbar': { height: 4 } }}>
+                                            <Box sx={{ display: 'flex', gap: 1.5, overflowX: 'auto', pb: 1, flexGrow: 1, alignItems: 'center', '::-webkit-scrollbar': { height: 4 } }}>
                                                 {(house.members || []).map(member => {
                                                     const mMeals = summaryRecord?.meals?.[member.email] || {};
                                                     const b = mMeals.breakfast ?? true;
@@ -1243,28 +1260,38 @@ export default function Dashboard() {
 
                                                     return (
                                                         <Box key={member.email} sx={{
-                                                            minWidth: 80, p: 1, pb: 0.5, bgcolor: 'white', borderRadius: 2,
-                                                            boxShadow: '0 2px 8px rgba(0,0,0,0.04)', display: 'flex', flexDirection: 'column', alignItems: 'center'
+                                                            minWidth: 90,
+                                                            p: 1.5,
+                                                            bgcolor: 'rgba(255,255,255,0.7)',
+                                                            borderRadius: 3,
+                                                            border: '1px solid rgba(255,255,255,0.3)',
+                                                            boxShadow: '0 4px 12px rgba(0,0,0,0.03)',
+                                                            display: 'flex',
+                                                            flexDirection: 'column',
+                                                            alignItems: 'center',
+                                                            transition: 'all 0.2s ease',
+                                                            '&:hover': { transform: 'scale(1.02)', bgcolor: 'white' }
                                                         }}>
-                                                            <Avatar src={member.photoUrl} sx={{ width: 32, height: 32, mb: 0.5, border: '2px solid', borderColor: hasAny ? 'primary.light' : 'error.light' }}>
+                                                            <Avatar src={member.photoUrl} sx={{ width: 36, height: 36, mb: 1, border: '2px solid', borderColor: hasAny ? 'primary.light' : 'error.light', boxShadow: '0 2px 8px rgba(0,0,0,0.1)' }}>
                                                                 {member.name ? member.name[0].toUpperCase() : member.email[0].toUpperCase()}
                                                             </Avatar>
-                                                            <Typography variant="caption" noWrap sx={{ fontWeight: 'bold', width: '100%', textAlign: 'center', mb: 0.5 }}>
+                                                            <Typography variant="caption" noWrap sx={{ fontWeight: 800, width: '100%', textAlign: 'center', mb: 1, fontSize: '0.7rem' }}>
                                                                 {member.name?.split(' ')[0] || member.email.split('@')[0]}
                                                             </Typography>
-                                                            <Box sx={{ display: 'flex', gap: 0.25 }}>
+                                                            <Box sx={{ display: 'flex', gap: 0.5 }}>
                                                                 {[
                                                                     { id: 'b', show: mealsPerDay === 3, active: b },
                                                                     { id: 'l', show: true, active: l },
                                                                     { id: 'd', show: true, active: d }
                                                                 ].filter(m => m.show).map(m => (
                                                                     <Box key={m.id} sx={{
-                                                                        width: 14, height: 14, borderRadius: '50%',
+                                                                        width: 16, height: 16, borderRadius: '50%',
                                                                         display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                                                        fontSize: '0.5rem', fontWeight: 'bold',
-                                                                        bgcolor: m.active ? 'primary.main' : 'rgba(0,0,0,0.05)',
+                                                                        fontSize: '0.55rem', fontWeight: 900,
+                                                                        bgcolor: m.active ? 'primary.main' : 'rgba(0,0,0,0.04)',
                                                                         color: m.active ? 'white' : 'text.disabled',
-                                                                        border: '1px solid', borderColor: m.active ? 'primary.dark' : 'divider'
+                                                                        border: '1px solid', borderColor: m.active ? 'primary.dark' : 'rgba(0,0,0,0.1)',
+                                                                        boxShadow: m.active ? '0 1px 3px rgba(108, 99, 255, 0.3)' : 'none'
                                                                     }}>
                                                                         {m.id.toUpperCase()}
                                                                     </Box>
