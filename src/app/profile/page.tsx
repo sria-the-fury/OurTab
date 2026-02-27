@@ -20,6 +20,7 @@ import Alert from '@mui/material/Alert';
 import Divider from '@mui/material/Divider';
 import HomeIcon from '@mui/icons-material/Home';
 import DeleteForeverIcon from '@mui/icons-material/DeleteForever';
+import LogoutIcon from '@mui/icons-material/Logout';
 import EditIcon from '@mui/icons-material/Edit';
 import CheckIcon from '@mui/icons-material/Check';
 import CloseIcon from '@mui/icons-material/Close';
@@ -43,7 +44,7 @@ import DialogActions from '@mui/material/DialogActions';
 import AuthGuard from '@/components/AuthGuard';
 
 export default function Profile() {
-    const { user, currency, updateCurrency, loading: authLoading, dbUser, house, mutateUser, mutateHouse } = useAuth();
+    const { user, currency, updateCurrency, loading: authLoading, dbUser, house, mutateUser, mutateHouse, logout } = useAuth();
     const [newHouseCurrency, setNewHouseCurrency] = useState('USD'); // local picker for Create House form
     const [typeOfHouse, setTypeOfHouse] = useState<'expenses' | 'meals_and_expenses'>('expenses');
     const [mealsPerDay, setMealsPerDay] = useState<2 | 3>(3);
@@ -997,6 +998,37 @@ export default function Profile() {
                             </Box>
                         )}
                     </Paper>
+
+                    {/* ── Card 5: Logout ── */}
+                    <Box className="animate-stagger" sx={{ transitionDelay: '0.45s' }}>
+                        <Button
+                            fullWidth
+                            variant="contained"
+                            color="error"
+                            startIcon={<LogoutIcon />}
+                            onClick={logout}
+                            sx={{
+                                py: 2,
+                                borderRadius: '24px',
+                                background: 'rgba(211, 47, 47, 0.05)',
+                                color: '#d32f2f',
+                                border: '1px solid rgba(211, 47, 47, 0.2)',
+                                boxShadow: 'none',
+                                fontWeight: 800,
+                                fontSize: '0.9rem',
+                                letterSpacing: '0.05em',
+                                textTransform: 'uppercase',
+                                '&:hover': {
+                                    background: 'rgba(211, 47, 47, 0.1)',
+                                    border: '1px solid rgba(211, 47, 47, 0.4)',
+                                    boxShadow: '0 8px 24px rgba(211, 47, 47, 0.1)'
+                                },
+                                transition: 'all 0.3s cubic-bezier(0.16, 1, 0.3, 1)'
+                            }}
+                        >
+                            Sign Out
+                        </Button>
+                    </Box>
 
                     {/* ── Footer: Feedback link ── */}
                     <Box className="animate-stagger" sx={{ textAlign: 'center', pt: 1, transitionDelay: '0.5s' }}>
