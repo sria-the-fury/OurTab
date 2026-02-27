@@ -859,25 +859,26 @@ export default function Shopping() {
     return (
         <AuthGuard>
             <main>
-                <Navbar actions={
-                    <IconButton
-                        color="primary"
-                        onClick={handleOpenHistory}
-                        sx={{
-                            bgcolor: 'background.paper',
-                            boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
-                            '&:hover': { bgcolor: 'rgba(108, 99, 255, 0.1)' },
-                            width: 40,
-                            height: 40
-                        }}
-                    >
-                        <HistoryIcon />
-                    </IconButton>
-                } />
+                <Navbar />
                 <Container maxWidth="sm" sx={{ mt: 4, mb: 10 }}>
-                    <Typography variant="h4" component="h1" gutterBottom>
-                        Shopping List
-                    </Typography>
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+                        <Typography variant="h4" component="h1" sx={{ fontWeight: 'bold' }}>
+                            Shopping List
+                        </Typography>
+                        <IconButton
+                            color="primary"
+                            onClick={handleOpenHistory}
+                            sx={{
+                                bgcolor: 'background.paper',
+                                boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
+                                '&:hover': { bgcolor: 'rgba(108, 99, 255, 0.1)' },
+                                width: 44,
+                                height: 44
+                            }}
+                        >
+                            <HistoryIcon />
+                        </IconButton>
+                    </Box>
 
 
                     {/* Add Item Form */}

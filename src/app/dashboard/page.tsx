@@ -677,7 +677,7 @@ export default function Dashboard() {
                                 transition: 'all 0.2s ease'
                             }}
                         >
-                            Add Expense
+                            Expense
                         </Button>
                     </Box>
 
