@@ -22,12 +22,18 @@ import DeleteForeverIcon from '@mui/icons-material/DeleteForever';
 import EditIcon from '@mui/icons-material/Edit';
 import CheckIcon from '@mui/icons-material/Check';
 import CloseIcon from '@mui/icons-material/Close';
+import CakeIcon from '@mui/icons-material/Cake';
 import AccountBalanceIcon from '@mui/icons-material/AccountBalance';
 import HowToVoteIcon from '@mui/icons-material/HowToVote';
 import CancelIcon from '@mui/icons-material/Cancel';
 import DirectionsRunIcon from '@mui/icons-material/DirectionsRun';
 import FeedbackIcon from '@mui/icons-material/Feedback';
 import SendIcon from '@mui/icons-material/Send';
+import WhatsAppIcon from '@mui/icons-material/WhatsApp';
+import FacebookIcon from '@mui/icons-material/Facebook';
+import WorkIcon from '@mui/icons-material/Work';
+import ContactSupportIcon from '@mui/icons-material/ContactSupport';
+import AccountTreeIcon from '@mui/icons-material/AccountTree';
 import Dialog from '@mui/material/Dialog';
 import DialogTitle from '@mui/material/DialogTitle';
 import DialogContent from '@mui/material/DialogContent';
@@ -45,6 +51,19 @@ export default function Profile() {
     const [ibanValue, setIbanValue] = useState('');
     const [editingIban, setEditingIban] = useState(false);
     const [savingIban, setSavingIban] = useState(false);
+
+    // New Fields State
+    const [professionValue, setProfessionValue] = useState('');
+    const [whatsappValue, setWhatsappValue] = useState('');
+    const [messengerValue, setMessengerValue] = useState('');
+    const [walletValue, setWalletValue] = useState('');
+    const [birthdayValue, setBirthdayValue] = useState(''); // Format: MM-DD
+
+    const [editingProfession, setEditingProfession] = useState(false);
+    const [editingSocial, setEditingSocial] = useState(false);
+    const [editingPayment, setEditingPayment] = useState(false);
+    const [editingBirthday, setEditingBirthday] = useState(false);
+    const [savingFields, setSavingFields] = useState(false);
     const [openDeleteDialog, setOpenDeleteDialog] = useState(false);
     const [openLeaveDialog, setOpenLeaveDialog] = useState(false);
     const [feedbackSubject, setFeedbackSubject] = useState('');
@@ -67,10 +86,21 @@ export default function Profile() {
         if (house?.mealUpdateWindowEnd) setMealWindowEnd(house.mealUpdateWindowEnd);
     }, [house?.mealUpdateWindowStart, house?.mealUpdateWindowEnd]);
 
+    // Sync user data with state
+    React.useEffect(() => {
+        if (dbUser) {
+            setProfessionValue(dbUser.profession || '');
+            setWhatsappValue(dbUser.whatsapp || '');
+            setMessengerValue(dbUser.messenger || '');
+            setWalletValue(dbUser.wallet || '');
+            setBirthdayValue(dbUser.birthday || '');
+            setIbanValue(dbUser.iban || '');
+        }
+    }, [dbUser]);
+
     const { showToast } = useToast();
 
     // Derived state
-    const hasHouse = !!dbUser?.houseId;
     interface HouseDetails {
         id?: string;
         name?: string;
@@ -92,7 +122,10 @@ export default function Profile() {
             approvals?: string[];
         }>;
         pendingPayments?: unknown[];
+        mealUpdateWindowStart?: string;
+        mealUpdateWindowEnd?: string;
     }
+    const hasHouse = !!dbUser?.houseId;
     const houseDetails = house as HouseDetails | null;
     const effectiveCreator = houseDetails?.createdBy || (houseDetails?.members && houseDetails.members[0]?.email);
     const isCreator = effectiveCreator === user?.email;
@@ -314,6 +347,31 @@ export default function Profile() {
         setLoading(false);
     };
 
+    const handleSaveFields = async (fields: Partial<UserData>) => {
+        if (!user?.email) return;
+        setSavingFields(true);
+        try {
+            const res = await fetch('/api/users', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ email: user.email, ...fields }),
+            });
+            if (res.ok) {
+                showToast('Profile updated', 'success');
+                mutateUser();
+                return true;
+            } else {
+                showToast('Failed to update profile', 'error');
+                return false;
+            }
+        } catch {
+            showToast('Error saving profile', 'error');
+            return false;
+        } finally {
+            setSavingFields(false);
+        }
+    };
+
     if (authLoading) return <Loader />;
     if (!user) return null;
 
@@ -321,79 +379,400 @@ export default function Profile() {
         <AuthGuard>
             <main>
                 <Navbar />
-                <Container maxWidth="sm" sx={{ mt: 3, mb: 10, display: 'flex', flexDirection: 'column', gap: 2 }}>
 
-                    {/* ── Card 1: User Info ── */}
-                    <Paper className="glass" sx={{ p: 3, background: 'transparent' }}>
-                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                            <Avatar src={user.photoURL || ''} sx={{ width: 72, height: 72 }} />
-                            <Box sx={{ flex: 1, overflow: 'hidden' }}>
-                                <Typography variant="h6" fontWeight={700} noWrap>{user.displayName}</Typography>
-                                <Typography variant="body2" color="text.secondary" noWrap>{user.email}</Typography>
-                                {hasHouse && houseDetails && (
-                                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, mt: 0.5 }}>
-                                        <HomeIcon sx={{ fontSize: 14, color: 'primary.main' }} />
-                                        <Typography variant="caption" color="text.secondary">
-                                            <Box component="span" sx={{ fontWeight: 'bold', color: 'primary.main', fontFamily: 'var(--font-abril)' }}>
-                                                {houseDetails.name}
-                                            </Box>
-                                            {' '}[{houseDetails.currency === 'EUR' ? '€' : houseDetails.currency === 'BDT' ? '৳' : '$'}]
-                                        </Typography>
-                                    </Box>
-                                )}
-                            </Box>
-                        </Box>
+                {/* ── Premium Background Elements ── */}
+                <Box sx={{
+                    position: 'fixed',
+                    top: 0,
+                    left: 0,
+                    right: 0,
+                    bottom: 0,
+                    zIndex: -1,
+                    overflow: 'hidden',
+                    pointerEvents: 'none'
+                }}>
+                    <Box className="animate-blob" sx={{
+                        position: 'absolute',
+                        top: '-10%',
+                        left: '-10%',
+                        width: '40vw',
+                        height: '40vw',
+                        background: 'radial-gradient(circle, rgba(124, 77, 255, 0.15) 0%, transparent 70%)',
+                        filter: 'blur(50px)'
+                    }} />
+                    <Box className="animate-blob" sx={{
+                        position: 'absolute',
+                        bottom: '10%',
+                        right: '-5%',
+                        width: '35vw',
+                        height: '35vw',
+                        background: 'radial-gradient(circle, rgba(0, 184, 212, 0.15) 0%, transparent 70%)',
+                        filter: 'blur(50px)',
+                        animationDelay: '2s'
+                    }} />
+                </Box>
 
-                        <Divider sx={{ my: 2 }} />
+                <Container maxWidth="sm" sx={{ mt: 3, mb: 10, display: 'flex', flexDirection: 'column', gap: 3 }}>
 
-                        {/* IBAN row */}
-                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                            <AccountBalanceIcon sx={{ fontSize: 16, color: 'text.secondary' }} />
-                            <Typography variant="body2" color="text.secondary" sx={{ fontWeight: 500, mr: 0.5 }}>IBAN</Typography>
-                            {editingIban ? (
-                                <>
-                                    <TextField
-                                        size="small"
-                                        placeholder="e.g. DE89 3704 0044 0532 0130 00"
-                                        value={ibanValue}
-                                        onChange={(e) => setIbanValue(e.target.value)}
-                                        sx={{ flex: 1 }}
-                                        autoFocus
+                    {/* ── Card 1: User Info (Premium Header) ── */}
+                    <Paper className="glass animate-stagger" sx={{ p: 0, overflow: 'hidden', background: 'transparent', transitionDelay: '0.1s' }}>
+                        <Box sx={{
+                            p: 3,
+                            background: 'linear-gradient(135deg, rgba(255,255,255,0.05) 0%, transparent 100%)',
+                            position: 'relative'
+                        }}>
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 3 }}>
+                                <Box sx={{ position: 'relative' }}>
+                                    <Avatar
+                                        src={user.photoURL || ''}
+                                        sx={{
+                                            width: 86,
+                                            height: 86,
+                                            border: '3px solid rgba(255,255,255,0.2)',
+                                            boxShadow: '0 8px 16px rgba(0,0,0,0.2)'
+                                        }}
                                     />
-                                    <IconButton size="small" color="success" disabled={savingIban} onClick={async () => {
-                                        setSavingIban(true);
-                                        try {
-                                            const res = await fetch('/api/users', {
-                                                method: 'POST',
-                                                headers: { 'Content-Type': 'application/json' },
-                                                body: JSON.stringify({ email: user.email, iban: ibanValue.trim() }),
-                                            });
-                                            if (res.ok) { showToast('IBAN saved', 'success'); mutateUser(); setEditingIban(false); }
-                                            else showToast('Failed to save IBAN', 'error');
-                                        } catch { showToast('Error saving IBAN', 'error'); }
-                                        setSavingIban(false);
-                                    }}>
-                                        <CheckIcon fontSize="small" />
-                                    </IconButton>
-                                    <IconButton size="small" onClick={() => { setEditingIban(false); setIbanValue(dbUser?.iban || ''); }}>
-                                        <CloseIcon fontSize="small" />
-                                    </IconButton>
-                                </>
-                            ) : (
-                                <>
-                                    <Typography variant="body2" color="text.secondary" sx={{ fontFamily: 'monospace', flex: 1 }}>
-                                        {dbUser?.iban ? dbUser.iban : <em style={{ opacity: 0.5 }}>Not set</em>}
+                                    <Box className="shimmer" sx={{
+                                        position: 'absolute',
+                                        top: 0,
+                                        left: 0,
+                                        right: 0,
+                                        bottom: 0,
+                                        borderRadius: '50%',
+                                        zIndex: 1,
+                                        pointerEvents: 'none'
+                                    }} />
+                                </Box>
+                                <Box sx={{ flex: 1, overflow: 'hidden' }}>
+                                    <Typography variant="h5" sx={{ fontWeight: 900, mb: 0.5, letterSpacing: '-0.02em', color: 'text.primary' }}>
+                                        {user.displayName}
                                     </Typography>
-                                    <IconButton size="small" onClick={() => { setIbanValue(dbUser?.iban || ''); setEditingIban(true); }}>
-                                        <EditIcon sx={{ fontSize: 14 }} />
-                                    </IconButton>
-                                </>
-                            )}
+                                    <Typography variant="body2" sx={{ opacity: 0.6, mb: 2, fontWeight: 500 }}>
+                                        {user.email}
+                                    </Typography>
+
+                                    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+                                        {/* Profession Badge */}
+                                        {editingProfession ? (
+                                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                                <TextField
+                                                    size="small"
+                                                    placeholder="e.g. Student @ University"
+                                                    value={professionValue}
+                                                    onChange={(e) => setProfessionValue(e.target.value)}
+                                                    sx={{ flex: 1, '& .MuiInputBase-root': { borderRadius: '20px', background: 'rgba(255,255,255,0.05)' } }}
+                                                    autoFocus
+                                                />
+                                                <IconButton size="small" color="success" disabled={savingFields} onClick={async () => {
+                                                    if (await handleSaveFields({ profession: professionValue.trim() })) {
+                                                        setEditingProfession(false);
+                                                    }
+                                                }}>
+                                                    <CheckIcon fontSize="small" />
+                                                </IconButton>
+                                                <IconButton size="small" onClick={() => { setEditingProfession(false); setProfessionValue(dbUser?.profession || ''); }}>
+                                                    <CloseIcon fontSize="small" />
+                                                </IconButton>
+                                            </Box>
+                                        ) : (
+                                            <Box
+                                                sx={{
+                                                    display: 'inline-flex',
+                                                    alignItems: 'center',
+                                                    gap: 1,
+                                                    px: 1.5,
+                                                    py: 0.5,
+                                                    borderRadius: '20px',
+                                                    background: 'rgba(124, 77, 255, 0.1)',
+                                                    border: '1px solid rgba(124, 77, 255, 0.2)',
+                                                    width: 'fit-content',
+                                                    cursor: 'pointer',
+                                                    transition: 'all 0.2s ease',
+                                                    '&:hover': { background: 'rgba(124, 77, 255, 0.15)', transform: 'scale(1.02)' }
+                                                }}
+                                                onClick={() => { setProfessionValue(dbUser?.profession || ''); setEditingProfession(true); }}
+                                            >
+                                                <WorkIcon sx={{ fontSize: 14, color: '#7c4dff' }} />
+                                                <Typography variant="caption" sx={{ fontWeight: 800, color: '#7c4dff', textTransform: 'uppercase', letterSpacing: '0.03em' }}>
+                                                    {dbUser?.profession || 'Set Profession'}
+                                                </Typography>
+                                                <EditIcon sx={{ fontSize: 10, opacity: 0.5 }} />
+                                            </Box>
+                                        )}
+
+                                        {/* Birthday Badge */}
+                                        {editingBirthday ? (
+                                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                                <Box sx={{ display: 'flex', gap: 0.5, flex: 1 }}>
+                                                    <TextField
+                                                        select
+                                                        size="small"
+                                                        value={birthdayValue?.split('-')[0] || '01'}
+                                                        onChange={(e) => {
+                                                            const month = e.target.value;
+                                                            const day = birthdayValue?.split('-')[1] || '01';
+                                                            setBirthdayValue(`${month}-${day}`);
+                                                        }}
+                                                        sx={{ flex: 1, '& .MuiInputBase-root': { borderRadius: '20px 0 0 20px', background: 'rgba(255,255,255,0.05)' } }}
+                                                        SelectProps={{ native: true }}
+                                                    >
+                                                        {Array.from({ length: 12 }).map((_, i) => (
+                                                            <option key={i + 1} value={String(i + 1).padStart(2, '0')}>
+                                                                {new Date(2000, i).toLocaleString('default', { month: 'short' })}
+                                                            </option>
+                                                        ))}
+                                                    </TextField>
+                                                    <TextField
+                                                        select
+                                                        size="small"
+                                                        value={birthdayValue?.split('-')[1] || '01'}
+                                                        onChange={(e) => {
+                                                            const day = e.target.value;
+                                                            const month = birthdayValue?.split('-')[0] || '01';
+                                                            setBirthdayValue(`${month}-${day}`);
+                                                        }}
+                                                        sx={{ flex: 1, '& .MuiInputBase-root': { borderRadius: '0 20px 20px 0', background: 'rgba(255,255,255,0.05)' } }}
+                                                        SelectProps={{ native: true }}
+                                                    >
+                                                        {Array.from({ length: 31 }).map((_, i) => (
+                                                            <option key={i + 1} value={String(i + 1).padStart(2, '0')}>
+                                                                {i + 1}
+                                                            </option>
+                                                        ))}
+                                                    </TextField>
+                                                </Box>
+                                                <IconButton size="small" color="success" disabled={savingFields} onClick={async () => {
+                                                    if (await handleSaveFields({ birthday: birthdayValue })) {
+                                                        setEditingBirthday(false);
+                                                    }
+                                                }}>
+                                                    <CheckIcon sx={{ fontSize: 14 }} />
+                                                </IconButton>
+                                                <IconButton size="small" onClick={() => { setEditingBirthday(false); setBirthdayValue(dbUser?.birthday || ''); }}>
+                                                    <CloseIcon fontSize="small" />
+                                                </IconButton>
+                                            </Box>
+                                        ) : (
+                                            <Box
+                                                sx={{
+                                                    display: 'inline-flex',
+                                                    alignItems: 'center',
+                                                    gap: 1,
+                                                    px: 1.5,
+                                                    py: 0.5,
+                                                    borderRadius: '20px',
+                                                    background: 'rgba(255, 105, 180, 0.1)',
+                                                    border: '1px solid rgba(255, 105, 180, 0.2)',
+                                                    width: 'fit-content',
+                                                    cursor: 'pointer',
+                                                    transition: 'all 0.2s ease',
+                                                    '&:hover': { background: 'rgba(255, 105, 180, 0.15)', transform: 'scale(1.02)' }
+                                                }}
+                                                onClick={() => { setBirthdayValue(dbUser?.birthday || '01-01'); setEditingBirthday(true); }}
+                                            >
+                                                <CakeIcon sx={{ fontSize: 14, color: '#ff69b4' }} />
+                                                <Typography variant="caption" sx={{ fontWeight: 800, color: '#ff69b4', textTransform: 'uppercase', letterSpacing: '0.03em' }}>
+                                                    {dbUser?.birthday ? (() => {
+                                                        const [m, d] = dbUser.birthday.split('-');
+                                                        const date = new Date(2000, parseInt(m) - 1, parseInt(d));
+                                                        const dayNum = parseInt(d);
+                                                        const suffix = (n: number) => {
+                                                            if (n > 3 && n < 21) return 'th';
+                                                            switch (n % 10) {
+                                                                case 1: return "st";
+                                                                case 2: return "nd";
+                                                                case 3: return "rd";
+                                                                default: return "th";
+                                                            }
+                                                        };
+                                                        return `${dayNum}${suffix(dayNum)} ${date.toLocaleString('default', { month: 'long' })}`;
+                                                    })() : 'Set Birthday'}
+                                                </Typography>
+                                                <EditIcon sx={{ fontSize: 10, opacity: 0.5 }} />
+                                            </Box>
+                                        )}
+
+                                        {/* House Info */}
+                                        {hasHouse && houseDetails && (
+                                            <Box sx={{
+                                                display: 'flex',
+                                                alignItems: 'center',
+                                                gap: 1,
+                                                mt: 1,
+                                                opacity: 0.8
+                                            }}>
+                                                <HomeIcon sx={{ fontSize: 16, color: 'primary.main' }} />
+                                                <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                                                    <Box component="span" sx={{ color: 'primary.main', fontFamily: 'var(--font-abril)', letterSpacing: '0.05em' }}>
+                                                        {houseDetails.name}
+                                                    </Box>
+                                                    {' '}<Box component="span" sx={{ opacity: 0.5 }}>[{houseDetails.currency === 'EUR' ? '€' : houseDetails.currency === 'BDT' ? '৳' : '$'}]</Box>
+                                                </Typography>
+                                            </Box>
+                                        )}
+                                    </Box>
+                                </Box>
+                            </Box>
                         </Box>
                     </Paper>
 
-                    {/* ── Card 3: House Management ── */}
-                    <Paper className="glass" sx={{ p: 3, background: 'transparent' }}>
+                    {/* ── Card 2: Social Records (Premium Grid) ── */}
+                    <Paper className="glass animate-stagger" sx={{ p: 3, background: 'transparent', transitionDelay: '0.2s' }}>
+                        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 3 }}>
+                            <Typography variant="subtitle2" sx={{ fontWeight: 900, fontSize: '0.7rem', textTransform: 'uppercase', letterSpacing: '0.1em', opacity: 0.5 }}>
+                                Social Network
+                            </Typography>
+                            {!editingSocial && (
+                                <IconButton size="small" onClick={() => setEditingSocial(true)} sx={{ background: 'rgba(255,255,255,0.05)', '&:hover': { background: 'rgba(255,255,255,0.1)' } }}>
+                                    <EditIcon sx={{ fontSize: 14 }} />
+                                </IconButton>
+                            )}
+                        </Box>
+
+                        {editingSocial ? (
+                            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2.5 }}>
+                                <TextField
+                                    label="WhatsApp Number"
+                                    size="small"
+                                    placeholder="+8801..."
+                                    value={whatsappValue}
+                                    onChange={(e) => setWhatsappValue(e.target.value)}
+                                    fullWidth
+                                    sx={{ '& .MuiInputBase-root': { borderRadius: '12px' } }}
+                                />
+                                <TextField
+                                    label="Messenger Username/Link"
+                                    size="small"
+                                    placeholder="fb.com/username"
+                                    value={messengerValue}
+                                    onChange={(e) => setMessengerValue(e.target.value)}
+                                    fullWidth
+                                    sx={{ '& .MuiInputBase-root': { borderRadius: '12px' } }}
+                                />
+                                <Box sx={{ display: 'flex', gap: 1, justifyContent: 'flex-end' }}>
+                                    <Button size="small" sx={{ borderRadius: '20px' }} onClick={() => {
+                                        setEditingSocial(false);
+                                        setWhatsappValue(dbUser?.whatsapp || '');
+                                        setMessengerValue(dbUser?.messenger || '');
+                                    }}>Cancel</Button>
+                                    <Button size="small" variant="contained" sx={{ borderRadius: '20px', px: 3 }} disabled={savingFields} onClick={async () => {
+                                        if (await handleSaveFields({ whatsapp: whatsappValue.trim(), messenger: messengerValue.trim() })) {
+                                            setEditingSocial(false);
+                                        }
+                                    }}>Save Links</Button>
+                                </Box>
+                            </Box>
+                        ) : (
+                            <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 2 }}>
+                                <Box sx={{
+                                    p: 2,
+                                    borderRadius: '16px',
+                                    background: 'rgba(37, 211, 102, 0.05)',
+                                    border: '1px solid rgba(37, 211, 102, 0.1)',
+                                    display: 'flex',
+                                    flexDirection: 'column',
+                                    gap: 1,
+                                    transition: 'all 0.3s ease',
+                                    '&:hover': { transform: 'scale(1.05)', background: 'rgba(37, 211, 102, 0.08)' }
+                                }}>
+                                    <WhatsAppIcon sx={{ color: '#25D366', fontSize: 24 }} />
+                                    <Typography variant="caption" sx={{ fontWeight: 800, opacity: 0.5 }}>WhatsApp</Typography>
+                                    <Typography variant="body2" sx={{ fontWeight: 700, noWrap: true }}>
+                                        {dbUser?.whatsapp ? (
+                                            <a href={`https://wa.me/${dbUser.whatsapp.replace(/\D/g, '')}`} target="_blank" rel="noopener noreferrer" style={{ textDecoration: 'none', color: 'inherit' }}>
+                                                {dbUser.whatsapp}
+                                            </a>
+                                        ) : 'Not linked'}
+                                    </Typography>
+                                </Box>
+
+                                <Box sx={{
+                                    p: 2,
+                                    borderRadius: '16px',
+                                    background: 'rgba(0, 132, 255, 0.05)',
+                                    border: '1px solid rgba(0, 132, 255, 0.1)',
+                                    display: 'flex',
+                                    flexDirection: 'column',
+                                    gap: 1,
+                                    transition: 'all 0.3s ease',
+                                    '&:hover': { transform: 'scale(1.05)', background: 'rgba(0, 132, 255, 0.08)' }
+                                }}>
+                                    <FacebookIcon sx={{ color: '#0084FF', fontSize: 24 }} />
+                                    <Typography variant="caption" sx={{ fontWeight: 800, opacity: 0.5 }}>Messenger</Typography>
+                                    <Typography variant="body2" sx={{ fontWeight: 700, noWrap: true }}>
+                                        {dbUser?.messenger ? (
+                                            <a href={dbUser.messenger.startsWith('http') ? dbUser.messenger : `https://${dbUser.messenger}`} target="_blank" rel="noopener noreferrer" style={{ textDecoration: 'none', color: 'inherit' }}>
+                                                Open Chat
+                                            </a>
+                                        ) : 'Not linked'}
+                                    </Typography>
+                                </Box>
+                            </Box>
+                        )}
+                    </Paper>
+
+                    {/* ── Card 3: Banking Details (Conditional Premium) ── */}
+                    {hasHouse && houseDetails?.typeOfHouse === 'expenses' && (
+                        <Paper className="glass animate-stagger" sx={{ p: 3, background: 'transparent', transitionDelay: '0.3s' }}>
+                            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 3 }}>
+                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                                    <Box sx={{ p: 1, borderRadius: '10px', background: 'rgba(var(--primary-rgb), 0.1)' }}>
+                                        <AccountBalanceIcon color="primary" sx={{ fontSize: 20 }} />
+                                    </Box>
+                                    <Typography variant="subtitle1" fontWeight={900} sx={{ letterSpacing: '-0.01em' }}>Banking Details</Typography>
+                                </Box>
+                                {!editingIban && (
+                                    <IconButton size="small" onClick={() => setEditingIban(true)} sx={{ background: 'rgba(255,255,255,0.05)' }}>
+                                        <EditIcon sx={{ fontSize: 16 }} />
+                                    </IconButton>
+                                )}
+                            </Box>
+
+                            {editingIban ? (
+                                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                                    <TextField
+                                        label="IBAN"
+                                        size="small"
+                                        placeholder="DE89..."
+                                        value={ibanValue}
+                                        onChange={(e) => setIbanValue(e.target.value)}
+                                        fullWidth
+                                        autoFocus
+                                        sx={{ '& .MuiInputBase-root': { borderRadius: '12px' } }}
+                                    />
+                                    <Box sx={{ display: 'flex', gap: 1, justifyContent: 'flex-end' }}>
+                                        <Button size="small" onClick={() => {
+                                            setEditingIban(false);
+                                            setIbanValue(dbUser?.iban || '');
+                                        }}>Cancel</Button>
+                                        <Button size="small" variant="contained" sx={{ borderRadius: '20px', px: 3 }} disabled={savingFields} onClick={async () => {
+                                            if (await handleSaveFields({ iban: ibanValue.trim() })) {
+                                                setEditingIban(false);
+                                            }
+                                        }}>Save IBAN</Button>
+                                    </Box>
+                                </Box>
+                            ) : (
+                                <Box sx={{
+                                    p: 2,
+                                    borderRadius: '12px',
+                                    background: 'rgba(255,255,255,0.03)',
+                                    border: '1px solid rgba(255,255,255,0.05)',
+                                    display: 'flex',
+                                    flexDirection: 'column',
+                                    gap: 0.5
+                                }}>
+                                    <Typography variant="caption" sx={{ color: 'text.disabled', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.1em', fontSize: '0.65rem' }}>IBAN</Typography>
+                                    <Typography variant="body2" sx={{ fontFamily: '"Roboto Mono", monospace', fontSize: '0.95rem', letterSpacing: '0.05em', fontWeight: 600 }} color={dbUser?.iban ? 'text.primary' : 'text.disabled'}>
+                                        {dbUser?.iban || 'Not configured'}
+                                    </Typography>
+                                </Box>
+                            )}
+                        </Paper>
+                    )}
+
+                    {/* ── Card 4: House Management ── */}
+                    <Paper className="glass animate-stagger" sx={{ p: 3, background: 'transparent', transitionDelay: '0.4s' }}>
 
                         {hasHouse && houseDetails ? (
                             <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1.5 }}>
@@ -619,14 +998,23 @@ export default function Profile() {
                     </Paper>
 
                     {/* ── Footer: Feedback link ── */}
-                    <Box sx={{ textAlign: 'center', pt: 1 }}>
+                    <Box className="animate-stagger" sx={{ textAlign: 'center', pt: 1, transitionDelay: '0.5s' }}>
                         <Typography
                             variant="body2"
                             color="text.disabled"
-                            sx={{ cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 0.5, '&:hover': { color: 'primary.main' }, transition: 'color 0.2s' }}
+                            sx={{
+                                cursor: 'pointer',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: 0.8,
+                                fontWeight: 600,
+                                fontSize: '0.75rem',
+                                '&:hover': { color: 'primary.main', transform: 'translateY(-1px)' },
+                                transition: 'all 0.2s cubic-bezier(0.16, 1, 0.3, 1)'
+                            }}
                             onClick={() => setOpenFeedbackDialog(true)}
                         >
-                            <FeedbackIcon sx={{ fontSize: 14 }} />
+                            <FeedbackIcon sx={{ fontSize: 16 }} />
                             Send Feedback & Suggestions
                         </Typography>
                     </Box>
