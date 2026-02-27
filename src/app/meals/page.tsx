@@ -254,7 +254,7 @@ export default function MealsPage() {
                                     <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', mb: 1 }}>
                                         <Avatar src={member.photoUrl} sx={{ width: 36, height: 36, mb: 1, border: '2px solid rgba(108, 99, 255, 0.3)' }} />
                                         <Typography variant="subtitle2" sx={{ fontWeight: 700, maxWidth: 120 }} noWrap>
-                                            {member.name || member.email.split('@')[0]}
+                                            {member.name ? member.name.split(' ').slice(0, 2).join(' ') : member.email.split('@')[0]}
                                         </Typography>
                                     </Box>
                                     <Stack direction="row" spacing={2} justifyContent="center" sx={{ opacity: 0.5 }}>
@@ -399,7 +399,7 @@ export default function MealsPage() {
                                                             {member.name ? member.name[0].toUpperCase() : member.email[0].toUpperCase()}
                                                         </Avatar>
                                                         <Typography variant="body2" sx={{ fontWeight: 700 }}>
-                                                            {member.name || member.email.split('@')[0]}
+                                                            {member.name ? member.name.split(' ').slice(0, 2).join(' ') : member.email.split('@')[0]}
                                                         </Typography>
                                                     </Box>
                                                     <Box sx={{ display: 'flex', gap: 0.8 }}>
@@ -463,7 +463,7 @@ export default function MealsPage() {
                                             }} />
                                             <Box sx={{ flexGrow: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
                                                 <Typography variant="h6" sx={{ fontWeight: 800, mb: 1, lineHeight: 1.2 }}>
-                                                    {member.name || member.email.split('@')[0]}
+                                                    {member.name ? member.name.split(' ').slice(0, 2).join(' ') : member.email.split('@')[0]}
                                                 </Typography>
                                                 <Box sx={{
                                                     display: 'inline-flex',

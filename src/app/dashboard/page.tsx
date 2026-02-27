@@ -1484,11 +1484,11 @@ export default function Dashboard() {
                                     <Grid size={{ xs: 12, md: 8 }}>
                                         <Typography variant="subtitle2" color="text.secondary" sx={{ textTransform: 'uppercase', mb: 2, fontWeight: 700 }}>Meal Accounting</Typography>
                                         <Box sx={{ overflowX: 'auto' }}>
-                                            <Box sx={{ minWidth: 400, display: 'flex', flexDirection: 'column', gap: 1 }}>
+                                            <Box sx={{ minWidth: 280, display: 'flex', flexDirection: 'column', gap: 1 }}>
                                                 <Box sx={{ display: 'flex', borderBottom: '1px solid rgba(0,0,0,0.05)', pb: 1 }}>
-                                                    <Typography variant="caption" sx={{ flex: 1, fontWeight: 800 }}>Member</Typography>
+                                                    <Typography variant="caption" sx={{ flex: 1.5, fontWeight: 800 }}>Member</Typography>
                                                     <Typography variant="caption" sx={{ flex: 1, fontWeight: 800, textAlign: 'center' }}>Meals</Typography>
-                                                    <Typography variant="caption" sx={{ flex: 1, fontWeight: 800, textAlign: 'center' }}>Meal Cost</Typography>
+                                                    <Typography variant="caption" sx={{ flex: 1, fontWeight: 800, textAlign: 'center' }}>Spent</Typography>
                                                     <Typography variant="caption" sx={{ flex: 1, fontWeight: 800, textAlign: 'right' }}>Balance</Typography>
                                                 </Box>
                                                 {(house.members || []).map(member => {
@@ -1496,9 +1496,9 @@ export default function Dashboard() {
                                                     const remaining = mStats.deposits - mStats.rent - mStats.utilities - mStats.wage - mStats.mealCost;
                                                     return (
                                                         <Box key={member.email} sx={{ display: 'flex', alignItems: 'center' }}>
-                                                            <Box sx={{ flex: 1, display: 'flex', alignItems: 'center', gap: 1 }}>
-                                                                <Avatar src={member.photoUrl} sx={{ width: 24, height: 24, fontSize: '0.7rem' }}>{member.name?.[0]}</Avatar>
-                                                                <Typography variant="body2" sx={{ fontWeight: 600 }}>{member.name?.split(' ')[0]}</Typography>
+                                                            <Box sx={{ flex: 1.5, display: 'flex', alignItems: 'center', gap: 1 }}>
+                                                                <Avatar src={member.photoUrl} sx={{ width: 20, height: 20, fontSize: '0.6rem' }}>{member.name?.[0]}</Avatar>
+                                                                <Typography variant="body2" sx={{ fontWeight: 600, fontSize: '0.8rem' }}>{member.name?.split(' ').slice(0, 2).join(' ')}</Typography>
                                                             </Box>
                                                             <Typography variant="body2" sx={{ flex: 1, textAlign: 'center' }}>{mStats.mealCount}</Typography>
                                                             <Typography variant="body2" sx={{ flex: 1, textAlign: 'center' }}>{displayCurrency}{mStats.mealCost.toFixed(0)}</Typography>
@@ -1509,10 +1509,10 @@ export default function Dashboard() {
                                                     );
                                                 })}
                                                 <Box sx={{ display: 'flex', mt: 1, pt: 1, borderTop: '1px dashed rgba(0,0,0,0.1)' }}>
-                                                    <Typography variant="body2" sx={{ flex: 1, fontWeight: 800 }}>Total</Typography>
-                                                    <Typography variant="body2" sx={{ flex: 1, textAlign: 'center', fontWeight: 800 }}>{houseFundStatsResult.totalMeals}</Typography>
-                                                    <Typography variant="body2" sx={{ flex: 1, textAlign: 'center', fontWeight: 800 }}>{displayCurrency}{houseFundStatsResult.totalGroceries.toFixed(0)}</Typography>
-                                                    <Typography variant="body2" sx={{ flex: 1, textAlign: 'right', fontWeight: 800, color: 'primary.main' }}>
+                                                    <Typography variant="body2" sx={{ flex: 1.5, fontWeight: 800, fontSize: '0.8rem' }}>Total</Typography>
+                                                    <Typography variant="body2" sx={{ flex: 1, textAlign: 'center', fontWeight: 800, fontSize: '0.8rem' }}>{houseFundStatsResult.totalMeals}</Typography>
+                                                    <Typography variant="body2" sx={{ flex: 1, textAlign: 'center', fontWeight: 800, fontSize: '0.8rem' }}>{displayCurrency}{houseFundStatsResult.totalGroceries.toFixed(0)}</Typography>
+                                                    <Typography variant="body2" sx={{ flex: 1, textAlign: 'right', fontWeight: 800, color: 'primary.main', fontSize: '0.75rem' }}>
                                                         {displayCurrency}{houseFundStatsResult.costPerMeal.toFixed(2)}/meal
                                                     </Typography>
                                                 </Box>
