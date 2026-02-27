@@ -1,6 +1,5 @@
 'use client';
 
-import Navbar from '@/components/Navbar';
 import Container from '@mui/material/Container';
 import Typography from '@mui/material/Typography';
 import Box from '@mui/material/Box';
@@ -79,7 +78,6 @@ export default function NotificationsPage() {
     return (
         <AuthGuard>
             <main style={{ minHeight: '100vh', position: 'relative', overflowX: 'hidden' }}>
-                <Navbar />
                 <Container maxWidth="sm" sx={{ mt: 3, mb: 20, position: 'relative', zIndex: 1 }}>
                     {/* --- Header Section --- */}
                     <Box sx={{ mb: 6, display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', animation: 'fadeInDown 0.8s ease-out' }}>

@@ -1,7 +1,6 @@
 'use client';
 
 import React, { useState } from 'react';
-import Navbar from '@/components/Navbar';
 import Container from '@mui/material/Container';
 import Typography from '@mui/material/Typography';
 import Box from '@mui/material/Box';
@@ -380,7 +379,6 @@ export default function Profile() {
     return (
         <AuthGuard>
             <main>
-                <Navbar />
 
                 {/* ── Premium Background Elements ── */}
                 <Box sx={{

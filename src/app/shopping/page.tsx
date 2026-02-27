@@ -1,6 +1,5 @@
 'use client';
 
-import Navbar from '@/components/Navbar';
 import Container from '@mui/material/Container';
 import Select from '@mui/material/Select';
 import MenuItem from '@mui/material/MenuItem';
@@ -859,7 +858,6 @@ export default function Shopping() {
     return (
         <AuthGuard>
             <main>
-                <Navbar />
                 <Container maxWidth="sm" sx={{ mt: 4, mb: 10 }}>
                     <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
                         <Typography variant="h4" component="h1" sx={{ fontWeight: 'bold' }}>

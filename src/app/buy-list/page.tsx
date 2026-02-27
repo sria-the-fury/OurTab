@@ -1,6 +1,5 @@
 'use client';
 
-import Navbar from '@/components/Navbar';
 import Container from '@mui/material/Container';
 import Typography from '@mui/material/Typography';
 import Box from '@mui/material/Box';
@@ -102,7 +101,6 @@ export default function Todos() {
                 position: 'relative',
                 overflowX: 'hidden'
             }}>
-                <Navbar />
 
                 <Container maxWidth="sm" sx={{ mt: 3, mb: 20, position: 'relative', zIndex: 1 }}>
                     {/* --- Header Section --- */}

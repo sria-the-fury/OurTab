@@ -2,7 +2,6 @@
 
 import { useState, useMemo } from 'react';
 import * as React from 'react';
-import Navbar from '@/components/Navbar';
 import Container from '@mui/material/Container';
 import Typography from '@mui/material/Typography';
 import Box from '@mui/material/Box';
@@ -636,7 +635,6 @@ export default function Dashboard() {
     return (
         <AuthGuard>
             <main>
-                <Navbar />
                 <Container maxWidth="lg" sx={{ mt: 4 }}>
                     <Box sx={{
                         display: 'flex',

@@ -2,7 +2,6 @@
 
 import * as React from 'react';
 import { useState, useMemo } from 'react';
-import Navbar from '@/components/Navbar';
 import Container from '@mui/material/Container';
 import Typography from '@mui/material/Typography';
 import Box from '@mui/material/Box';
@@ -100,7 +99,6 @@ export default function MealsPage() {
     if (!house || house.typeOfHouse !== 'meals_and_expenses') {
         return (
             <AuthGuard>
-                <Navbar />
                 <Container maxWidth="lg" sx={{ mt: 4, display: 'flex', flexDirection: 'column', alignItems: 'center', pt: 10 }}>
                     <RestaurantMenuIcon sx={{ fontSize: 80, color: 'text.disabled', mb: 2 }} />
                     <Typography variant="h5" color="text.secondary">Meal tracking is not enabled for this house.</Typography>
@@ -143,7 +141,6 @@ export default function MealsPage() {
     return (
         <AuthGuard>
             <main>
-                <Navbar />
                 <Container maxWidth="lg" sx={{ mt: 4, pb: 10 }}>
                     {/* Header Section */}
                     <Box sx={{
