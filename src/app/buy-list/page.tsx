@@ -306,7 +306,7 @@ export default function Todos() {
                                         variant="overline"
                                         sx={{ px: 2, mb: 2, display: 'block', fontWeight: 900, letterSpacing: 2, opacity: 0.5, fontSize: '0.7rem', color: 'text.secondary' }}
                                     >
-                                        Items need to buy
+                                        Procured Items
                                     </Typography>
                                     <List sx={{ display: 'flex', flexDirection: 'column', gap: 1.5, p: 0 }}>
                                         {completedTodos.map((todo) => {
