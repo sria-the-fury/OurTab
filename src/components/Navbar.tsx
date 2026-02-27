@@ -37,7 +37,7 @@ export default function Navbar({ actions }: NavbarProps) {
                         </Box>
                     </Link>
                     <Box sx={{ position: 'absolute', right: 16, display: 'flex', alignItems: 'center', gap: 1 }}>
-                        {isDashboardPage && <NotificationBell />}
+                        {!isDashboardPage && <NotificationBell />}
                         {actions}
                     </Box>
                 </Toolbar>

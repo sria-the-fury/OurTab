@@ -58,6 +58,7 @@ import WorkIcon from '@mui/icons-material/Work';
 import CakeIcon from '@mui/icons-material/Cake';
 import WhatsAppIcon from '@mui/icons-material/WhatsApp';
 import FacebookIcon from '@mui/icons-material/Facebook';
+import NotificationBell from '@/components/NotificationBell';
 
 
 const formatBirthday = (birthday?: string) => {
@@ -660,25 +661,7 @@ export default function Dashboard() {
                                 Overview of your household finances and expenses
                             </Typography>
                         </Box>
-                        <Button
-                            variant="contained"
-                            startIcon={<AddIcon />}
-                            href="/shopping"
-                            sx={{
-                                borderRadius: 3,
-                                py: 1.2,
-                                px: 3,
-                                fontWeight: 700,
-                                boxShadow: '0 4px 15px rgba(108, 99, 255, 0.3)',
-                                '&:hover': {
-                                    boxShadow: '0 6px 20px rgba(108, 99, 255, 0.4)',
-                                    transform: 'translateY(-2px)'
-                                },
-                                transition: 'all 0.2s ease'
-                            }}
-                        >
-                            Expense
-                        </Button>
+                        <NotificationBell />
                     </Box>
 
                     {/* Month Navigator - Premium Glass Style */}
@@ -998,6 +981,29 @@ export default function Dashboard() {
                                                 <PersonAddIcon fontSize="small" />
                                             </IconButton>
                                         </Box>
+                                        <Button
+                                            variant="contained"
+                                            color="primary"
+                                            fullWidth
+                                            startIcon={<AddIcon />}
+                                            onClick={() => router.push('/shopping')}
+                                            sx={{
+                                                borderRadius: 3,
+                                                py: 1.2,
+                                                textTransform: 'none',
+                                                fontWeight: 700,
+                                                boxShadow: '0 4px 15px rgba(108, 99, 255, 0.2)',
+                                                bgcolor: '#6C63FF',
+                                                '&:hover': {
+                                                    bgcolor: '#5a52e0',
+                                                    boxShadow: '0 6px 20px rgba(108, 99, 255, 0.3)',
+                                                    transform: 'translateY(-2px)'
+                                                },
+                                                transition: 'all 0.2s ease'
+                                            }}
+                                        >
+                                            Add Expense
+                                        </Button>
                                     </Box>
                                 ) : (
                                     <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'start', justifyContent: 'center', flex: 1, position: 'relative', zIndex: 1 }}>
@@ -2361,6 +2367,6 @@ export default function Dashboard() {
                     </DialogActions>
                 </Dialog>
             </main>
-        </AuthGuard>
+        </AuthGuard >
     );
 }
