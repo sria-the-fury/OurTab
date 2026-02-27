@@ -701,7 +701,7 @@ export default function Profile() {
                                     <Typography variant="caption" sx={{ fontWeight: 800, opacity: 0.5 }}>Messenger</Typography>
                                     <Typography variant="body2" noWrap sx={{ fontWeight: 700 }}>
                                         {dbUser?.messenger ? (
-                                            <a href={dbUser.messenger.startsWith('http') ? dbUser.messenger : `https://${dbUser.messenger}`} target="_blank" rel="noopener noreferrer" style={{ textDecoration: 'none', color: 'inherit' }}>
+                                            <a href={dbUser.messenger.startsWith('http') ? dbUser.messenger : `https://m.me/${dbUser.messenger}`} target="_blank" rel="noopener noreferrer" style={{ textDecoration: 'none', color: 'inherit' }}>
                                                 Open Chat
                                             </a>
                                         ) : 'Not linked'}
