@@ -1,4 +1,4 @@
-export type NotificationType = 'expense' | 'settlement' | 'shopping' | 'house';
+export type NotificationType = 'expense' | 'settlement' | 'shopping' | 'house' | 'birthday';
 
 export interface AppNotification {
     id?: string;

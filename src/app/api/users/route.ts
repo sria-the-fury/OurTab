@@ -5,7 +5,7 @@ import { adminDb } from '@/lib/firebaseAdmin';
 export async function POST(request: Request) {
     try {
         const body = await request.json();
-        const { email, name, photoUrl, iban } = body;
+        const { email, name, photoUrl, profession, whatsapp, messenger, birthday, iban } = body;
 
         if (!email) {
             return NextResponse.json({ error: 'Email is required' }, { status: 400 });
@@ -18,6 +18,10 @@ export async function POST(request: Request) {
             email: string;
             name?: string;
             photoUrl?: string;
+            profession?: string;
+            whatsapp?: string;
+            messenger?: string;
+            birthday?: string;
             iban?: string;
         }
 
@@ -25,7 +29,12 @@ export async function POST(request: Request) {
 
         if (name !== undefined) userData.name = name;
         if (photoUrl !== undefined) userData.photoUrl = photoUrl;
+        if (profession !== undefined) userData.profession = profession;
+        if (whatsapp !== undefined) userData.whatsapp = whatsapp;
+        if (messenger !== undefined) userData.messenger = messenger;
         if (iban !== undefined) userData.iban = iban;
+        // Removed bkash, nagad, upay
+        if (birthday !== undefined) userData.birthday = birthday; // Added birthday
 
         if (userSnap.exists) {
             const existing = userSnap.data()!;

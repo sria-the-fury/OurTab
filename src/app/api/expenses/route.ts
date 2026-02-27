@@ -5,7 +5,7 @@ import { createNotification } from '@/lib/notifications';
 export async function POST(request: Request) {
     try {
         const body = await request.json();
-        const { amount, description, userId, houseId, contributors } = body;
+        const { amount, description, category, userId, houseId, contributors } = body;
 
         if (!amount || !description || !userId || !houseId) {
             return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
@@ -27,6 +27,7 @@ export async function POST(request: Request) {
         const expenseData: {
             amount: number;
             description: string;
+            category?: string;
             userId: string;
             houseId: string;
             date: string;
@@ -38,6 +39,10 @@ export async function POST(request: Request) {
             houseId,
             date: new Date().toISOString()
         };
+
+        if (category) {
+            expenseData.category = category;
+        }
 
         if (contributors && contributors.length > 0) {
             expenseData.contributors = contributors.map((c: { email: string; amount: number | string }) => ({
@@ -75,6 +80,7 @@ export async function POST(request: Request) {
             if (houseData && Array.isArray(houseData.members)) {
                 // If the array contains strings:
                 const isStringArray = houseData.members.length > 0 && typeof houseData.members[0] === 'string';
+                const currencySymbol = houseData.currency === 'EUR' ? '€' : (houseData.currency === 'GBP' ? '£' : '$');
 
                 if (isStringArray) {
                     const notifications = houseData.members
@@ -83,7 +89,7 @@ export async function POST(request: Request) {
                             createNotification({
                                 userId: memberEmail,
                                 type: 'expense',
-                                message: `has made an expense of $${totalAmount.toFixed(2)}.`,
+                                message: `has made an expense of ${currencySymbol}${totalAmount.toFixed(2)}.`,
                                 senderName: finalSenderName,
                                 senderPhotoUrl: finalSenderPhotoUrl,
                                 relatedId: expenseRef.id
@@ -102,7 +108,7 @@ export async function POST(request: Request) {
                             createNotification({
                                 userId: member.email,
                                 type: 'expense',
-                                message: `has made an expense of $${totalAmount.toFixed(2)}.`,
+                                message: `has made an expense of ${currencySymbol}${totalAmount.toFixed(2)}.`,
                                 senderName: objectSenderName,
                                 senderPhotoUrl: objectSenderPhotoUrl,
                                 relatedId: expenseRef.id

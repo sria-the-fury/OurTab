@@ -7,7 +7,12 @@ export interface UserData {
     photoUrl?: string;
     // currency is stored on the house, not on the user
     houseId?: string;
+    profession?: string;
+    whatsapp?: string;
+    messenger?: string;
     iban?: string;
+    birthday?: string; // Format: "MM-DD"
+    wallet?: string;
 }
 
 const fetcher = (url: string) => fetch(url).then((res) => {

@@ -2,7 +2,6 @@
 
 import { useState, useMemo } from 'react';
 import * as React from 'react';
-import Navbar from '@/components/Navbar';
 import Container from '@mui/material/Container';
 import Typography from '@mui/material/Typography';
 import Box from '@mui/material/Box';
@@ -11,11 +10,16 @@ import Grid from '@mui/material/Grid';
 import Button from '@mui/material/Button';
 import Chip from '@mui/material/Chip';
 import Alert from '@mui/material/Alert';
+import Checkbox from '@mui/material/Checkbox';
+import Divider from '@mui/material/Divider';
+import IconButton from '@mui/material/IconButton';
 import AddIcon from '@mui/icons-material/Add';
 import AttachMoneyIcon from '@mui/icons-material/AttachMoney';
 import EuroIcon from '@mui/icons-material/Euro';
 import CurrencyExchangeIcon from '@mui/icons-material/CurrencyExchange';
 import GroupIcon from '@mui/icons-material/Group';
+import RestaurantIcon from '@mui/icons-material/Restaurant';
+import TimerOffIcon from '@mui/icons-material/TimerOff';
 import ArrowBackIosIcon from '@mui/icons-material/ArrowBackIos';
 import ArrowForwardIosIcon from '@mui/icons-material/ArrowForwardIos';
 import ArrowUpwardIcon from '@mui/icons-material/ArrowUpward';
@@ -24,13 +28,16 @@ import ArrowForwardIcon from '@mui/icons-material/ArrowForward';
 import AccountBalanceWalletIcon from '@mui/icons-material/AccountBalanceWallet';
 import AccountBalanceIcon from '@mui/icons-material/AccountBalance';
 import DoneAllIcon from '@mui/icons-material/DoneAll';
-import IconButton from '@mui/material/IconButton';
-import ContentCopyIcon from '@mui/icons-material/ContentCopy';
+import CalendarMonthIcon from '@mui/icons-material/CalendarMonth';
+import KeyboardArrowLeftIcon from '@mui/icons-material/KeyboardArrowLeft';
+import KeyboardArrowRightIcon from '@mui/icons-material/KeyboardArrowRight';
 import Tooltip from '@mui/material/Tooltip';
+import Stack from '@mui/material/Stack';
 import { useAuth } from '@/components/AuthContext';
 import { useRouter } from 'next/navigation';
 import { useHouseData } from '@/hooks/useHouseData';
 import { useToast } from '@/components/ToastContext';
+import { calculateMemberFundAccounting } from '@/utils/accounting';
 import Loader from '@/components/Loader';
 import BottomNav from '@/components/BottomNav';
 import AuthGuard from '@/components/AuthGuard';
@@ -45,6 +52,33 @@ import PaymentsIcon from '@mui/icons-material/Payments';
 import DeleteIcon from '@mui/icons-material/Delete';
 import HowToVoteIcon from '@mui/icons-material/HowToVote';
 import FormatListBulletedIcon from '@mui/icons-material/FormatListBulleted';
+import ContentCopyIcon from '@mui/icons-material/ContentCopy';
+import WorkIcon from '@mui/icons-material/Work';
+import CakeIcon from '@mui/icons-material/Cake';
+import WhatsAppIcon from '@mui/icons-material/WhatsApp';
+import FacebookIcon from '@mui/icons-material/Facebook';
+import NotificationBell from '@/components/NotificationBell';
+
+
+const formatBirthday = (birthday?: string) => {
+    if (!birthday || birthday === '') return null;
+    const parts = birthday.split('-');
+    if (parts.length !== 2) return birthday;
+    const month = parseInt(parts[0]);
+    const day = parseInt(parts[1]);
+    if (isNaN(month) || isNaN(day)) return birthday;
+    const months = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+    const suffix = (d: number) => {
+        if (d > 3 && d < 21) return 'th';
+        switch (d % 10) {
+            case 1: return 'st';
+            case 2: return 'nd';
+            case 3: return 'rd';
+            default: return 'th';
+        }
+    };
+    return `${day}${suffix(day)} ${months[month - 1]}`;
+};
 
 
 interface Expense {
@@ -54,6 +88,7 @@ interface Expense {
     userId: string;
     houseId: string;
     date: string;
+    category?: string;
     contributors?: Array<{ email: string; amount: number }>;
     isSettlementPayment?: boolean;
     method?: 'bank' | 'cash';
@@ -67,12 +102,83 @@ export default function Dashboard() {
     const router = useRouter();
 
     // Use the custom hook for data fetching
-    const { house, expenses, todos, loading: dataLoading, mutateHouse, mutateExpenses } = useHouseData();
+    const { house, expenses, todos, fundDeposits, meals, loading: dataLoading, mutateHouse, mutateExpenses, mutateFundDeposits, mutateMeals } = useHouseData();
 
     // Derived state for pending todos
     const pendingTodos = useMemo(() => {
         return todos?.filter(todo => !todo.isCompleted) || [];
     }, [todos]);
+
+    // House Fund Stats (total collected, spent, rentDeducted, remaining)
+    const houseFundStats = useMemo(() => {
+        if (!house || house.typeOfHouse !== 'meals_and_expenses') return { collected: 0, spent: 0, rentDeducted: 0, remaining: 0 };
+        const collected = (fundDeposits || [])
+            .filter(d => d.status === 'approved')
+            .reduce((sum, d) => sum + Number(d.amount), 0);
+        const spentGroceries = (expenses || [])
+            .filter(e => !e.isSettlementPayment && (e.category === 'groceries' || !e.category))
+            .reduce((sum, e) => sum + Number(e.amount), 0);
+        const spentUtilities = (expenses || [])
+            .filter(e => !e.isSettlementPayment && e.category === 'utilities')
+            .reduce((sum, e) => sum + Number(e.amount), 0);
+        const spentWage = (expenses || [])
+            .filter(e => !e.isSettlementPayment && e.category === 'wage')
+            .reduce((sum, e) => sum + Number(e.amount), 0);
+        const spentMisc = (expenses || [])
+            .filter(e => !e.isSettlementPayment && e.category === 'other')
+            .reduce((sum, e) => sum + Number(e.amount), 0);
+
+        const totalSpent = Number(spentGroceries) + Number(spentUtilities) + Number(spentWage) + Number(spentMisc);
+
+        const getYYYYMM = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+
+        // Collect all unique months across all history
+        const months = new Set<string>();
+        (expenses || []).forEach(e => months.add(getYYYYMM(new Date(e.date))));
+        (fundDeposits || []).filter(d => d.status === 'approved').forEach(d => {
+            months.add(getYYYYMM(new Date(d.createdAt)));
+        });
+        (meals || []).forEach(m => months.add(m.date.substring(0, 7)));
+
+        const targetMonth = getYYYYMM(new Date());
+        months.add(targetMonth);
+
+        const sortedMonths = Array.from(months).sort();
+        let totalRentDeducted = 0;
+        let totalMealsCount = 0;
+        const totalMonthlyRent = (house?.members || []).reduce((sum, m) => sum + Number(m.rentAmount || 0), 0);
+
+        const mealsPerDay = house?.mealsPerDay || 3;
+        (meals || []).forEach(dayRecord => {
+            (house?.members || []).forEach(m => {
+                const email = typeof m === 'string' ? m : m.email;
+                const mMeals = dayRecord.meals?.[email] || {};
+                if (mealsPerDay === 3 && (mMeals.breakfast ?? true)) totalMealsCount++;
+                if (mMeals.lunch ?? true) totalMealsCount++;
+                if (mMeals.dinner ?? true) totalMealsCount++;
+            });
+        });
+
+        for (const monthStr of sortedMonths) {
+            if (monthStr > targetMonth) break;
+            totalRentDeducted += totalMonthlyRent;
+        }
+
+        const avgMealCost = totalMealsCount > 0 ? (spentGroceries / totalMealsCount) : 0;
+
+        return {
+            collected,
+            spent: totalSpent,
+            spentGroceries,
+            spentUtilities,
+            spentWage,
+            spentMisc,
+            totalMealsCount,
+            avgMealCost,
+            rentDeducted: Number(totalRentDeducted),
+            remaining: collected - totalSpent - Number(totalRentDeducted)
+        };
+    }, [fundDeposits, expenses, meals, house]);
 
     // Combine loading states
     const loading = authLoading || (!!user && dataLoading && !house && expenses.length === 0);
@@ -116,11 +222,36 @@ export default function Dashboard() {
     // Cancel Payment State
     const [cancelPaymentId, setCancelPaymentId] = useState<string | null>(null);
 
+    // Fund Deposit State
+    const [openDepositDialog, setOpenDepositDialog] = useState(false);
+    const [openDepositDetails, setOpenDepositDetails] = useState(false);
+    const [depositAmount, setDepositAmount] = useState('');
+
     // Member Details Dialog State
     const [openMemberDialog, setOpenMemberDialog] = useState(false);
-    const [selectedMember, setSelectedMember] = useState<{ email: string; name?: string; photoUrl?: string; iban?: string } | null>(null);
+    const [selectedMember, setSelectedMember] = useState<{
+        email: string;
+        name?: string;
+        photoUrl?: string;
+        iban?: string;
+        profession?: string;
+        birthday?: string;
+        whatsapp?: string;
+        messenger?: string;
+        wallet?: string;
+    } | null>(null);
 
-    const handleMemberClick = (member: { email: string; name?: string; photoUrl?: string; iban?: string }) => {
+    const handleMemberClick = (member: {
+        email: string;
+        name?: string;
+        photoUrl?: string;
+        iban?: string;
+        profession?: string;
+        birthday?: string;
+        whatsapp?: string;
+        messenger?: string;
+        wallet?: string;
+    }) => {
         setSelectedMember(member);
         setOpenMemberDialog(true);
     };
@@ -157,6 +288,33 @@ export default function Dashboard() {
         } catch (error) {
             console.error('Failed to update expense', error);
             showToast('Error updating expense', 'error');
+        }
+    };
+
+    const handleRequestDeposit = async () => {
+        if (!house?.id || !user?.email || !depositAmount) return;
+        try {
+            const res = await fetch('/api/fund-deposits', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    houseId: house.id,
+                    email: user.email,
+                    amount: depositAmount
+                })
+            });
+            if (res.ok) {
+                showToast('Deposit request submitted!', 'success');
+                setOpenDepositDialog(false);
+                setDepositAmount('');
+                mutateFundDeposits(); // Refresh deposits array to update UI
+            } else {
+                const data = await res.json();
+                showToast(data.error || 'Failed to submit deposit Request', 'error');
+            }
+        } catch (error: any) {
+            console.error('Error submitting deposit', error);
+            showToast(error.message || 'Error submitting deposit', 'error');
         }
     };
 
@@ -259,70 +417,158 @@ export default function Dashboard() {
         return myTotal;
     })();
 
+    // Calculate per-member accounting for the Fund Dialog
+    const accountingResult = useMemo(() => {
+        return calculateMemberFundAccounting(house, expenses, fundDeposits, meals);
+    }, [house, expenses, fundDeposits, meals]);
+
+    const memberFundAccounting = accountingResult.members;
+    const houseFundStatsResult = accountingResult.summary;
+
     // Memoize settlement calculation to prevent re-render issues
     const settlements = useMemo(() => {
         if (!house || !house.members || house.members.length < 2) return [];
 
-        const memberBalances: { [key: string]: number } = {};
         const members = house.members;
+        const memberBalances: { [key: string]: number } = {};
 
-        // Initialize 0 balance for all members
-        members.forEach(m => memberBalances[m.email] = 0);
+        // === 1. EXPENSES ONLY TRACKING (Legacy/Default) ===
+        if (house.typeOfHouse !== 'meals_and_expenses') {
+            members.forEach(m => memberBalances[m.email] = 0);
 
-        // Process all expenses so payments and debts cancel out accurately over time
-        expenses.forEach((exp: Expense) => {
-            if (exp.isSettlementPayment && exp.settlementBetween && exp.settlementBetween.length === 2) {
-                // Settlement payment — only affects the two members involved
-                const [payer, receiver] = [exp.userId, exp.settlementBetween.find(e => e !== exp.userId)!];
-                if (memberBalances[payer] !== undefined) memberBalances[payer] += exp.amount;
-                else memberBalances[payer] = exp.amount;
-                if (memberBalances[receiver] !== undefined) memberBalances[receiver] -= exp.amount;
-                else memberBalances[receiver] = -exp.amount;
-                return;
-            }
-            if (exp.contributors && exp.contributors.length > 0) {
-                // Expense has contributors - track who paid what
-                let contributorTotal = 0;
-                exp.contributors.forEach(contributor => {
-                    if (memberBalances[contributor.email] !== undefined) {
-                        memberBalances[contributor.email] += contributor.amount;
-                    } else {
-                        memberBalances[contributor.email] = contributor.amount;
-                    }
-                    contributorTotal += contributor.amount;
-                });
-
-                // If contributors don't cover the full amount,
-                // attribute the remainder to the creator (handles legacy data)
-                const remainder = exp.amount - contributorTotal;
-                if (remainder > 0.01) {
-                    if (memberBalances[exp.userId] !== undefined) {
-                        memberBalances[exp.userId] += remainder;
-                    } else {
-                        memberBalances[exp.userId] = remainder;
-                    }
+            expenses.forEach((exp: Expense) => {
+                if (exp.isSettlementPayment && exp.settlementBetween && exp.settlementBetween.length === 2) {
+                    const [payer, receiver] = [exp.userId, exp.settlementBetween.find(e => e !== exp.userId)!];
+                    if (memberBalances[payer] !== undefined) memberBalances[payer] += exp.amount;
+                    else memberBalances[payer] = exp.amount;
+                    if (memberBalances[receiver] !== undefined) memberBalances[receiver] -= exp.amount;
+                    else memberBalances[receiver] = -exp.amount;
+                    return;
                 }
 
-                // Split the expense equally among all members
-                const sharePerPerson = exp.amount / members.length;
-                members.forEach(m => {
-                    memberBalances[m.email] -= sharePerPerson;
-                });
-            } else {
-                // No contributors specified - assume creator paid all, split equally
-                if (memberBalances[exp.userId] !== undefined) {
-                    memberBalances[exp.userId] += exp.amount;
+                // Normal Expense Logic
+                if (exp.contributors && exp.contributors.length > 0) {
+                    let contributorTotal = 0;
+                    exp.contributors.forEach(contributor => {
+                        if (memberBalances[contributor.email] !== undefined) {
+                            memberBalances[contributor.email] += contributor.amount;
+                        } else {
+                            memberBalances[contributor.email] = contributor.amount;
+                        }
+                        contributorTotal += contributor.amount;
+                    });
+                    const remainder = exp.amount - contributorTotal;
+                    if (remainder > 0.01) {
+                        if (memberBalances[exp.userId] !== undefined) memberBalances[exp.userId] += remainder;
+                        else memberBalances[exp.userId] = remainder;
+                    }
                 } else {
-                    memberBalances[exp.userId] = exp.amount;
+                    if (memberBalances[exp.userId] !== undefined) memberBalances[exp.userId] += exp.amount;
+                    else memberBalances[exp.userId] = exp.amount;
                 }
 
-                // Split equally among all members
                 const sharePerPerson = exp.amount / members.length;
                 members.forEach(m => {
                     memberBalances[m.email] -= sharePerPerson;
                 });
+            });
+        }
+        // === 2. MEALS AND EXPENSES TRACKING ===
+        else {
+            const getYYYYMM = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+            const targetMonth = getYYYYMM(selectedDate);
+
+            // Collect all unique months across all history
+            const months = new Set<string>();
+            expenses.forEach(e => months.add(getYYYYMM(new Date(e.date))));
+            if (fundDeposits) {
+                fundDeposits.filter(d => d.status === 'approved').forEach(d => {
+                    months.add(getYYYYMM(new Date(d.createdAt)));
+                });
             }
-        });
+            if (meals) {
+                meals.forEach(m => months.add(m.date.substring(0, 7))); // meals date is YYYY-MM-DD
+            }
+
+            // Make sure the target month is included so rent is deducted even if there are no expenses yet
+            months.add(targetMonth);
+
+            const sortedMonths = Array.from(months).sort();
+
+            members.forEach(m => {
+                memberBalances[m.email] = 0;
+            });
+
+            // Calculate running balance month by month up to selected target month
+            for (const monthStr of sortedMonths) {
+                if (monthStr > targetMonth) break;
+
+                const mealsPerDay = house.mealsPerDay || 3;
+                let monthlyMealsConsumed = 0;
+                const monthlyMemberMeals: { [key: string]: number } = {};
+                members.forEach(m => monthlyMemberMeals[m.email] = 0);
+
+                if (meals && meals.length > 0) {
+                    meals.filter(m => m.date.startsWith(monthStr)).forEach(dayRecord => {
+                        members.forEach(m => {
+                            const mMeals = dayRecord.meals?.[m.email] || {};
+                            if (mealsPerDay === 3 && (mMeals.breakfast ?? true)) monthlyMemberMeals[m.email]++;
+                            if (mMeals.lunch ?? true) monthlyMemberMeals[m.email]++;
+                            if (mMeals.dinner ?? true) monthlyMemberMeals[m.email]++;
+                        });
+                    });
+                }
+
+                monthlyMealsConsumed = Object.values(monthlyMemberMeals).reduce((sum, count) => sum + count, 0);
+
+                // Deposits for this month
+                if (fundDeposits) {
+                    fundDeposits
+                        .filter(d => d.status === 'approved' && getYYYYMM(new Date(d.createdAt)) === monthStr)
+                        .forEach(d => {
+                            if (memberBalances[d.email] !== undefined) memberBalances[d.email] += d.amount;
+                        });
+                }
+
+                // Rent for this month (Deduct once per month)
+                members.forEach(m => {
+                    const rent = m.rentAmount || 0;
+                    memberBalances[m.email] -= rent;
+                });
+
+                // Expenses for this month
+                let monthlyGroceries = 0;
+                let monthlyOther = 0;
+
+                expenses
+                    .filter(e => getYYYYMM(new Date(e.date)) === monthStr)
+                    .forEach((exp: Expense) => {
+                        if (exp.isSettlementPayment && exp.settlementBetween && exp.settlementBetween.length === 2) {
+                            const [payer, receiver] = [exp.userId, exp.settlementBetween.find(e => e !== exp.userId)!];
+                            if (memberBalances[payer] !== undefined) memberBalances[payer] += exp.amount;
+                            else memberBalances[payer] = exp.amount;
+                            if (memberBalances[receiver] !== undefined) memberBalances[receiver] -= exp.amount;
+                            else memberBalances[receiver] = -exp.amount;
+                            return;
+                        }
+
+                        if (exp.category === 'groceries' || !exp.category) {
+                            monthlyGroceries += exp.amount;
+                        } else {
+                            monthlyOther += exp.amount;
+                        }
+                    });
+
+                const otherSharePerPerson = members.length > 0 ? (monthlyOther / members.length) : 0;
+                const mealUnitPrice = monthlyMealsConsumed > 0 ? (monthlyGroceries / monthlyMealsConsumed) : 0;
+
+                members.forEach(m => {
+                    memberBalances[m.email] -= otherSharePerPerson;
+                    const memberGroceryCost = monthlyMemberMeals[m.email] * mealUnitPrice;
+                    memberBalances[m.email] -= memberGroceryCost;
+                });
+            }
+        }
 
         // Calculate net balances (Positive = is owed money, Negative = owes money)
         const netBalances: { id: string, amount: number }[] = [];
@@ -389,111 +635,278 @@ export default function Dashboard() {
     return (
         <AuthGuard>
             <main>
-                <Navbar />
                 <Container maxWidth="lg" sx={{ mt: 4 }}>
-                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 4 }}>
-                        <Typography variant="h4" component="h1">
-                            Dashboard
-                        </Typography>
-                        <Button variant="contained" startIcon={<AddIcon />} href="/shopping">
-                            Add Expense
-                        </Button>
+                    <Box sx={{
+                        display: 'flex',
+                        flexDirection: { xs: 'column', sm: 'row' },
+                        justifyContent: 'space-between',
+                        alignItems: { xs: 'flex-start', sm: 'center' },
+                        mb: 4,
+                        gap: 2
+                    }}>
+                        <Box>
+                            <Typography variant="h3" component="h1" sx={{
+                                fontWeight: 800,
+                                background: 'linear-gradient(45deg, #6C63FF 30%, #FF6584 90%)',
+                                WebkitBackgroundClip: 'text',
+                                WebkitTextFillColor: 'transparent',
+                                mb: 0.5,
+                                letterSpacing: '-0.02em'
+                            }}>
+                                Dashboard
+                            </Typography>
+                            <Typography variant="body1" color="text.secondary" sx={{ opacity: 0.8, fontWeight: 500 }}>
+                                Overview of your household finances and expenses
+                            </Typography>
+                        </Box>
+                        <NotificationBell />
                     </Box>
 
-                    {/* Month Navigation */}
-                    <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', mb: 3 }}>
-                        <IconButton onClick={handlePreviousMonth}>
-                            <ArrowBackIosIcon />
+                    {/* Month Navigator - Premium Glass Style */}
+                    <Paper className="glass" sx={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        mb: 4,
+                        p: 1.5,
+                        borderRadius: 4,
+                        maxWidth: 400,
+                        mx: 'auto',
+                        background: 'rgba(255, 255, 255, 0.1)',
+                        border: '1px solid rgba(255, 255, 255, 0.2)',
+                        boxShadow: '0 10px 30px rgba(0,0,0,0.05)'
+                    }}>
+                        <IconButton
+                            onClick={handlePreviousMonth}
+                            disabled={
+                                !!house?.createdAt &&
+                                (selectedDate.getFullYear() < new Date(house.createdAt).getFullYear() ||
+                                    (selectedDate.getFullYear() === new Date(house.createdAt).getFullYear() && selectedDate.getMonth() <= new Date(house.createdAt).getMonth()))
+                            }
+                            sx={{
+                                color: 'primary.main',
+                                bgcolor: 'rgba(108, 99, 255, 0.05)',
+                                '&:hover': { bgcolor: 'rgba(108, 99, 255, 0.1)' }
+                            }}
+                        >
+                            <KeyboardArrowLeftIcon />
                         </IconButton>
-                        <Typography variant="h6" sx={{ mx: 2, minWidth: 150, textAlign: 'center' }}>
-                            {selectedDate.toLocaleString('default', { month: 'long', year: 'numeric' })}
-                        </Typography>
-                        <IconButton onClick={handleNextMonth} disabled={selectedDate.getMonth() === new Date().getMonth() && selectedDate.getFullYear() === new Date().getFullYear()}>
-                            <ArrowForwardIosIcon />
+
+                        <Stack direction="row" spacing={1} alignItems="center">
+                            <CalendarMonthIcon sx={{ color: 'primary.main', opacity: 0.7 }} fontSize="small" />
+                            <Typography variant="h6" sx={{ fontWeight: 700, letterSpacing: '0.01em', minWidth: 160, textAlign: 'center' }}>
+                                {selectedDate.toLocaleString('default', { month: 'long', year: 'numeric' })}
+                            </Typography>
+                        </Stack>
+
+                        <IconButton
+                            onClick={handleNextMonth}
+                            disabled={selectedDate.getFullYear() > new Date().getFullYear() || (selectedDate.getFullYear() === new Date().getFullYear() && selectedDate.getMonth() >= new Date().getMonth())}
+                            sx={{
+                                color: 'primary.main',
+                                bgcolor: 'rgba(108, 99, 255, 0.05)',
+                                '&:hover': { bgcolor: 'rgba(108, 99, 255, 0.1)' }
+                            }}
+                        >
+                            <KeyboardArrowRightIcon />
                         </IconButton>
-                    </Box>
+                    </Paper>
 
                     <Grid container spacing={3}>
-                        {/* Total Cost Widget */}
-                        <Grid size={{ xs: 12, md: 4 }}>
-                            <Paper className="glass" sx={{
-                                p: 3,
-                                display: 'flex',
-                                flexDirection: 'column',
-                                height: '100%',
-                                position: 'relative',
-                                overflow: 'hidden',
-                                bgcolor: 'rgba(108, 99, 255, 0.08)',
-                                border: '1px solid rgba(108, 99, 255, 0.2)'
-                            }}>
-                                <Box sx={{ position: 'absolute', top: -10, right: -10, opacity: 0.15, color: 'primary.main' }}>
-                                    <CurrencyIcon sx={{ fontSize: 100 }} />
-                                </Box>
-                                <Typography component="h2" variant="h6" color="primary" gutterBottom>
-                                    Total Expenses
-                                </Typography>
-                                <Typography component="p" variant="h3" sx={{ fontWeight: 'bold', color: 'text.primary', mb: 1 }}>
-                                    {displayCurrency}{totalFilteredExpenses.toFixed(2)}
-                                </Typography>
-                                <Typography variant="caption" color="text.secondary">
-                                    {selectedDate.toLocaleString('default', { month: 'long' })}
-                                </Typography>
-                                <Box sx={{ mt: 2, pt: 1.5, borderTop: '1px dashed rgba(108, 99, 255, 0.3)' }}>
-                                    <Typography variant="body2" color="text.secondary">
-                                        My Expenses
+                        {/* Fund Deposits Widget (First for Meals and Expenses) */}
+                        {house?.typeOfHouse === 'meals_and_expenses' && (
+                            <Grid size={{ xs: 12, md: 4 }}>
+                                <Paper className="glass" sx={{
+                                    p: 3,
+                                    display: 'flex',
+                                    flexDirection: 'column',
+                                    height: '100%',
+                                    position: 'relative',
+                                    overflow: 'hidden',
+                                    borderRadius: 4,
+                                    background: 'rgba(76, 175, 80, 0.05)',
+                                    border: '1px solid rgba(76, 175, 80, 0.2)',
+                                    cursor: 'pointer',
+                                    transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                                    '&:hover': {
+                                        transform: 'translateY(-5px)',
+                                        background: 'rgba(76, 175, 80, 0.08)',
+                                        boxShadow: '0 12px 30px rgba(76, 175, 80, 0.15)',
+                                        '& .stat-icon': { transform: 'scale(1.1) rotate(-10deg)', opacity: 0.25 }
+                                    }
+                                }} onClick={() => setOpenDepositDetails(true)}>
+                                    <Box className="stat-icon" sx={{ transition: 'all 0.3s ease', position: 'absolute', top: -15, right: -15, opacity: 0.15, color: 'success.main' }}>
+                                        <AccountBalanceIcon sx={{ fontSize: 110 }} />
+                                    </Box>
+
+                                    <Typography variant="subtitle2" sx={{ fontWeight: 800, color: 'success.main', textTransform: 'uppercase', letterSpacing: '0.1em', mb: 2 }}>
+                                        House Fund
                                     </Typography>
-                                    <Typography component="p" variant="h6" sx={{ fontWeight: 'bold', color: 'text.primary' }}>
-                                        {displayCurrency}{myFilteredExpenses.toFixed(2)}
+
+                                    <Box sx={{ flexGrow: 1 }}>
+                                        <Typography variant="h3" sx={{ fontWeight: 900, mb: 2, display: 'flex', alignItems: 'baseline' }}>
+                                            <Box component="span" sx={{ fontSize: '0.6em', opacity: 0.7, mr: 0.5 }}>{displayCurrency}</Box>
+                                            {houseFundStats.remaining.toFixed(0)}
+                                            <Box component="span" sx={{ fontSize: '0.4em', opacity: 0.5, ml: 0.5 }}>.{houseFundStats.remaining.toFixed(2).split('.')[1]}</Box>
+                                        </Typography>
+
+                                        <Grid container spacing={1}>
+                                            {[
+                                                { label: 'Total', value: houseFundStats.collected, color: 'text.primary' },
+                                                { label: 'Spent', value: houseFundStats.spent, color: 'error.main' },
+                                                { label: 'Rent', value: houseFundStats.rentDeducted, color: 'warning.main' }
+                                            ].map((stat, i) => (
+                                                <Grid size={4} key={i}>
+                                                    <Typography variant="caption" sx={{ display: 'block', color: 'text.secondary', fontWeight: 600 }}>{stat.label}</Typography>
+                                                    <Typography variant="body2" sx={{ fontWeight: 800, color: stat.color }}>
+                                                        {stat.value.toFixed(0)}
+                                                    </Typography>
+                                                </Grid>
+                                            ))}
+                                        </Grid>
+                                    </Box>
+
+                                    <Box sx={{
+                                        mt: 3,
+                                        pt: 2,
+                                        display: 'flex',
+                                        alignItems: 'center',
+                                        justifyContent: 'space-between',
+                                        borderTop: '1px solid rgba(76, 175, 80, 0.1)'
+                                    }}>
+                                        <Box>
+                                            <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 600 }}>My Contribution</Typography>
+                                            <Typography variant="subtitle2" sx={{ fontWeight: 800, color: 'success.main' }}>
+                                                {displayCurrency}{(memberFundAccounting[user?.email || '']?.deposits || 0).toFixed(2)}
+                                            </Typography>
+                                        </Box>
+                                        <Button
+                                            variant="contained"
+                                            color="success"
+                                            size="small"
+                                            startIcon={<AddIcon />}
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                setOpenDepositDialog(true);
+                                            }}
+                                            sx={{
+                                                borderRadius: 2,
+                                                textTransform: 'none',
+                                                fontWeight: 700,
+                                                boxShadow: 'none',
+                                                '&:hover': { boxShadow: '0 4px 12px rgba(76, 175, 80, 0.3)' }
+                                            }}
+                                        >
+                                            Deposit
+                                        </Button>
+                                    </Box>
+                                </Paper>
+                            </Grid>
+                        )}
+
+                        {/* Total Cost Widget — hidden for meals_and_expenses */}
+                        {house?.typeOfHouse !== 'meals_and_expenses' && (
+                            <Grid size={{ xs: 12, md: 4 }}>
+                                <Paper className="glass" sx={{
+                                    p: 3,
+                                    display: 'flex',
+                                    flexDirection: 'column',
+                                    height: '100%',
+                                    position: 'relative',
+                                    overflow: 'hidden',
+                                    borderRadius: 4,
+                                    background: 'rgba(108, 99, 255, 0.05)',
+                                    border: '1px solid rgba(108, 99, 255, 0.2)',
+                                    transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                                    '&:hover': {
+                                        transform: 'translateY(-5px)',
+                                        background: 'rgba(108, 99, 255, 0.08)',
+                                        boxShadow: '0 12px 30px rgba(108, 99, 255, 0.15)',
+                                        '& .stat-icon': { transform: 'scale(1.1) rotate(10deg)', opacity: 0.25 }
+                                    }
+                                }}>
+                                    <Box className="stat-icon" sx={{ transition: 'all 0.3s ease', position: 'absolute', top: -15, right: -15, opacity: 0.15, color: 'primary.main' }}>
+                                        <CurrencyIcon sx={{ fontSize: 110 }} />
+                                    </Box>
+
+                                    <Typography variant="subtitle2" sx={{ fontWeight: 800, color: 'primary.main', textTransform: 'uppercase', letterSpacing: '0.1em', mb: 2 }}>
+                                        Total Expenses
                                     </Typography>
-                                </Box>
-                            </Paper>
-                        </Grid>
+
+                                    <Box sx={{ flexGrow: 1 }}>
+                                        <Typography variant="h3" sx={{ fontWeight: 900, mb: 1, display: 'flex', alignItems: 'baseline' }}>
+                                            <Box component="span" sx={{ fontSize: '0.6em', opacity: 0.7, mr: 0.5 }}>{displayCurrency}</Box>
+                                            {totalFilteredExpenses.toFixed(0)}
+                                            <Box component="span" sx={{ fontSize: '0.4em', opacity: 0.5, ml: 0.5 }}>.{totalFilteredExpenses.toFixed(2).split('.')[1]}</Box>
+                                        </Typography>
+                                        <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 600 }}>
+                                            {selectedDate.toLocaleString('default', { month: 'long', year: 'numeric' })}
+                                        </Typography>
+                                    </Box>
+
+                                    <Box sx={{ mt: 3, pt: 2, borderTop: '1px solid rgba(108, 99, 255, 0.1)' }}>
+                                        <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 600 }}>My Personal Share</Typography>
+                                        <Typography variant="h6" sx={{ fontWeight: 800, color: 'text.primary' }}>
+                                            {displayCurrency}{myFilteredExpenses.toFixed(2)}
+                                        </Typography>
+                                    </Box>
+                                </Paper>
+                            </Grid>
+                        )}
                         {/* My Settlements Widget */}
-                        <Grid size={{ xs: 12, md: 4 }}>
-                            <Paper className="glass" sx={{
-                                p: 3,
-                                display: 'flex',
-                                flexDirection: 'column',
-                                height: '100%',
-                                position: 'relative',
-                                overflow: 'hidden',
-                                cursor: 'pointer',
-                                transition: 'transform 0.2s, box-shadow 0.2s',
-                                bgcolor: 'rgba(0, 191, 165, 0.08)',
-                                border: '1px solid rgba(0, 191, 165, 0.2)',
-                                '&:hover': {
-                                    transform: 'translateY(-2px)',
-                                    boxShadow: '0 8px 24px rgba(0,0,0,0.1)'
-                                },
-                            }}
-                                onClick={() => setOpenHistoryDialog(true)}
-                            >
-                                <Box sx={{ position: 'absolute', top: -10, right: -10, opacity: 0.15, color: 'secondary.main' }}>
-                                    <AccountBalanceWalletIcon sx={{ fontSize: 100 }} />
-                                </Box>
-                                <Typography component="h2" variant="h6" color="secondary" gutterBottom>
-                                    My Settlements
-                                </Typography>
-                                <Box sx={{ display: 'flex', gap: 2, alignItems: 'center', mt: 1 }}>
-                                    <Box>
-                                        <Typography variant="body2" color="text.secondary" sx={{ display: 'flex', alignItems: 'center' }}>
-                                            <ArrowUpwardIcon color="error" sx={{ fontSize: 16, mr: 0.5 }} /> To Pay
-                                        </Typography>
-                                        <Typography component="p" variant="h5" sx={{ fontWeight: 'bold', color: 'error.main' }}>
-                                            {displayCurrency}{myDebt.toFixed(2)}
-                                        </Typography>
+                        {house?.typeOfHouse !== 'meals_and_expenses' && (
+                            <Grid size={{ xs: 12, md: 4 }}>
+                                <Paper className="glass" sx={{
+                                    p: 3,
+                                    display: 'flex',
+                                    flexDirection: 'column',
+                                    height: '100%',
+                                    position: 'relative',
+                                    overflow: 'hidden',
+                                    borderRadius: 4,
+                                    cursor: 'pointer',
+                                    background: 'rgba(0, 191, 165, 0.05)',
+                                    border: '1px solid rgba(0, 191, 165, 0.2)',
+                                    transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                                    '&:hover': {
+                                        transform: 'translateY(-5px)',
+                                        background: 'rgba(0, 191, 165, 0.08)',
+                                        boxShadow: '0 12px 30px rgba(0, 191, 165, 0.15)',
+                                        '& .stat-icon': { transform: 'scale(1.1) rotate(-10deg)', opacity: 0.25 }
+                                    },
+                                }}
+                                    onClick={() => setOpenHistoryDialog(true)}
+                                >
+                                    <Box className="stat-icon" sx={{ transition: 'all 0.3s ease', position: 'absolute', top: -15, right: -15, opacity: 0.15, color: 'secondary.main' }}>
+                                        <AccountBalanceWalletIcon sx={{ fontSize: 110 }} />
                                     </Box>
-                                    <Box>
-                                        <Typography variant="body2" color="text.secondary" sx={{ display: 'flex', alignItems: 'center' }}>
-                                            <ArrowDownwardIcon color="success" sx={{ fontSize: 16, mr: 0.5 }} /> To Receive
-                                        </Typography>
-                                        <Typography component="p" variant="h5" sx={{ fontWeight: 'bold', color: 'success.main' }}>
-                                            {displayCurrency}{myCredit.toFixed(2)}
-                                        </Typography>
+
+                                    <Typography variant="subtitle2" sx={{ fontWeight: 800, color: 'secondary.main', textTransform: 'uppercase', letterSpacing: '0.1em', mb: 2 }}>
+                                        My Settlements
+                                    </Typography>
+
+                                    <Box sx={{ display: 'flex', gap: 3, alignItems: 'center', mt: 1 }}>
+                                        <Box>
+                                            <Typography variant="caption" sx={{ display: 'flex', alignItems: 'center', color: 'text.secondary', fontWeight: 600, mb: 0.5 }}>
+                                                <ArrowUpwardIcon color="error" sx={{ fontSize: 14, mr: 0.5 }} /> To Pay
+                                            </Typography>
+                                            <Typography variant="h5" sx={{ fontWeight: 900, color: 'error.main' }}>
+                                                {displayCurrency}{myDebt.toFixed(2)}
+                                            </Typography>
+                                        </Box>
+                                        <Divider orientation="vertical" flexItem sx={{ opacity: 0.1 }} />
+                                        <Box>
+                                            <Typography variant="caption" sx={{ display: 'flex', alignItems: 'center', color: 'text.secondary', fontWeight: 600, mb: 0.5 }}>
+                                                <ArrowDownwardIcon color="success" sx={{ fontSize: 14, mr: 0.5 }} /> To Receive
+                                            </Typography>
+                                            <Typography variant="h5" sx={{ fontWeight: 900, color: 'success.main' }}>
+                                                {displayCurrency}{myCredit.toFixed(2)}
+                                            </Typography>
+                                        </Box>
                                     </Box>
-                                </Box>
-                            </Paper>
-                        </Grid>
+                                </Paper>
+                            </Grid>
+                        )}
                         {/* Group Name Widget */}
                         <Grid size={{ xs: 12, md: 4 }}>
                             <Paper className="glass" sx={{
@@ -503,58 +916,109 @@ export default function Dashboard() {
                                 height: '100%',
                                 position: 'relative',
                                 overflow: 'hidden',
-                                bgcolor: 'rgba(2, 136, 209, 0.08)',
-                                border: '1px solid rgba(2, 136, 209, 0.2)'
+                                borderRadius: 4,
+                                background: 'rgba(2, 136, 209, 0.05)',
+                                border: '1px solid rgba(2, 136, 209, 0.2)',
+                                transition: 'all 0.3s ease',
+                                '&:hover': {
+                                    boxShadow: '0 8px 25px rgba(2, 136, 209, 0.15)',
+                                    '& .stat-icon': { transform: 'scale(1.1) rotate(10deg)', opacity: 0.25 }
+                                }
                             }}>
-                                <Box sx={{ position: 'absolute', top: -10, right: -10, opacity: 0.15, color: 'info.main' }}>
-                                    <GroupIcon sx={{ fontSize: 100 }} />
+                                <Box className="stat-icon" sx={{ transition: 'all 0.3s ease', position: 'absolute', top: -15, right: -15, opacity: 0.15, color: 'info.main' }}>
+                                    <GroupIcon sx={{ fontSize: 110 }} />
                                 </Box>
                                 {house ? (
-                                    <Box>
-                                        <Typography component="h2" variant="h4" sx={{
-                                            fontWeight: 'bold',
-                                            fontFamily: 'var(--font-abril)',
-                                            color: 'primary.main',
-                                            mb: 3,
-                                            pt: 1
-                                        }}>
-                                            <Box component="span" sx={{ fontSize: '1.5em', color: 'rgba(108, 99, 255, 0.4)', lineHeight: 0, verticalAlign: 'bottom' }}>&ldquo;</Box>
-                                            {house.name}
-                                            <Box component="span" sx={{ fontSize: '1.5em', color: 'rgba(108, 99, 255, 0.4)', lineHeight: 0, verticalAlign: 'top' }}>&rdquo;</Box>
+                                    <Box sx={{ position: 'relative', zIndex: 1 }}>
+                                        <Typography variant="subtitle2" sx={{ fontWeight: 800, color: 'info.main', textTransform: 'uppercase', letterSpacing: '0.1em', mb: 1 }}>
+                                            Household
                                         </Typography>
+
+                                        <Typography variant="h4" sx={{
+                                            fontWeight: 900,
+                                            background: 'linear-gradient(45deg, #0288d1 30%, #26c6da 90%)',
+                                            WebkitBackgroundClip: 'text',
+                                            WebkitTextFillColor: 'transparent',
+                                            mb: 0.5,
+                                            lineHeight: 1.2
+                                        }}>
+                                            {house.name}
+                                        </Typography>
+
+                                        <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 600, fontStyle: 'italic', display: 'block', mb: 2.5 }}>
+                                            {house.typeOfHouse === 'meals_and_expenses' ? 'Meals and Expenses Tracking' : 'Shared Expenses Tracking'}
+                                        </Typography>
+
                                         <Box sx={{ display: 'flex', flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 1, mb: 3 }}>
                                             {house.members?.map((member) => (
-                                                <Chip
-                                                    key={member.email}
-                                                    avatar={<Avatar alt={member.name} src={member.photoUrl} />}
-                                                    label={member.name || member.email.split('@')[0]}
-                                                    variant="filled"
-                                                    color="default"
-                                                    onClick={() => handleMemberClick(member)}
-                                                    sx={{ bgcolor: 'rgba(0,0,0,0.05)' }}
-                                                />
+                                                <Tooltip key={member.email} title={member.name || member.email}>
+                                                    <Avatar
+                                                        alt={member.name}
+                                                        src={member.photoUrl}
+                                                        onClick={() => handleMemberClick(member)}
+                                                        sx={{
+                                                            width: 32,
+                                                            height: 32,
+                                                            cursor: 'pointer',
+                                                            border: '2px solid rgba(255,255,255,0.2)',
+                                                            transition: 'transform 0.2s',
+                                                            '&:hover': { transform: 'scale(1.1) translateY(-2px)', borderColor: 'info.main' }
+                                                        }}
+                                                    />
+                                                </Tooltip>
                                             ))}
+                                            <IconButton
+                                                size="small"
+                                                onClick={() => setOpenAddMember(true)}
+                                                sx={{
+                                                    bgcolor: 'rgba(2, 136, 209, 0.1)',
+                                                    color: 'info.main',
+                                                    '&:hover': { bgcolor: 'rgba(2, 136, 209, 0.2)' }
+                                                }}
+                                            >
+                                                <PersonAddIcon fontSize="small" />
+                                            </IconButton>
                                         </Box>
                                         <Button
-                                            variant="outlined"
-                                            color="secondary"
-                                            size="small"
-                                            startIcon={<PersonAddIcon />}
-                                            onClick={() => setOpenAddMember(true)}
-                                            sx={{ mt: 'auto', alignSelf: 'flex-start' }}
+                                            variant="contained"
+                                            color="primary"
+                                            fullWidth
+                                            startIcon={<AddIcon />}
+                                            onClick={() => router.push('/shopping')}
+                                            sx={{
+                                                borderRadius: 3,
+                                                py: 1.2,
+                                                textTransform: 'none',
+                                                fontWeight: 700,
+                                                boxShadow: '0 4px 15px rgba(108, 99, 255, 0.2)',
+                                                bgcolor: '#6C63FF',
+                                                '&:hover': {
+                                                    bgcolor: '#5a52e0',
+                                                    boxShadow: '0 6px 20px rgba(108, 99, 255, 0.3)',
+                                                    transform: 'translateY(-2px)'
+                                                },
+                                                transition: 'all 0.2s ease'
+                                            }}
                                         >
-                                            Add Member
+                                            Add Expense
                                         </Button>
                                     </Box>
                                 ) : (
-                                    <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'start', justifyContent: 'center', flex: 1 }}>
-                                        <Typography component="h2" variant="h6" color="info.main" gutterBottom>
+                                    <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'start', justifyContent: 'center', flex: 1, position: 'relative', zIndex: 1 }}>
+                                        <Typography variant="h6" color="info.main" sx={{ fontWeight: 800, mb: 1 }}>
                                             My House
                                         </Typography>
-                                        <Typography color="text.secondary" paragraph>
-                                            You are not in a house yet.
+                                        <Typography color="text.secondary" sx={{ mb: 3, fontWeight: 500 }}>
+                                            You haven&apos;t joined any household yet.
                                         </Typography>
-                                        <Button variant="contained" color="secondary" href="/profile">Create House</Button>
+                                        <Button
+                                            variant="contained"
+                                            color="info"
+                                            href="/profile"
+                                            sx={{ borderRadius: 2, textTransform: 'none', fontWeight: 700 }}
+                                        >
+                                            Create House
+                                        </Button>
                                     </Box>
                                 )}
                             </Paper>
@@ -562,62 +1026,67 @@ export default function Dashboard() {
 
                         {/* Buy List Widget */}
                         <Grid size={{ xs: 12, md: 4 }}>
-                            <Paper sx={{
+                            <Paper className="glass" sx={{
                                 p: 3,
                                 display: 'flex',
                                 flexDirection: 'column',
                                 height: '100%',
                                 position: 'relative',
                                 overflow: 'hidden',
-                                cursor: 'pointer',
-                                transition: 'transform 0.2s, box-shadow 0.2s',
-                                bgcolor: 'rgba(237, 108, 2, 0.08)',
+                                borderRadius: 4,
+                                background: 'rgba(237, 108, 2, 0.05)',
                                 border: '1px solid rgba(237, 108, 2, 0.2)',
+                                cursor: 'pointer',
+                                transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
                                 '&:hover': {
-                                    transform: 'translateY(-2px)',
-                                    boxShadow: '0 8px 24px rgba(0,0,0,0.1)'
+                                    transform: 'translateY(-5px)',
+                                    background: 'rgba(237, 108, 2, 0.08)',
+                                    boxShadow: '0 12px 30px rgba(237, 108, 2, 0.15)',
+                                    '& .stat-icon': { transform: 'scale(1.1) rotate(10deg)', opacity: 0.25 }
                                 },
                             }}
                                 onClick={() => router.push('/buy-list')}
                             >
-                                <Box sx={{ position: 'absolute', top: -10, right: -10, opacity: 0.15, color: 'warning.main' }}>
-                                    <FormatListBulletedIcon sx={{ fontSize: 100 }} />
+                                <Box className="stat-icon" sx={{ transition: 'all 0.3s ease', position: 'absolute', top: -15, right: -15, opacity: 0.15, color: 'warning.main' }}>
+                                    <FormatListBulletedIcon sx={{ fontSize: 110 }} />
                                 </Box>
-                                <Typography component="h2" variant="h6" color="warning.main" gutterBottom>
+                                <Typography variant="subtitle2" sx={{ fontWeight: 800, color: 'warning.main', textTransform: 'uppercase', letterSpacing: '0.1em', mb: 2 }}>
                                     Buy List ({pendingTodos.length})
                                 </Typography>
 
-                                <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 1 }}>
+                                <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 1.5, position: 'relative', zIndex: 1 }}>
                                     {pendingTodos.length === 0 ? (
-                                        <Typography color="text.secondary" variant="body2" sx={{ my: 'auto', textAlign: 'center' }}>
-                                            No pending items. You&apos;re all caught up! ✨
+                                        <Typography color="text.secondary" variant="body2" sx={{ my: 'auto', textAlign: 'center', opacity: 0.7 }}>
+                                            All caught up! ✨
                                         </Typography>
                                     ) : (
                                         pendingTodos.slice(0, 3).map(todo => (
-                                            <Box key={todo.id} sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                                                <Box sx={{ width: 6, height: 6, borderRadius: '50%', bgcolor: 'warning.main' }} />
-                                                <Typography variant="body2" noWrap sx={{ flex: 1 }}>
+                                            <Box key={todo.id} sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                                                <Box sx={{ width: 8, height: 8, borderRadius: '50%', bgcolor: 'warning.main', boxShadow: '0 0 10px rgba(237, 108, 2, 0.4)' }} />
+                                                <Typography variant="body2" noWrap sx={{ flex: 1, fontWeight: 600 }}>
                                                     {todo.itemName}
                                                 </Typography>
                                             </Box>
                                         ))
                                     )}
                                     {pendingTodos.length > 3 && (
-                                        <Typography variant="caption" color="text.secondary" sx={{ mt: 1 }}>
+                                        <Typography variant="caption" color="text.secondary" sx={{ mt: 0.5, fontWeight: 700, ml: 2.5 }}>
                                             + {pendingTodos.length - 3} more items
                                         </Typography>
                                     )}
                                 </Box>
-                                <Typography variant="caption" sx={{ mt: 'auto', pt: 2, color: 'text.secondary', alignSelf: 'flex-start', display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                                    {pendingTodos.length === 0 ? 'Click to add item' : 'Click to open full list'} <ArrowForwardIosIcon sx={{ fontSize: 10 }} />
-                                </Typography>
+                                <Box sx={{ mt: 'auto', pt: 2, display: 'flex', alignItems: 'center', gap: 0.5, color: 'text.secondary', transition: 'color 0.2s', '&:hover': { color: 'warning.main' } }}>
+                                    <Typography variant="caption" sx={{ fontWeight: 700 }}>
+                                        {pendingTodos.length === 0 ? 'Add item' : 'View full list'}
+                                    </Typography>
+                                    <ArrowForwardIosIcon sx={{ fontSize: 10 }} />
+                                </Box>
                             </Paper>
                         </Grid>
-
                     </Grid>
 
                     {/* Pending Payment Requests (Receiver View) */}
-                    {house && (() => {
+                    {house?.typeOfHouse !== 'meals_and_expenses' && house && (() => {
                         const myPending = (house.pendingPayments || []).filter(
                             p => p.to === user?.email && p.status === 'pending'
                         );
@@ -625,60 +1094,73 @@ export default function Dashboard() {
                         const houseMembers = house.members || [];
                         return (
                             <Box sx={{ mt: 4 }}>
-                                <Typography variant="h6" gutterBottom>Incoming Payment Requests</Typography>
+                                <Typography variant="subtitle1" sx={{ fontWeight: 800, color: 'text.primary', mb: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
+                                    <PaymentsIcon sx={{ color: 'info.main' }} /> Incoming Payments
+                                </Typography>
                                 <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
                                     {myPending.map(payment => {
                                         const fromMember = houseMembers.find(m => m.email === payment.from);
                                         const fromName = fromMember?.name || payment.from.split('@')[0];
                                         return (
-                                            <Alert
-                                                key={payment.id}
-                                                severity="info"
-                                                action={
-                                                    <Button
-                                                        color="inherit"
-                                                        size="small"
-                                                        startIcon={<HowToVoteIcon />}
-                                                        onClick={async () => {
-                                                            try {
-                                                                const res = await fetch('/api/houses/approve-payment', {
-                                                                    method: 'POST',
-                                                                    headers: { 'Content-Type': 'application/json' },
-                                                                    body: JSON.stringify({
-                                                                        houseId: house.id,
-                                                                        paymentId: payment.id,
-                                                                        approverEmail: user?.email,
-                                                                    }),
-                                                                });
-                                                                if (res.ok) {
-                                                                    showToast('Payment approved! Settlement updated.', 'success');
-                                                                    mutateHouse();
-                                                                    mutateExpenses();
-                                                                } else {
-                                                                    const d = await res.json();
-                                                                    showToast(d.error || 'Failed to approve', 'error');
-                                                                }
-                                                            } catch {
-                                                                showToast('Error approving payment', 'error');
+                                            <Paper key={payment.id} className="glass" sx={{
+                                                p: 2,
+                                                borderRadius: 3,
+                                                background: 'rgba(2, 136, 209, 0.04)',
+                                                border: '1px solid rgba(2, 136, 209, 0.2)',
+                                                display: 'flex',
+                                                flexDirection: { xs: 'column', sm: 'row' },
+                                                justifyContent: 'space-between',
+                                                alignItems: { xs: 'flex-start', sm: 'center' },
+                                                gap: 2
+                                            }}>
+                                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                                                    <Avatar src={fromMember?.photoUrl} sx={{ width: 40, height: 40, border: '2px solid rgba(2, 136, 209, 0.2)' }} />
+                                                    <Box>
+                                                        <Typography variant="body2" sx={{ fontWeight: 700 }}>
+                                                            {fromName} sent {displayCurrency}{payment.amount.toFixed(2)}
+                                                        </Typography>
+                                                        <Typography variant="caption" color="text.secondary">
+                                                            Status: Waiting for your approval
+                                                        </Typography>
+                                                        {payment.method && (
+                                                            <Chip
+                                                                label={payment.method === 'cash' ? 'Cash' : 'Bank'}
+                                                                size="small"
+                                                                sx={{ ml: 1, height: 20, fontSize: '0.6rem', fontWeight: 700, bgcolor: 'rgba(2, 136, 209, 0.1)', color: 'info.main' }}
+                                                            />
+                                                        )}
+                                                    </Box>
+                                                </Box>
+                                                <Button
+                                                    variant="contained"
+                                                    color="info"
+                                                    size="small"
+                                                    startIcon={<HowToVoteIcon />}
+                                                    onClick={async () => {
+                                                        try {
+                                                            const res = await fetch('/api/houses/approve-payment', {
+                                                                method: 'POST',
+                                                                headers: { 'Content-Type': 'application/json' },
+                                                                body: JSON.stringify({
+                                                                    houseId: house.id,
+                                                                    paymentId: payment.id,
+                                                                    approverEmail: user?.email,
+                                                                }),
+                                                            });
+                                                            if (res.ok) {
+                                                                showToast('Payment approved!', 'success');
+                                                                mutateHouse();
+                                                                mutateExpenses();
                                                             }
-                                                        }}
-                                                    >
-                                                        Approve
-                                                    </Button>
-                                                }
-                                            >
-                                                <strong>{fromName}</strong> says he paid you{' '}
-                                                <strong>{displayCurrency}{payment.amount.toFixed(2)}</strong>
-                                                {payment.method && (
-                                                    <Chip
-                                                        label={payment.method === 'cash' ? '💵 Cash' : '🏦 Bank'}
-                                                        size="small"
-                                                        variant="outlined"
-                                                        sx={{ ml: 1, verticalAlign: 'middle', fontSize: '0.7rem' }}
-                                                    />
-                                                )}.{' '}
-                                                Approve to update the settlement.
-                                            </Alert>
+                                                        } catch {
+                                                            showToast('Error approving payment', 'error');
+                                                        }
+                                                    }}
+                                                    sx={{ borderRadius: 2, textTransform: 'none', fontWeight: 700, px: 3, boxShadow: '0 4px 12px rgba(2, 136, 209, 0.2)' }}
+                                                >
+                                                    Approve
+                                                </Button>
+                                            </Paper>
                                         );
                                     })}
                                 </Box>
@@ -686,8 +1168,361 @@ export default function Dashboard() {
                         );
                     })()}
 
+                    {/* Active Meal Summary and Tomorrow's Meal Widget Container */}
+                    {house?.typeOfHouse === 'meals_and_expenses' && (
+                        <Grid container spacing={3} sx={{ mt: 2 }}>
+                            {/* Tomorrow's Meal Opt-Out Card */}
+                            <Grid size={{ xs: 12, md: 6 }}>
+                                {(() => {
+                                    const windowStart = house.mealUpdateWindowStart || '20:00';
+                                    const windowEnd = house.mealUpdateWindowEnd || '05:00';
+                                    const now = new Date();
+                                    const currentHHMM = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+                                    const isCrossMidnight = windowStart > windowEnd;
+                                    const inWindow = isCrossMidnight
+                                        ? (currentHHMM >= windowStart || currentHHMM <= windowEnd)
+                                        : (currentHHMM >= windowStart && currentHHMM <= windowEnd);
+
+                                    if (!inWindow) return (
+                                        <Paper className="glass" sx={{
+                                            p: 2, height: '100%', display: 'flex', alignItems: 'center', gap: 2,
+                                            bgcolor: 'rgba(0,0,0,0.02)', border: '1px dashed rgba(0,0,0,0.1)'
+                                        }}>
+                                            <TimerOffIcon sx={{ color: 'text.disabled' }} />
+                                            <Typography variant="body2" color="text.secondary">
+                                                Meal window closed. opens at {windowStart}
+                                            </Typography>
+                                        </Paper>
+                                    );
+
+                                    const isAfterMidnightPart = isCrossMidnight && currentHHMM <= windowEnd;
+                                    const targetDate = new Date(now);
+                                    if (!isAfterMidnightPart) targetDate.setDate(targetDate.getDate() + 1);
+
+                                    const tomorrowStr = `${targetDate.getFullYear()}-${String(targetDate.getMonth() + 1).padStart(2, '0')}-${String(targetDate.getDate()).padStart(2, '0')}`;
+                                    const tomorrowRecord = (meals || []).find(m => m.date === tomorrowStr);
+                                    const myEmail = user?.email || '';
+                                    const myMeals = tomorrowRecord?.meals?.[myEmail] || {};
+                                    const mealsPerDay = house.mealsPerDay || 3;
+
+                                    const handleTomorrowMeal = async (mealType: 'breakfast' | 'lunch' | 'dinner', current: boolean) => {
+                                        try {
+                                            const res = await fetch('/api/meals', {
+                                                method: 'POST',
+                                                headers: { 'Content-Type': 'application/json' },
+                                                body: JSON.stringify({ houseId: house.id, date: tomorrowStr, email: myEmail, mealType, isTaking: !current })
+                                            });
+                                            if (res.ok) mutateMeals();
+                                        } catch { /* silent */ }
+                                    };
+
+                                    return (
+                                        <Paper className="glass" sx={{
+                                            p: 3,
+                                            height: '100%',
+                                            bgcolor: 'rgba(76,175,80,0.06)',
+                                            border: '1px solid rgba(76,175,80,0.15)',
+                                            display: 'flex',
+                                            flexDirection: 'column',
+                                        }}>
+                                            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
+                                                <Typography variant="subtitle2" sx={{ fontWeight: 800, color: 'success.main', display: 'flex', alignItems: 'center', gap: 1, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                                                    <RestaurantIcon sx={{ fontSize: 18 }} /> Tomorrow&apos;s Meal
+                                                </Typography>
+                                                <Chip label={`Closes at ${windowEnd}`} size="small" variant="outlined" sx={{ height: 24, fontSize: '0.7rem', fontWeight: 700, color: 'success.main', borderColor: 'rgba(76,175,80,0.3)', bgcolor: 'rgba(76,175,80,0.05)' }} />
+                                            </Box>
+
+                                            <Box sx={{ display: 'flex', gap: 2, flexGrow: 1, alignItems: 'stretch' }}>
+                                                {[
+                                                    { id: 'breakfast', label: 'B', full: 'Breakfast', checked: myMeals.breakfast ?? true },
+                                                    { id: 'lunch', label: 'L', full: 'Lunch', checked: myMeals.lunch ?? true },
+                                                    { id: 'dinner', label: 'D', full: 'Dinner', checked: myMeals.dinner ?? true }
+                                                ].filter(m => m.id !== 'breakfast' || mealsPerDay === 3).map(meal => (
+                                                    <Box
+                                                        key={meal.id}
+                                                        onClick={() => handleTomorrowMeal(meal.id as any, meal.checked)}
+                                                        sx={{
+                                                            flex: 1,
+                                                            py: 2.5,
+                                                            px: 1.5,
+                                                            borderRadius: 4,
+                                                            cursor: 'pointer',
+                                                            display: 'flex',
+                                                            flexDirection: 'column',
+                                                            alignItems: 'center',
+                                                            bgcolor: meal.checked ? 'success.main' : 'rgba(0,0,0,0.06)',
+                                                            color: meal.checked ? 'white' : 'text.secondary',
+                                                            border: '1px solid',
+                                                            borderColor: meal.checked ? 'success.dark' : 'rgba(0,0,0,0.1)',
+                                                            boxShadow: meal.checked ? '0 6px 18px rgba(76, 175, 80, 0.3)' : '0 2px 8px rgba(0,0,0,0.05)',
+                                                            transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                                                            '&:hover': {
+                                                                transform: 'translateY(-4px)',
+                                                                bgcolor: meal.checked ? 'success.dark' : 'rgba(0,0,0,0.08)',
+                                                                boxShadow: meal.checked ? '0 8px 20px rgba(76, 175, 80, 0.4)' : '0 6px 12px rgba(0,0,0,0.1)'
+                                                            }
+                                                        }}
+                                                    >
+                                                        <Typography variant="h4" sx={{ fontWeight: 900, lineHeight: 1, mb: 0.5 }}>{meal.label}</Typography>
+                                                        <Typography variant="body2" sx={{ fontSize: '0.75rem', fontWeight: 700, textTransform: 'uppercase', opacity: 0.9 }}>{meal.full}</Typography>
+                                                    </Box>
+                                                ))}
+                                            </Box>
+                                        </Paper>
+                                    );
+                                })()}
+                            </Grid>
+
+                            {/* Active Meal Summary */}
+                            <Grid size={{ xs: 12, md: 6 }}>
+                                {(() => {
+                                    const windowStart = house.mealUpdateWindowStart || '20:00';
+                                    const now = new Date();
+                                    const currentHHMM = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+                                    const summaryDate = new Date(now);
+                                    if (currentHHMM >= windowStart) summaryDate.setDate(summaryDate.getDate() + 1);
+
+                                    const summaryStr = `${summaryDate.getFullYear()}-${String(summaryDate.getMonth() + 1).padStart(2, '0')}-${String(summaryDate.getDate()).padStart(2, '0')}`;
+                                    const summaryLabel = summaryDate.toLocaleDateString('default', { weekday: 'short', month: 'short', day: 'numeric' });
+                                    const summaryRecord = (meals || []).find(m => m.date === summaryStr);
+                                    const mealsPerDay = house.mealsPerDay || 3;
+
+                                    return (
+                                        <Paper className="glass" sx={{
+                                            p: 3,
+                                            bgcolor: 'rgba(108, 99, 255, 0.04)',
+                                            border: '1px solid rgba(108, 99, 255, 0.15)',
+                                            height: '100%',
+                                            display: 'flex',
+                                            flexDirection: 'column'
+                                        }}>
+                                            <Typography variant="subtitle2" sx={{ fontWeight: 800, mb: 3, color: 'primary.main', display: 'flex', alignItems: 'center', gap: 1, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                                                <GroupIcon sx={{ fontSize: 18 }} /> Meal Summary — {summaryLabel}
+                                            </Typography>
+
+                                            <Box sx={{ display: 'flex', gap: 1.5, overflowX: 'auto', pb: 1, flexGrow: 1, alignItems: 'center', '::-webkit-scrollbar': { height: 4 } }}>
+                                                {(house.members || []).map(member => {
+                                                    const mMeals = summaryRecord?.meals?.[member.email] || {};
+                                                    const b = mMeals.breakfast ?? true;
+                                                    const l = mMeals.lunch ?? true;
+                                                    const d = mMeals.dinner ?? true;
+                                                    const hasAny = (mealsPerDay === 3 ? b : false) || l || d;
+
+                                                    return (
+                                                        <Box key={member.email} sx={{
+                                                            minWidth: 90,
+                                                            p: 1.5,
+                                                            bgcolor: 'rgba(255,255,255,0.7)',
+                                                            borderRadius: 3,
+                                                            border: '1px solid rgba(255,255,255,0.3)',
+                                                            boxShadow: '0 4px 12px rgba(0,0,0,0.03)',
+                                                            display: 'flex',
+                                                            flexDirection: 'column',
+                                                            alignItems: 'center',
+                                                            transition: 'all 0.2s ease',
+                                                            '&:hover': { transform: 'scale(1.02)', bgcolor: 'white' }
+                                                        }}>
+                                                            <Avatar src={member.photoUrl} sx={{ width: 36, height: 36, mb: 1, border: '2px solid', borderColor: hasAny ? 'primary.light' : 'error.light', boxShadow: '0 2px 8px rgba(0,0,0,0.1)' }}>
+                                                                {member.name ? member.name[0].toUpperCase() : member.email[0].toUpperCase()}
+                                                            </Avatar>
+                                                            <Typography variant="caption" noWrap sx={{ fontWeight: 800, width: '100%', textAlign: 'center', mb: 1, fontSize: '0.7rem' }}>
+                                                                {member.name?.split(' ')[0] || member.email.split('@')[0]}
+                                                            </Typography>
+                                                            <Box sx={{ display: 'flex', gap: 0.5 }}>
+                                                                {[
+                                                                    { id: 'b', show: mealsPerDay === 3, active: b },
+                                                                    { id: 'l', show: true, active: l },
+                                                                    { id: 'd', show: true, active: d }
+                                                                ].filter(m => m.show).map(m => (
+                                                                    <Box key={m.id} sx={{
+                                                                        width: 16, height: 16, borderRadius: '50%',
+                                                                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                                                        fontSize: '0.55rem', fontWeight: 900,
+                                                                        bgcolor: m.active ? 'primary.main' : 'rgba(0,0,0,0.04)',
+                                                                        color: m.active ? 'white' : 'text.disabled',
+                                                                        border: '1px solid', borderColor: m.active ? 'primary.dark' : 'rgba(0,0,0,0.1)',
+                                                                        boxShadow: m.active ? '0 1px 3px rgba(108, 99, 255, 0.3)' : 'none'
+                                                                    }}>
+                                                                        {m.id.toUpperCase()}
+                                                                    </Box>
+                                                                ))}
+                                                            </Box>
+                                                        </Box>
+                                                    );
+                                                })}
+                                            </Box>
+                                        </Paper>
+                                    );
+                                })()}
+                            </Grid>
+                        </Grid>
+                    )}
+
+                    {/* Pending Deposit Approvals (Manager View) */}
+                    {house?.typeOfHouse === 'meals_and_expenses' && (house.memberDetails?.[user?.email || '']?.role === 'manager' || house.createdBy === user?.email) && (() => {
+                        const pendingDeposits = (fundDeposits || []).filter(d => d.status === 'pending');
+                        if (pendingDeposits.length === 0) return null;
+
+                        return (
+                            <Box sx={{ mt: 4 }}>
+                                <Typography variant="subtitle1" sx={{ fontWeight: 800, color: 'text.primary', mb: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
+                                    <AccountBalanceIcon sx={{ color: 'success.main' }} /> Pending Deposits
+                                </Typography>
+                                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                                    {pendingDeposits.map(deposit => {
+                                        const fromMember = (house.members || []).find(m => m.email === deposit.email);
+                                        const fromName = fromMember?.name || deposit.email.split('@')[0];
+                                        return (
+                                            <Paper key={deposit.id} className="glass" sx={{
+                                                p: 2,
+                                                borderRadius: 3,
+                                                background: 'rgba(76, 175, 80, 0.04)',
+                                                border: '1px solid rgba(76, 175, 80, 0.2)',
+                                                display: 'flex',
+                                                flexDirection: { xs: 'column', sm: 'row' },
+                                                justifyContent: 'space-between',
+                                                alignItems: { xs: 'flex-start', sm: 'center' },
+                                                gap: 2
+                                            }}>
+                                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                                                    <Avatar src={fromMember?.photoUrl} sx={{ width: 40, height: 40, border: '2px solid rgba(76, 175, 80, 0.2)' }} />
+                                                    <Box>
+                                                        <Typography variant="body2" sx={{ fontWeight: 700 }}>
+                                                            {fromName} requested to deposit {displayCurrency}{deposit.amount.toFixed(2)}
+                                                        </Typography>
+                                                        <Typography variant="caption" color="text.secondary">
+                                                            Verify the transfer and approve
+                                                        </Typography>
+                                                    </Box>
+                                                </Box>
+                                                <Box sx={{ display: 'flex', gap: 1 }}>
+                                                    <Button
+                                                        variant="outlined"
+                                                        color="error"
+                                                        size="small"
+                                                        onClick={async () => {
+                                                            try {
+                                                                const res = await fetch('/api/fund-deposits/approve', {
+                                                                    method: 'POST',
+                                                                    headers: { 'Content-Type': 'application/json' },
+                                                                    body: JSON.stringify({ depositId: deposit.id, action: 'reject', managerEmail: user?.email })
+                                                                });
+                                                                if (res.ok) {
+                                                                    showToast('Deposit rejected', 'info');
+                                                                    mutateHouse();
+                                                                    mutateFundDeposits();
+                                                                }
+                                                            } catch {
+                                                                showToast('Error processing request', 'error');
+                                                            }
+                                                        }}
+                                                        sx={{ borderRadius: 2, textTransform: 'none', fontWeight: 700 }}
+                                                    >
+                                                        Reject
+                                                    </Button>
+                                                    <Button
+                                                        variant="contained"
+                                                        color="success"
+                                                        size="small"
+                                                        onClick={async () => {
+                                                            try {
+                                                                const res = await fetch('/api/fund-deposits/approve', {
+                                                                    method: 'POST',
+                                                                    headers: { 'Content-Type': 'application/json' },
+                                                                    body: JSON.stringify({ depositId: deposit.id, action: 'approve', managerEmail: user?.email })
+                                                                });
+                                                                if (res.ok) {
+                                                                    showToast('Deposit approved', 'success');
+                                                                    mutateHouse();
+                                                                    mutateFundDeposits();
+                                                                }
+                                                            } catch {
+                                                                showToast('Error processing request', 'error');
+                                                            }
+                                                        }}
+                                                        sx={{ borderRadius: 2, textTransform: 'none', fontWeight: 700, px: 3, boxShadow: '0 4px 12px rgba(76, 175, 80, 0.2)' }}
+                                                    >
+                                                        Approve
+                                                    </Button>
+                                                </Box>
+                                            </Paper>
+                                        );
+                                    })}
+                                </Box>
+                            </Box>
+                        );
+                    })()}
+
+                    {/* House Fund Summary Table (Bottom) */}
+                    {house?.typeOfHouse === 'meals_and_expenses' && (
+                        <Box sx={{ mt: 6 }}>
+                            <Typography variant="h6" sx={{ fontWeight: 800, mb: 3, display: 'flex', alignItems: 'center', gap: 1 }}>
+                                <AccountBalanceWalletIcon color="primary" /> House Fund & Meal Summary
+                            </Typography>
+                            <Paper className="glass" sx={{ p: 3, borderRadius: 4, background: 'rgba(255, 255, 255, 0.02)', border: '1px solid rgba(255,255,255,0.1)' }}>
+                                <Grid container spacing={4}>
+                                    <Grid size={{ xs: 12, md: 4 }}>
+                                        <Typography variant="subtitle2" color="text.secondary" sx={{ textTransform: 'uppercase', mb: 2, fontWeight: 700 }}>Financial Status</Typography>
+                                        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                                            <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                                                <Typography variant="body2">Current Remaining Fund</Typography>
+                                                <Typography variant="body2" sx={{ fontWeight: 800, color: 'success.main' }}>{displayCurrency}{houseFundStatsResult.remainingFund.toFixed(2)}</Typography>
+                                            </Box>
+                                            <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                                                <Typography variant="body2" color="text.secondary">Prev. Months Remaining</Typography>
+                                                <Typography variant="body2" sx={{ fontWeight: 600 }}>{displayCurrency}{houseFundStatsResult.previousMonthsRemaining.toFixed(2)}</Typography>
+                                            </Box>
+                                            <Divider sx={{ opacity: 0.1 }} />
+                                            <Typography variant="caption" color="text.secondary" sx={{ fontStyle: 'italic' }}>
+                                                Note: Remaining funds are automatically added to the next month's calculation.
+                                            </Typography>
+                                        </Box>
+                                    </Grid>
+                                    <Grid size={{ xs: 12, md: 8 }}>
+                                        <Typography variant="subtitle2" color="text.secondary" sx={{ textTransform: 'uppercase', mb: 2, fontWeight: 700 }}>Meal Accounting</Typography>
+                                        <Box sx={{ overflowX: 'auto' }}>
+                                            <Box sx={{ minWidth: 400, display: 'flex', flexDirection: 'column', gap: 1.5 }}>
+                                                <Box sx={{ display: 'flex', borderBottom: '1px solid rgba(0,0,0,0.05)', pb: 1 }}>
+                                                    <Typography variant="caption" sx={{ flex: 2, fontWeight: 800 }}>Member</Typography>
+                                                    <Typography variant="caption" sx={{ flex: 1, fontWeight: 800, textAlign: 'center' }}>Meals Taken</Typography>
+                                                    <Typography variant="caption" sx={{ flex: 1, fontWeight: 800, textAlign: 'center' }}>Total Cost</Typography>
+                                                    <Typography variant="caption" sx={{ flex: 1, fontWeight: 800, textAlign: 'right' }}>Net Balance</Typography>
+                                                </Box>
+                                                {(house.members || []).map(member => {
+                                                    const mStats = memberFundAccounting[member.email] || { deposits: 0, rent: 0, utilities: 0, wage: 0, mealCount: 0, mealCost: 0 };
+                                                    const remaining = mStats.deposits - mStats.rent - mStats.utilities - mStats.wage - mStats.mealCost;
+                                                    return (
+                                                        <Box key={member.email} sx={{ display: 'flex', alignItems: 'center' }}>
+                                                            <Box sx={{ flex: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
+                                                                <Avatar src={member.photoUrl} sx={{ width: 24, height: 24, fontSize: '0.7rem' }}>{member.name?.[0]}</Avatar>
+                                                                <Typography variant="body2" sx={{ fontWeight: 600 }}>{member.name?.split(' ')[0]}</Typography>
+                                                            </Box>
+                                                            <Typography variant="body2" sx={{ flex: 1, textAlign: 'center' }}>{mStats.mealCount}</Typography>
+                                                            <Typography variant="body2" sx={{ flex: 1, textAlign: 'center' }}>{displayCurrency}{mStats.mealCost.toFixed(0)}</Typography>
+                                                            <Typography variant="body2" sx={{ flex: 1, textAlign: 'right', fontWeight: 800, color: remaining >= 0 ? 'success.main' : 'error.main' }}>
+                                                                {displayCurrency}{remaining.toFixed(0)}
+                                                            </Typography>
+                                                        </Box>
+                                                    );
+                                                })}
+                                                <Box sx={{ display: 'flex', mt: 1, pt: 1, borderTop: '1px dashed rgba(0,0,0,0.1)' }}>
+                                                    <Typography variant="body2" sx={{ flex: 2, fontWeight: 800 }}>Total</Typography>
+                                                    <Typography variant="body2" sx={{ flex: 1, textAlign: 'center', fontWeight: 800 }}>{houseFundStatsResult.totalMeals}</Typography>
+                                                    <Typography variant="body2" sx={{ flex: 1, textAlign: 'center', fontWeight: 800 }}>{displayCurrency}{houseFundStatsResult.totalGroceries.toFixed(0)}</Typography>
+                                                    <Typography variant="body2" sx={{ flex: 1, textAlign: 'right', fontWeight: 800, color: 'primary.main' }}>
+                                                        {displayCurrency}{houseFundStatsResult.costPerMeal.toFixed(2)}/meal
+                                                    </Typography>
+                                                </Box>
+                                            </Box>
+                                        </Box>
+                                    </Grid>
+                                </Grid>
+                            </Paper>
+                        </Box>
+                    )}
+
                     {/* Settlements Widget */}
-                    {house && expenses.length > 0 && house.members && house.members.length > 1 && (
+                    {house?.typeOfHouse !== 'meals_and_expenses' && house && expenses.length > 0 && house.members && house.members.length > 1 && (
                         <Box sx={{ mt: 4 }}>
                             <Typography variant="h6" gutterBottom>Settlements (Who owes whom)</Typography>
                             <Grid container spacing={2}>
@@ -798,10 +1633,14 @@ export default function Dashboard() {
                     )}
 
 
-                    <Box sx={{ mt: 4 }}>
-                        <Typography variant="h6" gutterBottom>Expenses for {selectedDate.toLocaleString('default', { month: 'long' })}</Typography>
+                    <Box sx={{ mt: 6 }}>
+                        <Typography variant="subtitle1" sx={{ fontWeight: 800, color: 'text.primary', mb: 3, display: 'flex', alignItems: 'center', gap: 1 }}>
+                            <FormatListBulletedIcon sx={{ color: 'primary.main' }} /> Expenses for {selectedDate.toLocaleString('default', { month: 'long' })}
+                        </Typography>
                         {filteredExpenses.length === 0 ? (
-                            <Typography color="text.secondary">No expenses found.</Typography>
+                            <Paper className="glass" sx={{ p: 4, textAlign: 'center', borderRadius: 4, background: 'rgba(0,0,0,0.02)', border: '1px dashed rgba(0,0,0,0.1)' }}>
+                                <Typography color="text.secondary">No expenses found for this month.</Typography>
+                            </Paper>
                         ) : (
                             <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
                                 {(() => {
@@ -819,40 +1658,45 @@ export default function Dashboard() {
                                                 const expenseDateStr = expenseDate.toLocaleString('en-GB', {
                                                     day: 'numeric',
                                                     month: 'short',
-                                                    year: 'numeric',
                                                     hour: '2-digit',
-                                                    minute: '2-digit',
-                                                    hour12: false
+                                                    minute: '2-digit'
                                                 });
 
-                                                // Check if current user is owner and within 48 hours
                                                 const isOwner = user?.email === expense.userId;
                                                 const now = new Date();
                                                 const diffInHours = (now.getTime() - expenseDate.getTime()) / (1000 * 60 * 60);
                                                 const canEdit = isOwner && diffInHours <= 48;
 
                                                 return (
-                                                    <Paper key={expense.id} className="glass" sx={{ p: 2, background: 'transparent' }}>
+                                                    <Paper key={expense.id} className="glass" sx={{
+                                                        p: 2,
+                                                        borderRadius: 3,
+                                                        background: 'rgba(255, 255, 255, 0.03)',
+                                                        border: '1px solid rgba(255, 255, 255, 0.1)',
+                                                        transition: 'all 0.2s ease',
+                                                        '&:hover': {
+                                                            background: 'rgba(255, 255, 255, 0.06)',
+                                                            transform: 'translateX(4px)',
+                                                            borderColor: 'primary.main'
+                                                        }
+                                                    }}>
                                                         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                                            <Box>
-                                                                <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                                                                    Groceries: {expense.description}
-                                                                </Typography>
-                                                                <Typography variant="caption" color="text.secondary">
-                                                                    {memberName} • {expenseDateStr}
-                                                                </Typography>
-                                                                {expense.contributors && expense.contributors.length > 0 && (
-                                                                    <Typography variant="caption" color="primary" sx={{ display: 'block', mt: 0.5 }}>
-                                                                        Paid by: {expense.contributors.map(c => {
-                                                                            const contributorMember = house?.members?.find(m => m.email === c.email);
-                                                                            const contributorName = contributorMember?.name || c.email.split('@')[0];
-                                                                            return `${contributorName} (${displayCurrency}${c.amount.toFixed(2)})`;
-                                                                        }).join(', ')}
+                                                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                                                                <Avatar src={member?.photoUrl} sx={{ width: 36, height: 36, border: '2px solid rgba(108, 99, 255, 0.2)' }} />
+                                                                <Box>
+                                                                    <Typography variant="body2" sx={{ fontWeight: 700, mb: 0.25 }}>
+                                                                        {house?.typeOfHouse === 'meals_and_expenses' && expense.category
+                                                                            ? `${expense.category.charAt(0).toUpperCase() + expense.category.slice(1)}: `
+                                                                            : ''}
+                                                                        {expense.description}
                                                                     </Typography>
-                                                                )}
+                                                                    <Typography variant="caption" color="text.secondary" sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                                                                        <strong>{memberName}</strong> • {expenseDateStr}
+                                                                    </Typography>
+                                                                </Box>
                                                             </Box>
-                                                            <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                                                                <Typography variant="h6" color="primary" sx={{ fontWeight: 'bold', mr: 2 }}>
+                                                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                                                                <Typography variant="h6" color="primary" sx={{ fontWeight: 900 }}>
                                                                     {displayCurrency}{expense.amount.toFixed(2)}
                                                                 </Typography>
                                                                 {canEdit && (
@@ -860,6 +1704,7 @@ export default function Dashboard() {
                                                                         size="small"
                                                                         color="error"
                                                                         onClick={() => handleDeleteExpense(expense.id)}
+                                                                        sx={{ bgcolor: 'rgba(244, 67, 54, 0.05)', '&:hover': { bgcolor: 'rgba(244, 67, 54, 0.1)' } }}
                                                                     >
                                                                         <DeleteIcon fontSize="small" />
                                                                     </IconButton>
@@ -872,7 +1717,17 @@ export default function Dashboard() {
                                             {sortedExpenses.length > 5 && (
                                                 <Button
                                                     onClick={() => setShowAllExpenses(!showAllExpenses)}
-                                                    sx={{ mt: 1, alignSelf: 'center' }}
+                                                    sx={{
+                                                        mt: 1,
+                                                        alignSelf: 'center',
+                                                        borderRadius: 3,
+                                                        textTransform: 'none',
+                                                        fontWeight: 700,
+                                                        color: 'primary.main',
+                                                        bgcolor: 'rgba(108, 99, 255, 0.05)',
+                                                        px: 4,
+                                                        '&:hover': { bgcolor: 'rgba(108, 99, 255, 0.1)' }
+                                                    }}
                                                 >
                                                     {showAllExpenses ? 'Show Less' : `Show ${sortedExpenses.length - 5} More`}
                                                 </Button>
@@ -1108,40 +1963,319 @@ export default function Dashboard() {
                     </DialogActions>
                 </Dialog>
 
+                {/* Submit Deposit Request Dialog */}
+                <Dialog open={openDepositDialog} onClose={() => setOpenDepositDialog(false)} maxWidth="xs" fullWidth>
+                    <DialogTitle>Submit Fund Deposit</DialogTitle>
+                    <DialogContent>
+                        <Box sx={{ pt: 1, display: 'flex', flexDirection: 'column', gap: 2 }}>
+                            <Typography variant="body2" color="text.secondary">
+                                Enter the amount you transferred to the central house account. This will need approval by the manager.
+                            </Typography>
+                            <TextField
+                                label="Amount"
+                                type="number"
+                                fullWidth
+                                value={depositAmount}
+                                onChange={(e) => setDepositAmount(e.target.value)}
+                                InputProps={{
+                                    startAdornment: (
+                                        <Box component="span" sx={{ mr: 0.5, color: 'text.secondary' }}>{displayCurrency}</Box>
+                                    ),
+                                }}
+                            />
+                        </Box>
+                    </DialogContent>
+                    <DialogActions>
+                        <Button onClick={() => setOpenDepositDialog(false)}>Cancel</Button>
+                        <Button
+                            variant="contained"
+                            color="success"
+                            onClick={handleRequestDeposit}
+                            disabled={!depositAmount || Number(depositAmount) <= 0}
+                        >
+                            Request Approval
+                        </Button>
+                    </DialogActions>
+                </Dialog>
+
+                {/* Deposit Details Dialog */}
+                <Dialog open={openDepositDetails} onClose={() => setOpenDepositDetails(false)} maxWidth="sm" fullWidth>
+                    <DialogTitle>House Fund — Deposit Contributions</DialogTitle>
+                    <DialogContent>
+                        {(() => {
+                            const approvedDeposits = (fundDeposits || []).filter(d => d.status === 'approved');
+                            if (approvedDeposits.length === 0) {
+                                return (
+                                    <Typography color="text.secondary" sx={{ py: 2, textAlign: 'center' }}>
+                                        No approved deposits yet.
+                                    </Typography>
+                                );
+                            }
+                            // Aggregate per email
+                            const perMember: Record<string, number> = {};
+                            approvedDeposits.forEach(d => {
+                                perMember[d.email] = (perMember[d.email] || 0) + Number(d.amount);
+                            });
+                            const members = house?.members || [];
+
+                            return (
+                                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, mt: 1 }}>
+                                    {members.map((m: any) => {
+                                        const email = typeof m === 'string' ? m : m.email;
+                                        const mStats = memberFundAccounting[email] || { deposits: 0, rent: 0, utilities: 0, wage: 0, mealCount: 0, mealCost: 0 };
+                                        const name = (typeof m === 'object' && m?.name) || email.split('@')[0];
+                                        const photoUrl = typeof m === 'object' ? m?.photoUrl : undefined;
+                                        const remaining = mStats.deposits - mStats.rent - mStats.utilities - mStats.wage - mStats.mealCost;
+
+                                        return (
+                                            <Box key={email} sx={{ p: 2, bgcolor: 'rgba(0,0,0,0.02)', borderRadius: 2, border: '1px solid', borderColor: 'divider' }}>
+                                                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1.5 }}>
+                                                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                                                        <Avatar src={photoUrl} sx={{ width: 40, height: 40, bgcolor: 'primary.main', fontSize: '1rem' }}>
+                                                            {name[0]?.toUpperCase()}
+                                                        </Avatar>
+                                                        <Box>
+                                                            <Typography variant="subtitle1" sx={{ fontWeight: 'bold', lineHeight: 1.2 }}>{name}</Typography>
+                                                            <Typography variant="caption" color="text.secondary">{email}</Typography>
+                                                        </Box>
+                                                    </Box>
+                                                    <Box sx={{ textAlign: 'right' }}>
+                                                        <Typography variant="caption" color="text.secondary" display="block">Total Deposits</Typography>
+                                                        <Typography variant="subtitle1" sx={{ fontWeight: 'bold', color: 'success.main' }}>
+                                                            {displayCurrency}{mStats.deposits.toFixed(2)}
+                                                        </Typography>
+                                                    </Box>
+                                                </Box>
+
+                                                <Box sx={{ pl: 1, display: 'flex', flexDirection: 'column', gap: 0.75 }}>
+                                                    <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                                                        <Typography variant="body2" color="text.secondary">Rent Portion</Typography>
+                                                        <Typography variant="body2" sx={{ fontWeight: 'medium', color: 'error.main' }}>
+                                                            - {displayCurrency}{mStats.rent.toFixed(2)}
+                                                        </Typography>
+                                                    </Box>
+                                                    <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                                                        <Typography variant="body2" color="text.secondary">Utilities (Portion)</Typography>
+                                                        <Typography variant="body2" sx={{ fontWeight: 'medium', color: 'error.main' }}>
+                                                            - {displayCurrency}{mStats.utilities.toFixed(2)}
+                                                        </Typography>
+                                                    </Box>
+                                                    <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                                                        <Typography variant="body2" color="text.secondary">Worker Wage (Portion)</Typography>
+                                                        <Typography variant="body2" sx={{ fontWeight: 'medium', color: 'error.main' }}>
+                                                            - {displayCurrency}{mStats.wage.toFixed(2)}
+                                                        </Typography>
+                                                    </Box>
+                                                    <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                                                        <Typography variant="body2" color="text.secondary">
+                                                            Total Meals ({mStats.mealCount}): Cost
+                                                        </Typography>
+                                                        <Typography variant="body2" sx={{ fontWeight: 'medium', color: 'error.main' }}>
+                                                            - {displayCurrency}{mStats.mealCost.toFixed(2)}
+                                                        </Typography>
+                                                    </Box>
+
+                                                    <Divider sx={{ my: 1, opacity: 0.6 }} />
+
+                                                    <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                                                        <Typography variant="body2" sx={{ fontWeight: 'bold' }}>Net Balance</Typography>
+                                                        <Typography variant="body2" sx={{ fontWeight: 'bold', color: remaining >= 0 ? 'success.main' : 'error.main' }}>
+                                                            {remaining >= 0 ? '' : '-'}{displayCurrency}{Math.abs(remaining).toFixed(2)}
+                                                        </Typography>
+                                                    </Box>
+                                                </Box>
+                                            </Box>
+                                        );
+                                    })}
+
+                                    <Box sx={{ mt: 1, pt: 2, borderTop: '2px dashed', borderColor: 'divider' }}>
+                                        <Typography variant="subtitle2" sx={{ mb: 1.5, fontWeight: 'bold', color: 'text.secondary', textTransform: 'uppercase', letterSpacing: 1 }}>
+                                            House Totals Summary
+                                        </Typography>
+                                        <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.5 }}>
+                                            <Typography variant="body2">Previous Months Remaining</Typography>
+                                            <Typography variant="body2" sx={{ fontWeight: 'bold', color: houseFundStatsResult.previousMonthsRemaining >= 0 ? 'success.main' : 'error.main' }}>
+                                                {displayCurrency}{houseFundStatsResult.previousMonthsRemaining.toFixed(2)}
+                                            </Typography>
+                                        </Box>
+                                        <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.5 }}>
+                                            <Typography variant="body2">Total Fund Collected</Typography>
+                                            <Typography variant="body2" sx={{ fontWeight: 'bold', color: 'success.main' }}>
+                                                {displayCurrency}{houseFundStatsResult.totalDeposits.toFixed(2)}
+                                            </Typography>
+                                        </Box>
+                                        <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.5 }}>
+                                            <Typography variant="body2">Total Rent Deducted</Typography>
+                                            <Typography variant="body2" sx={{ fontWeight: 'bold', color: 'error.main' }}>
+                                                - {displayCurrency}{houseFundStatsResult.totalRent.toFixed(2)}
+                                            </Typography>
+                                        </Box>
+                                        <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.5 }}>
+                                            <Typography variant="body2">Total Utilities</Typography>
+                                            <Typography variant="body2" sx={{ fontWeight: 'bold', color: 'error.main' }}>
+                                                - {displayCurrency}{houseFundStatsResult.totalUtilities.toFixed(2)}
+                                            </Typography>
+                                        </Box>
+                                        <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.5 }}>
+                                            <Typography variant="body2">Total Worker Wage</Typography>
+                                            <Typography variant="body2" sx={{ fontWeight: 'bold', color: 'error.main' }}>
+                                                - {displayCurrency}{houseFundStatsResult.totalWages.toFixed(2)}
+                                            </Typography>
+                                        </Box>
+                                        <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.5 }}>
+                                            <Typography variant="body2">Total Grocery Cost</Typography>
+                                            <Typography variant="body2" sx={{ fontWeight: 'bold', color: 'error.main' }}>
+                                                - {displayCurrency}{houseFundStatsResult.totalGroceries.toFixed(2)}
+                                            </Typography>
+                                        </Box>
+
+                                        <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.5, mt: 1 }}>
+                                            <Typography variant="body2" color="text.secondary">Total Meals (Accumulated)</Typography>
+                                            <Typography variant="body2" sx={{ fontWeight: 'bold' }}>
+                                                {houseFundStatsResult.totalMeals}
+                                            </Typography>
+                                        </Box>
+                                        <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.5 }}>
+                                            <Typography variant="body2" color="text.secondary">Cost per Meal</Typography>
+                                            <Typography variant="body2" sx={{ fontWeight: 'bold', color: 'primary.main' }}>
+                                                {displayCurrency}{houseFundStatsResult.costPerMeal.toFixed(2)}
+                                            </Typography>
+                                        </Box>
+                                        <Typography variant="caption" color="text.secondary" sx={{ fontStyle: 'italic', display: 'block', mt: 0.5 }}>
+                                            * Includes tomorrow's planned meals in total count
+                                        </Typography>
+
+                                        <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 1, pt: 1, borderTop: '1px solid', borderColor: 'divider' }}>
+                                            <Typography variant="h6" sx={{ fontSize: '1rem', fontWeight: 'bold' }}>Remaining House Fund</Typography>
+                                            <Typography variant="h6" sx={{ fontSize: '1rem', fontWeight: 'bold', color: 'success.main' }}>
+                                                {displayCurrency}{houseFundStatsResult.remainingFund.toFixed(2)}
+                                            </Typography>
+                                        </Box>
+                                    </Box>
+                                </Box>
+                            );
+                        })()}
+                    </DialogContent>
+                    <DialogActions>
+                        <Button onClick={() => setOpenDepositDetails(false)}>Close</Button>
+                    </DialogActions>
+                </Dialog>
+
                 {/* Member Details Dialog */}
-                <Dialog open={openMemberDialog} onClose={() => setOpenMemberDialog(false)} maxWidth="xs" fullWidth>
-                    <DialogTitle>Member Details</DialogTitle>
+                <Dialog
+                    open={openMemberDialog}
+                    onClose={() => setOpenMemberDialog(false)}
+                    maxWidth="xs"
+                    fullWidth
+                    PaperProps={{
+                        sx: { borderRadius: 4, bgcolor: 'background.paper', overflow: 'hidden' }
+                    }}
+                >
+                    <DialogTitle sx={{ fontWeight: 800, textAlign: 'center', pb: 1 }}>Member Details</DialogTitle>
                     <DialogContent>
                         {selectedMember && (
-                            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, mt: 1 }}>
-                                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                                        <Avatar src={selectedMember.photoUrl} alt={selectedMember.name} />
-                                        <Typography variant="body1"><strong>{selectedMember.name || selectedMember.email.split('@')[0]}</strong></Typography>
-                                    </Box>
-                                    <Tooltip title="Copy Name">
-                                        <IconButton onClick={() => handleCopy(selectedMember.name || selectedMember.email.split('@')[0])} size="small">
-                                            <ContentCopyIcon fontSize="small" />
-                                        </IconButton>
-                                    </Tooltip>
-                                </Box>
-                                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                                    <Typography variant="body2" color="text.secondary">
-                                        <strong>IBAN:</strong> {selectedMember.iban || 'Not provided'}
+                            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2.5, py: 1 }}>
+                                {/* Header: Image and Name */}
+                                <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1.5, mb: 1 }}>
+                                    <Avatar
+                                        src={selectedMember.photoUrl}
+                                        alt={selectedMember.name}
+                                        sx={{ width: 80, height: 80, border: '3px solid', borderColor: 'primary.light', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}
+                                    />
+                                    <Typography variant="h6" sx={{ fontWeight: 800, textAlign: 'center' }}>
+                                        {selectedMember.name || selectedMember.email.split('@')[0]}
                                     </Typography>
-                                    {selectedMember.iban && (
-                                        <Tooltip title="Copy IBAN">
-                                            <IconButton onClick={() => handleCopy(selectedMember.iban!)} size="small">
-                                                <ContentCopyIcon fontSize="small" />
-                                            </IconButton>
-                                        </Tooltip>
+                                </Box>
+
+                                <Divider sx={{ opacity: 0.6 }} />
+
+                                {/* Details Grid */}
+                                <Stack spacing={2}>
+                                    {/* Profession */}
+                                    {selectedMember.profession && (
+                                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                                            <WorkIcon sx={{ color: 'primary.main', fontSize: 20 }} />
+                                            <Box>
+                                                <Typography variant="caption" color="text.secondary" sx={{ display: 'block', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                                                    Profession
+                                                </Typography>
+                                                <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                                                    {selectedMember.profession}
+                                                </Typography>
+                                            </Box>
+                                        </Box>
                                     )}
+
+                                    {/* Birthday */}
+                                    {selectedMember.birthday && (
+                                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                                            <CakeIcon sx={{ color: 'error.light', fontSize: 20 }} />
+                                            <Box>
+                                                <Typography variant="caption" color="text.secondary" sx={{ display: 'block', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                                                    Birthday
+                                                </Typography>
+                                                <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                                                    {formatBirthday(selectedMember.birthday)}
+                                                </Typography>
+                                            </Box>
+                                        </Box>
+                                    )}
+
+                                    {/* IBAN - Only show for Expenses Tracking houses */}
+                                    {house?.typeOfHouse === 'expenses' && (
+                                        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', bgcolor: 'rgba(0,0,0,0.02)', p: 1.5, borderRadius: 2, border: '1px dashed', borderColor: 'divider' }}>
+                                            <Box>
+                                                <Typography variant="caption" color="text.secondary" sx={{ display: 'block', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                                                    IBAN
+                                                </Typography>
+                                                <Typography variant="body2" sx={{ fontWeight: 600, wordBreak: 'break-all', pr: 1 }}>
+                                                    {selectedMember.iban || 'Not provided'}
+                                                </Typography>
+                                            </Box>
+                                            {selectedMember.iban && (
+                                                <Tooltip title="Copy IBAN">
+                                                    <IconButton onClick={() => handleCopy(selectedMember.iban!)} size="small" sx={{ bgcolor: 'white' }}>
+                                                        <ContentCopyIcon fontSize="small" />
+                                                    </IconButton>
+                                                </Tooltip>
+                                            )}
+                                        </Box>
+                                    )}
+                                </Stack>
+
+                                {/* Social Links */}
+                                <Box sx={{ mt: 1 }}>
+                                    <Typography variant="caption" color="text.secondary" sx={{ display: 'block', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', mb: 1.5, textAlign: 'center' }}>
+                                        Social Connect
+                                    </Typography>
+                                    <Box sx={{ display: 'flex', justifyContent: 'center', gap: 2 }}>
+                                        <Button
+                                            variant="outlined"
+                                            startIcon={<WhatsAppIcon />}
+                                            disabled={!selectedMember.whatsapp}
+                                            onClick={() => selectedMember.whatsapp && window.open(selectedMember.whatsapp.startsWith('http') ? selectedMember.whatsapp : `https://wa.me/${selectedMember.whatsapp}`, '_blank')}
+                                            sx={{ borderRadius: 3, textTransform: 'none', fontWeight: 700 }}
+                                        >
+                                            WhatsApp
+                                        </Button>
+                                        <Button
+                                            variant="outlined"
+                                            startIcon={<FacebookIcon />}
+                                            disabled={!selectedMember.messenger}
+                                            onClick={() => selectedMember.messenger && window.open(selectedMember.messenger.startsWith('http') ? selectedMember.messenger : `https://m.me/${selectedMember.messenger}`, '_blank')}
+                                            sx={{ borderRadius: 3, textTransform: 'none', fontWeight: 700 }}
+                                        >
+                                            Messenger
+                                        </Button>
+                                    </Box>
                                 </Box>
                             </Box>
                         )}
                     </DialogContent>
-                    <DialogActions>
-                        <Button onClick={() => setOpenMemberDialog(false)}>Close</Button>
+                    <DialogActions sx={{ p: 2, pt: 0 }}>
+                        <Button onClick={() => setOpenMemberDialog(false)} fullWidth variant="contained" sx={{ borderRadius: 3, py: 1, fontWeight: 700 }}>
+                            Close
+                        </Button>
                     </DialogActions>
                 </Dialog>
 
@@ -1231,6 +2365,6 @@ export default function Dashboard() {
                     </DialogActions>
                 </Dialog>
             </main>
-        </AuthGuard>
+        </AuthGuard >
     );
 }
