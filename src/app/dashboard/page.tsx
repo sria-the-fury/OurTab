@@ -58,6 +58,9 @@ import CakeIcon from '@mui/icons-material/Cake';
 import WhatsAppIcon from '@mui/icons-material/WhatsApp';
 import FacebookIcon from '@mui/icons-material/Facebook';
 import NotificationBell from '@/components/NotificationBell';
+import InputAdornment from '@mui/material/InputAdornment';
+import EmailIcon from '@mui/icons-material/Email';
+import CloseIcon from '@mui/icons-material/Close';
 
 
 const formatBirthday = (birthday?: string) => {
@@ -1764,24 +1767,78 @@ export default function Dashboard() {
                 </Dialog>
 
                 {/* Add Member Dialog */}
-                <Dialog open={openAddMember} onClose={() => setOpenAddMember(false)}>
-                    <DialogTitle>Add New Member</DialogTitle>
+                <Dialog
+                    open={openAddMember}
+                    onClose={() => setOpenAddMember(false)}
+                    PaperProps={{
+                        className: 'glass',
+                        sx: {
+                            borderRadius: 4,
+                            backgroundImage: 'none',
+                            p: 1
+                        }
+                    }}
+                >
+                    <DialogTitle sx={{ display: 'flex', alignItems: 'center', gap: 1.5, pb: 1 }}>
+                        <Box sx={{
+                            display: 'flex',
+                            p: 1,
+                            borderRadius: 2,
+                            background: 'linear-gradient(45deg, #6C63FF 30%, #FF6584 90%)',
+                            color: 'white'
+                        }}>
+                            <PersonAddIcon />
+                        </Box>
+                        <Typography variant="h5" sx={{ fontWeight: 800 }}>Add Member</Typography>
+                    </DialogTitle>
                     <DialogContent>
+                        <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
+                            Invite someone to join your house. They'll be able to track expenses and contribute.
+                        </Typography>
                         <TextField
                             autoFocus
-                            margin="dense"
-                            id="email"
                             label="Email Address"
                             type="email"
                             fullWidth
                             variant="outlined"
                             value={newMemberEmail}
                             onChange={(e) => setNewMemberEmail(e.target.value)}
+                            error={!!newMemberEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(newMemberEmail)}
+                            helperText={!!newMemberEmail && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(newMemberEmail) ? "Please enter a valid email address" : ""}
+                            sx={{
+                                '& .MuiOutlinedInput-root': {
+                                    borderRadius: 3,
+                                }
+                            }}
                         />
                     </DialogContent>
-                    <DialogActions>
-                        <Button onClick={() => setOpenAddMember(false)}>Cancel</Button>
-                        <Button onClick={handleAddMember} disabled={!newMemberEmail}>Add</Button>
+                    <DialogActions sx={{ p: 3, pt: 0 }}>
+                        <Button
+                            onClick={() => setOpenAddMember(false)}
+                            sx={{ color: 'text.secondary', fontWeight: 600 }}
+                        >
+                            Cancel
+                        </Button>
+                        <Button
+                            onClick={handleAddMember}
+                            disabled={!newMemberEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(newMemberEmail)}
+                            variant="contained"
+                            sx={{
+                                borderRadius: 2.5,
+                                px: 4,
+                                py: 1,
+                                fontWeight: 700,
+                                textTransform: 'none',
+                                background: 'linear-gradient(45deg, #6C63FF 30%, #FF6584 90%)',
+                                boxShadow: '0 4px 15px rgba(108, 99, 255, 0.3)',
+                                '&:hover': {
+                                    background: 'linear-gradient(45deg, #5b54d6 30%, #e55a76 90%)',
+                                    boxShadow: '0 6px 20px rgba(108, 99, 255, 0.4)',
+                                }
+                            }}
+                        >
+                            Add Member
+                        </Button>
                     </DialogActions>
                 </Dialog>
 
