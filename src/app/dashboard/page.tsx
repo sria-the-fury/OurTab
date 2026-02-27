@@ -636,31 +636,34 @@ export default function Dashboard() {
         <AuthGuard>
             <main>
                 <Container maxWidth="lg" sx={{ mt: 4 }}>
-                    <Box sx={{
+                    <Box className="glass-nav" sx={{
+                        position: 'sticky',
+                        top: 0,
+                        zIndex: 1100,
                         display: 'flex',
-                        flexDirection: { xs: 'column', sm: 'row' },
                         justifyContent: 'space-between',
-                        alignItems: { xs: 'flex-start', sm: 'center' },
-                        mb: 4,
-                        gap: 2
+                        alignItems: 'center',
+                        py: 2,
+                        mb: 0.1,
+                        mx: { xs: -2, sm: -3 },
+                        px: { xs: 2, sm: 3 },
+                        backgroundColor: 'transparent !important', // Let glass-nav handle it
                     }}>
-                        <Box>
-                            <Typography variant="h3" component="h1" sx={{
-                                fontWeight: 800,
-                                background: 'linear-gradient(45deg, #6C63FF 30%, #FF6584 90%)',
-                                WebkitBackgroundClip: 'text',
-                                WebkitTextFillColor: 'transparent',
-                                mb: 0.5,
-                                letterSpacing: '-0.02em'
-                            }}>
-                                Dashboard
-                            </Typography>
-                            <Typography variant="body1" color="text.secondary" sx={{ opacity: 0.8, fontWeight: 500 }}>
-                                Overview of your household finances and expenses
-                            </Typography>
-                        </Box>
+                        <Typography variant="h4" component="h1" sx={{
+                            fontWeight: 800,
+                            background: 'linear-gradient(45deg, #6C63FF 30%, #FF6584 90%)',
+                            WebkitBackgroundClip: 'text',
+                            WebkitTextFillColor: 'transparent',
+                            lineHeight: 1.2,
+                            letterSpacing: '-0.02em'
+                        }}>
+                            Dashboard
+                        </Typography>
                         <NotificationBell />
                     </Box>
+                    <Typography variant="body1" color="text.secondary" sx={{ opacity: 0.8, fontWeight: 500 }}>
+                        Overview of your household finances and expenses
+                    </Typography>
 
                     {/* Month Navigator - Premium Glass Style */}
                     <Paper className="glass" sx={{
