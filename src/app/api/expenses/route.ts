@@ -80,6 +80,7 @@ export async function POST(request: Request) {
             if (houseData && Array.isArray(houseData.members)) {
                 // If the array contains strings:
                 const isStringArray = houseData.members.length > 0 && typeof houseData.members[0] === 'string';
+                const currencySymbol = houseData.currency === 'EUR' ? '€' : (houseData.currency === 'GBP' ? '£' : '$');
 
                 if (isStringArray) {
                     const notifications = houseData.members
@@ -88,7 +89,7 @@ export async function POST(request: Request) {
                             createNotification({
                                 userId: memberEmail,
                                 type: 'expense',
-                                message: `has made an expense of $${totalAmount.toFixed(2)}.`,
+                                message: `has made an expense of ${currencySymbol}${totalAmount.toFixed(2)}.`,
                                 senderName: finalSenderName,
                                 senderPhotoUrl: finalSenderPhotoUrl,
                                 relatedId: expenseRef.id
@@ -107,7 +108,7 @@ export async function POST(request: Request) {
                             createNotification({
                                 userId: member.email,
                                 type: 'expense',
-                                message: `has made an expense of $${totalAmount.toFixed(2)}.`,
+                                message: `has made an expense of ${currencySymbol}${totalAmount.toFixed(2)}.`,
                                 senderName: objectSenderName,
                                 senderPhotoUrl: objectSenderPhotoUrl,
                                 relatedId: expenseRef.id

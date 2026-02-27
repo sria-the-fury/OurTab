@@ -1,10 +1,11 @@
 import { NextResponse } from 'next/server';
 import { adminDb } from '@/lib/firebaseAdmin';
+import { createNotification } from '@/lib/notifications';
 
 export async function POST(request: Request) {
     try {
         const body = await request.json();
-        const { houseId, month, year, settlements } = body;
+        const { houseId, month, year, settlements, updatedBy } = body;
 
         if (!houseId || month === undefined || year === undefined || !settlements) {
             return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
@@ -22,6 +23,38 @@ export async function POST(request: Request) {
         };
 
         await adminDb.collection('settlements').doc(settlementId).set(settlementData);
+
+        // Notify house members
+        try {
+            const houseSnap = await adminDb.collection('houses').doc(houseId).get();
+            const houseData = houseSnap.data();
+            if (houseData && Array.isArray(houseData.members)) {
+                let senderName = 'System';
+                let senderPhotoUrl = '';
+
+                if (updatedBy) {
+                    const userSnap = await adminDb.collection('users').doc(updatedBy).get();
+                    if (userSnap.exists) {
+                        senderName = userSnap.data()?.name || updatedBy.split('@')[0];
+                        senderPhotoUrl = userSnap.data()?.photoUrl || '';
+                    }
+                }
+
+                const monthName = new Date(year, month).toLocaleString('default', { month: 'long' });
+                const notifications = houseData.members.map((memberEmail: string) =>
+                    createNotification({
+                        userId: memberEmail,
+                        type: 'settlement',
+                        message: `The settlement for ${monthName} ${year} has been updated.`,
+                        senderName,
+                        senderPhotoUrl
+                    })
+                );
+                await Promise.all(notifications);
+            }
+        } catch (notifErr) {
+            console.error('Error sending settlement notification:', notifErr);
+        }
 
         return NextResponse.json({ id: settlementId, ...settlementData });
     } catch (error) {

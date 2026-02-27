@@ -49,12 +49,16 @@ export async function POST(request: Request) {
 
         // Notify the receiver
         try {
+            const houseSnap = await adminDb.collection('houses').doc(houseId).get();
+            const houseData = houseSnap.data();
+            const currencySymbol = houseData?.currency === 'EUR' ? '€' : (houseData?.currency === 'GBP' ? '£' : '$');
+
             const senderSnap = await adminDb.collection('users').doc(fromEmail).get();
             const senderName = senderSnap.exists ? (senderSnap.data()?.name || fromEmail.split('@')[0]) : fromEmail.split('@')[0];
             const senderPhotoUrl = senderSnap.exists ? senderSnap.data()?.photoUrl : undefined;
 
             const actionText = method === 'cash' ? 'Please check and approve.' : 'Please check your Bank account and approve.';
-            const message = `has sent you $${amount}. ${actionText}`;
+            const message = `has sent you ${currencySymbol}${amount}. ${actionText}`;
 
             await createNotification({
                 userId: toEmail,

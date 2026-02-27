@@ -74,6 +74,10 @@ export async function POST(request: Request) {
 
         // Notify the sender
         try {
+            const houseSnap = await adminDb.collection('houses').doc(houseId).get();
+            const houseData = houseSnap.data();
+            const currencySymbol = houseData?.currency === 'EUR' ? '€' : (houseData?.currency === 'GBP' ? '£' : '$');
+
             const approverSnap = await adminDb.collection('users').doc(approverEmail).get();
             const approverName = approverSnap.exists ? (approverSnap.data()?.name || approverEmail.split('@')[0]) : approverEmail.split('@')[0];
             const approverPhotoUrl = approverSnap.exists ? approverSnap.data()?.photoUrl : undefined;
@@ -81,7 +85,7 @@ export async function POST(request: Request) {
             await createNotification({
                 userId: payment.from,
                 type: 'settlement',
-                message: `approved your payment of $${payment.amount}.`,
+                message: `approved your payment of ${currencySymbol}${payment.amount}.`,
                 relatedId: payment.id,
                 senderName: approverName,
                 senderPhotoUrl: approverPhotoUrl
