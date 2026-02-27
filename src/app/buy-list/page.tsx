@@ -104,7 +104,21 @@ export default function Todos() {
 
                 <Container maxWidth="sm" sx={{ mt: 3, mb: 20, position: 'relative', zIndex: 1 }}>
                     {/* --- Header Section --- */}
-                    <Box sx={{ mb: 6, textAlign: 'center', animation: 'fadeInDown 0.8s ease-out' }}>
+                    <Box className="glass-nav" sx={{
+                        position: 'sticky',
+                        top: 0,
+                        zIndex: 1100,
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                        py: 2,
+                        mb: 0.1,
+                        mx: { xs: -2, sm: -3 },
+                        px: { xs: 2, sm: 3 },
+                        animation: 'fadeInDown 0.8s ease-out',
+                        backgroundColor: 'transparent !important', // Let glass-nav handle it
+                    }}>
+
                         <Typography
                             variant="h4"
                             sx={{
@@ -118,7 +132,6 @@ export default function Todos() {
                                 gap: 2,
                                 mb: 1,
                                 letterSpacing: '-0.02em',
-                                fontFamily: 'var(--font-abril)'
                             }}
                         >
                             <Box sx={{

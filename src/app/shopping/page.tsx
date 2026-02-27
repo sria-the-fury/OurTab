@@ -859,8 +859,27 @@ export default function Shopping() {
         <AuthGuard>
             <main>
                 <Container maxWidth="sm" sx={{ mt: 4, mb: 10 }}>
-                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-                        <Typography variant="h4" component="h1" sx={{ fontWeight: 'bold' }}>
+                    <Box className="glass-nav" sx={{
+                        position: 'sticky',
+                        top: 0,
+                        zIndex: 1100,
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                        py: 2,
+                        mb: 0.1,
+                        mx: { xs: -2, sm: -3 },
+                        px: { xs: 2, sm: 3 },
+                        backgroundColor: 'transparent !important', // Let glass-nav handle it
+                    }}>
+                        <Typography variant="h4" component="h1" sx={{
+                            fontWeight: 800,
+                            background: 'linear-gradient(45deg, #6C63FF 30%, #FF6584 90%)',
+                            WebkitBackgroundClip: 'text',
+                            WebkitTextFillColor: 'transparent',
+                            lineHeight: 1.2,
+                            letterSpacing: '-0.02em'
+                        }}>
                             Shopping List
                         </Typography>
                         <IconButton
