@@ -61,8 +61,14 @@ OurTab keeps the whole house in sync with real-time, categorized alerts:
 ### Buy List
 ![Buy List](screenshots/buy_list.png)
 
-### Shopping / Add Expense
-![Shopping Page](screenshots/shopping.png)
+### Meal
+![Meal](screenshots/meal.png)
+
+### Add Expense
+![Expenses Page](screenshots/expenses.png)
+
+### Notifications
+![Notifications](screenshots/notifications.png)
 
 ### Profile
 ![Profile Page](screenshots/profile.png)
