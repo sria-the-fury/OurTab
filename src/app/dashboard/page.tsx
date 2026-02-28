@@ -1695,8 +1695,37 @@ export default function Dashboard() {
                                                                             : ''}
                                                                         {expense.description}
                                                                     </Typography>
-                                                                    <Typography variant="caption" color="text.secondary" sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                                                                        <strong>{memberName}</strong> • {expenseDateStr}
+                                                                    <Typography variant="caption" color="text.secondary" sx={{ display: 'flex', alignItems: 'center', gap: 0.5, flexWrap: 'wrap' }}>
+                                                                        {(() => {
+                                                                            const hasOtherContributors = expense.contributors && expense.contributors.some(c => c.email !== expense.userId);
+                                                                            const shopperContrib = expense.contributors?.find(c => c.email === expense.userId);
+
+                                                                            return (
+                                                                                <>
+                                                                                    <span style={{ fontWeight: 400 }}>
+                                                                                        {memberName}
+                                                                                        {hasOtherContributors && shopperContrib && ` ${displayCurrency}${shopperContrib.amount.toFixed(2)}`}
+                                                                                    </span>
+                                                                                    {hasOtherContributors && (
+                                                                                        <>
+                                                                                            <span style={{ margin: '0 4px', opacity: 0.5 }}>•</span>
+                                                                                            <span style={{ opacity: 0.8 }}>
+                                                                                                {expense.contributors
+                                                                                                    .filter(c => c.email !== expense.userId)
+                                                                                                    .map((c, i, arr) => {
+                                                                                                        const contribMember = house?.members?.find(m => m.email === c.email);
+                                                                                                        const cName = contribMember?.name || c.email.split('@')[0];
+                                                                                                        return `${cName} ${displayCurrency}${c.amount.toFixed(2)}${i < arr.length - 1 ? ', ' : ''}`;
+                                                                                                    })
+                                                                                                    .join('')}
+                                                                                            </span>
+                                                                                        </>
+                                                                                    )}
+                                                                                </>
+                                                                            );
+                                                                        })()}
+                                                                        <span style={{ margin: '0 4px', opacity: 0.5 }}>•</span>
+                                                                        {expenseDateStr}
                                                                     </Typography>
                                                                 </Box>
                                                             </Box>
