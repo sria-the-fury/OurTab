@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { adminDb } from '@/lib/firebaseAdmin';
 import { createNotification } from '@/lib/notifications';
+import { getCurrencySymbol } from '@/utils/currency';
 
 export async function POST(request: Request) {
     try {
@@ -61,11 +62,12 @@ export async function POST(request: Request) {
                     .filter((mEmail: string) => mEmail !== email && (allMemberDetails[mEmail]?.role === 'manager' || houseData.createdBy === mEmail));
 
                 if (managersToNotify.length > 0) {
+                    const currencySymbol = getCurrencySymbol(houseData?.currency);
                     const notifications = managersToNotify.map((mEmail: string) =>
                         createNotification({
                             userId: mEmail,
                             type: 'settlement',
-                            message: `requested to deposit $${Number(amount).toFixed(2)} to the house fund.`,
+                            message: `requested to deposit ${currencySymbol}${Number(amount).toFixed(2)} to the house fund.`,
                             senderName: finalSenderName,
                             senderPhotoUrl: finalSenderPhotoUrl,
                             relatedId: docRef.id

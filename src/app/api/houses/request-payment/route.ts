@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { adminDb } from '@/lib/firebaseAdmin';
 import { createNotification } from '@/lib/notifications';
+import { getCurrencySymbol } from '@/utils/currency';
 
 // POST: Create a payment request (payer → receiver)
 export async function POST(request: Request) {
@@ -51,7 +52,7 @@ export async function POST(request: Request) {
         try {
             const houseSnap = await adminDb.collection('houses').doc(houseId).get();
             const houseData = houseSnap.data();
-            const currencySymbol = houseData?.currency === 'EUR' ? '€' : (houseData?.currency === 'GBP' ? '£' : '$');
+            const currencySymbol = getCurrencySymbol(houseData?.currency);
 
             const senderSnap = await adminDb.collection('users').doc(fromEmail).get();
             const senderName = senderSnap.exists ? (senderSnap.data()?.name || fromEmail.split('@')[0]) : fromEmail.split('@')[0];

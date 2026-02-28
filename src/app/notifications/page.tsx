@@ -17,6 +17,8 @@ import ShoppingCartIcon from '@mui/icons-material/ShoppingCart';
 import HomeIcon from '@mui/icons-material/Home';
 import DoneAllIcon from '@mui/icons-material/DoneAll';
 import { useNotifications } from '@/hooks/useNotifications';
+import { useHouseData } from '@/hooks/useHouseData';
+import { getCurrencySymbol } from '@/utils/currency';
 import BottomNav from '@/components/BottomNav';
 import AuthGuard from '@/components/AuthGuard';
 import { useRouter } from 'next/navigation';
@@ -25,6 +27,15 @@ import { AppNotification } from '@/types/notification';
 export default function NotificationsPage() {
     const router = useRouter();
     const { notifications, markAsRead, markAllAsRead, isLoading } = useNotifications();
+    const { house } = useHouseData();
+
+    const currencySymbol = getCurrencySymbol(house?.currency);
+
+    const processMessage = (message: string) => {
+        // Replace all instances of $ with the current house currency symbol
+        // This handles cases where old notifications might have hardcoded $
+        return message.replaceAll('$', currencySymbol);
+    };
 
     const getIconForType = (type: string) => {
         switch (type) {
@@ -272,7 +283,7 @@ export default function NotificationsPage() {
                                                 }}
                                             >
                                                 {(() => {
-                                                    let displayMessage = notification.message;
+                                                    let displayMessage = processMessage(notification.message);
                                                     if (notification.senderName) {
                                                         if (displayMessage.startsWith(notification.senderName)) {
                                                             displayMessage = displayMessage.substring(notification.senderName.length).trim();

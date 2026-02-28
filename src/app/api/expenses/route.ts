@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { adminDb } from '@/lib/firebaseAdmin';
 import { createNotification } from '@/lib/notifications';
+import { getCurrencySymbol } from '@/utils/currency';
 
 export async function POST(request: Request) {
     try {
@@ -80,7 +81,7 @@ export async function POST(request: Request) {
             if (houseData && Array.isArray(houseData.members)) {
                 // If the array contains strings:
                 const isStringArray = houseData.members.length > 0 && typeof houseData.members[0] === 'string';
-                const currencySymbol = houseData.currency === 'EUR' ? '€' : (houseData.currency === 'GBP' ? '£' : '$');
+                const currencySymbol = getCurrencySymbol(houseData.currency);
 
                 if (isStringArray) {
                     const notifications = houseData.members
