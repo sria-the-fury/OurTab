@@ -18,7 +18,7 @@ const fetcher = (url: string) => fetch(url).then((res) => res.json());
 export function useExpenseTodos() {
     const { house } = useAuth();
 
-    const { data: todos, error, isLoading, mutate } = useSWR<ShoppingTodo[]>(
+    const { data: todos, error, isLoading, mutate } = useSWR<ExpenseTodo[]>(
         house?.id ? `/api/expense-todos?houseId=${house.id}` : null,
         fetcher
     );

@@ -62,6 +62,11 @@ export async function POST(request: Request) {
                 tomorrow.setDate(tomorrow.getDate() + 1);
                 offFromDate = tomorrow.toISOString().split('T')[0];
             }
+            const dateObj = new Date(offFromDate);
+            const day = dateObj.getDate().toString().padStart(2, '0');
+            const month = dateObj.toLocaleString('en-GB', { month: 'short' });
+            const year = dateObj.getFullYear();
+            const formattedDate = `${day} ${month} ${year}`;
 
             // Perform updates and aggressive healing in one batch
             const batch = adminDb.batch();
@@ -132,11 +137,32 @@ export async function POST(request: Request) {
                     (memberDetails[m]?.role === 'manager' || houseData.createdBy?.toLowerCase() === normalizedM);
             });
 
+            // Calculate potential offDate
+            const now = new Date();
+            const windowEnd = houseData.mealUpdateWindowEnd || '05:00';
+            const [endHour, endMin] = windowEnd.split(':').map(Number);
+            const todayEnd = new Date(now);
+            todayEnd.setHours(endHour, endMin, 0, 0);
+
+            let potentialOffDate: string;
+            if (now <= todayEnd) {
+                potentialOffDate = now.toISOString().split('T')[0];
+            } else {
+                const tomorrow = new Date(now);
+                tomorrow.setDate(tomorrow.getDate() + 1);
+                potentialOffDate = tomorrow.toISOString().split('T')[0];
+            }
+            const dateObj2 = new Date(potentialOffDate);
+            const d = dateObj2.getDate().toString().padStart(2, '0');
+            const mMonth = dateObj2.toLocaleString('en-GB', { month: 'short' });
+            const yYear = dateObj2.getFullYear();
+            const formattedDate = `${d} ${mMonth} ${yYear}`;
+
             const notifications = managers.map((m: string) =>
                 createNotification({
                     userId: m,
                     type: 'house',
-                    message: `${userName} has requested to turn off his meals. Please review in Profile settings.`,
+                    message: `${userName} has requested to turn off meals. Meals will stop from ${formattedDate}.`,
                     senderName: userName,
                     senderPhotoUrl: userPhotoUrl
                 })

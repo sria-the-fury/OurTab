@@ -66,6 +66,12 @@ export async function POST(request: Request) {
             offFromDate = tomorrow.toISOString().split('T')[0];
         }
 
+        const dateObj = new Date(offFromDate);
+        const day = dateObj.getDate().toString().padStart(2, '0');
+        const month = dateObj.toLocaleString('en-GB', { month: 'short' });
+        const year = dateObj.getFullYear();
+        const formattedDate = `${day} ${month} ${year}`;
+
         const { FieldPath } = require('firebase-admin/firestore');
         const isNested = (obj: any, email: string) => email.includes('.') && !!obj?.[email.split('.')[0]];
 
@@ -105,7 +111,7 @@ export async function POST(request: Request) {
             await createNotification({
                 userId: email,
                 type: 'house',
-                message: `Your request to turn off meals has been approved. Meals will stop counting from ${offFromDate}.`,
+                message: `has approved your request to turn off meals. Meals will stop from ${formattedDate}.`,
                 senderName: managerName,
                 senderPhotoUrl: managerPhotoUrl
             });

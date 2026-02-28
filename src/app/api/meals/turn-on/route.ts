@@ -82,7 +82,7 @@ export async function POST(request: Request) {
                 createNotification({
                     userId: m,
                     type: 'house',
-                    message: `${userName} has turned their meals back ON.`,
+                    message: `has turned their meals back ON.`,
                     senderName: userName,
                     senderPhotoUrl: userPhotoUrl
                 })
