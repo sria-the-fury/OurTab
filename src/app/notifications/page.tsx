@@ -19,6 +19,7 @@ import DoneAllIcon from '@mui/icons-material/DoneAll';
 import { useNotifications } from '@/hooks/useNotifications';
 import { useHouseData } from '@/hooks/useHouseData';
 import { getCurrencySymbol } from '@/utils/currency';
+import { formatTimeLocale, formatTimeStr } from '@/utils/date';
 import BottomNav from '@/components/BottomNav';
 import AuthGuard from '@/components/AuthGuard';
 import { useRouter } from 'next/navigation';
@@ -34,7 +35,24 @@ export default function NotificationsPage() {
     const processMessage = (message: string) => {
         // Replace all instances of $ with the current house currency symbol
         // This handles cases where old notifications might have hardcoded $
-        return message.replaceAll('$', currencySymbol);
+        let processed = message.replaceAll('$', currencySymbol);
+
+        // 1. Replace HH:mm times (e.g. 20:00) with locale-aware times
+        processed = processed.replace(/\b([01]\d|2[0-3]):[0-5]\d\b/g, (match) => {
+            return formatTimeStr(match);
+        });
+
+        // 2. Replace h:mm AM/PM (e.g. 8:00 PM) with locale-aware times for legacy notifications
+        processed = processed.replace(/\b(1[0-2]|0?[1-9]):([0-5]\d)\s*([AaPp][Mm])\b/g, (match, h, m, p) => {
+            let hours = parseInt(h);
+            const minutes = parseInt(m);
+            const ampm = p.toLowerCase();
+            if (ampm === 'pm' && hours < 12) hours += 12;
+            if (ampm === 'am' && hours === 12) hours = 0;
+            return formatTimeStr(`${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`);
+        });
+
+        return processed;
     };
 
     const getIconForType = (type: string) => {
@@ -60,9 +78,9 @@ export default function NotificationsPage() {
     const formatTime = (isoString?: string) => {
         if (!isoString) return '';
         const date = new Date(isoString);
-        return date.toLocaleString('en-US', {
-            month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit'
-        });
+        const timeStr = formatTimeLocale(date);
+        const dateStr = date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+        return `${dateStr}, ${timeStr}`;
     };
 
     const handleNotificationClick = async (notification: AppNotification) => {

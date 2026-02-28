@@ -61,6 +61,7 @@ import NotificationBell from '@/components/NotificationBell';
 import InputAdornment from '@mui/material/InputAdornment';
 import EmailIcon from '@mui/icons-material/Email';
 import CloseIcon from '@mui/icons-material/Close';
+import { formatDateLocale, formatTimeLocale } from '@/utils/date';
 
 
 const formatBirthday = (birthday?: string) => {
@@ -1664,12 +1665,7 @@ export default function Dashboard() {
                                                 const member = house?.members?.find(m => m.email === expense.userId);
                                                 const memberName = member?.name || expense.userId.split('@')[0];
                                                 const expenseDate = new Date(expense.date);
-                                                const expenseDateStr = expenseDate.toLocaleString('en-GB', {
-                                                    day: 'numeric',
-                                                    month: 'short',
-                                                    hour: '2-digit',
-                                                    minute: '2-digit'
-                                                });
+                                                const expenseDateStr = `${formatDateLocale(expenseDate, { day: 'numeric', month: 'short' })}, ${formatTimeLocale(expenseDate)}`;
 
                                                 const isOwner = user?.email === expense.userId;
                                                 const now = new Date();

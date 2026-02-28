@@ -210,7 +210,7 @@ export default function MealsPage() {
                         <Stack direction="row" spacing={1} alignItems="center">
                             <CalendarMonthIcon sx={{ color: 'primary.main', opacity: 0.7 }} fontSize="small" />
                             <Typography variant="h6" sx={{ fontWeight: 700, letterSpacing: '0.01em', minWidth: 160, textAlign: 'center' }}>
-                                {selectedDate.toLocaleString('default', { month: 'long', year: 'numeric' })}
+                                {selectedDate.toLocaleString(undefined, { month: 'long', year: 'numeric' })}
                             </Typography>
                         </Stack>
 
@@ -280,7 +280,7 @@ export default function MealsPage() {
                                     }}>
                                         <Box sx={{ pl: 1 }}>
                                             <Typography variant="body2" sx={{ fontWeight: isToday ? 800 : 600, color: isToday ? 'primary.main' : 'text.primary' }}>
-                                                {dateObj.getDate()} {dateObj.toLocaleString('default', { weekday: 'short' })}
+                                                {dateObj.getDate()} {dateObj.toLocaleString(undefined, { weekday: 'short' })}
                                             </Typography>
                                             {isToday && <Typography variant="caption" sx={{ color: 'primary.main', fontWeight: 700, display: 'block', mt: -0.5 }}>TODAY</Typography>}
                                         </Box>
@@ -340,7 +340,7 @@ export default function MealsPage() {
                                 }}>
                                     <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
                                         <Typography variant="subtitle1" sx={{ fontWeight: 800, color: isToday ? 'primary.main' : 'text.primary' }}>
-                                            {dateObj.getDate()} {dateObj.toLocaleString('default', { weekday: 'long' })}
+                                            {dateObj.getDate()} {dateObj.toLocaleString(undefined, { weekday: 'long' })}
                                         </Typography>
                                         {isToday && (
                                             <Chip

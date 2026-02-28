@@ -333,7 +333,7 @@ export default function Shopping() {
                 const grouped: { [key: string]: Expense[] } = {};
                 expensesData.forEach((exp: Expense) => {
                     const date = new Date(exp.date);
-                    const monthKey = date.toLocaleString('default', { month: 'long', year: 'numeric' });
+                    const monthKey = date.toLocaleString(undefined, { month: 'long', year: 'numeric' });
                     if (!grouped[monthKey]) grouped[monthKey] = [];
                     grouped[monthKey].push(exp);
                 });

@@ -40,7 +40,7 @@ export async function POST(request: Request) {
                     }
                 }
 
-                const monthName = new Date(year, month).toLocaleString('default', { month: 'long' });
+                const monthName = new Date(year, month).toLocaleString(undefined, { month: 'long' });
                 const notifications = houseData.members.map((memberEmail: string) =>
                     createNotification({
                         userId: memberEmail,

@@ -23,6 +23,7 @@ import BottomNav from '@/components/BottomNav';
 import AuthGuard from '@/components/AuthGuard';
 import { useShoppingTodos, ShoppingTodo } from '@/hooks/useShoppingTodos';
 import Loader from '@/components/Loader';
+import { formatTimeLocale, formatDateLocale } from '@/utils/date';
 
 export default function Todos() {
     const { user, house } = useAuth();
@@ -72,9 +73,9 @@ export default function Todos() {
         const date = new Date(isoString);
         const now = new Date();
         const isToday = date.toDateString() === now.toDateString();
-        const timeStr = date.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+        const timeStr = formatTimeLocale(date);
         if (isToday) return `Today at ${timeStr}`;
-        const dateStr = date.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+        const dateStr = formatDateLocale(date, { day: 'numeric', month: 'short', year: 'numeric' });
         return `${dateStr}, ${timeStr}`;
     };
 

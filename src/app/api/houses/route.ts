@@ -147,13 +147,7 @@ export async function DELETE(request: Request) {
 }
 
 function formatTime(timeStr: string) {
-    if (!timeStr) return '';
-    const [hours, minutes] = timeStr.split(':');
-    const h = parseInt(hours);
-    const m = parseInt(minutes);
-    const ampm = h >= 12 ? 'PM' : 'AM';
-    const displayHours = h % 12 || 12;
-    return `${displayHours}:${m.toString().padStart(2, '0')} ${ampm}`;
+    return timeStr; // Return raw HH:mm string to be formatted by the frontend
 }
 
 export async function PATCH(request: Request) {
