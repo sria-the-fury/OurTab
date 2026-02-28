@@ -142,14 +142,14 @@ src/
 │   │   ├── meals/            # Meals On/Off toggles and manager approval
 │   │   ├── notifications/    # Notifications CRUD and read flags
 │   │   ├── settlements/      # Settlement calculation logic
-│   │   ├── shopping-todos/   # Buy List CRUD and auto-marking
+│   │   ├── expense-todos/    # Buy List CRUD and auto-marking
 │   │   └── users/            # User profile data
 │   ├── buy-list/             # Buy List page
 │   ├── dashboard/            # Core financial overview & settlements page
 │   ├── meals/                # Meals management UI
 │   ├── notifications/        # Alerts & notifications page
 │   ├── profile/              # Account & household settings page
-│   ├── shopping/             # Live shopping / expense entry page
+│   ├── expense/              # Live shopping / expense entry page
 │   ├── globals.css           # Global styles and design system
 │   └── layout.tsx            # Main application layout wrapper
 ├── components/

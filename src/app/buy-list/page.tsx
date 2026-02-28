@@ -21,13 +21,13 @@ import { useState, useEffect } from 'react';
 import { useAuth } from '@/components/AuthContext';
 import BottomNav from '@/components/BottomNav';
 import AuthGuard from '@/components/AuthGuard';
-import { useShoppingTodos, ShoppingTodo } from '@/hooks/useShoppingTodos';
+import { useExpenseTodos, ExpenseTodo } from '@/hooks/useExpenseTodos';
 import Loader from '@/components/Loader';
 import { formatTimeLocale, formatDateLocale } from '@/utils/date';
 
 export default function Todos() {
     const { user, house } = useAuth();
-    const { todos, loading: todosLoading, addTodosBatch, toggleTodo, deleteTodo } = useShoppingTodos();
+    const { todos, loading: todosLoading, addTodosBatch, toggleTodo, deleteTodo } = useExpenseTodos();
     const [todoInput, setTodoInput] = useState('');
     const [pendingItems, setPendingItems] = useState<string[]>([]);
 
@@ -85,13 +85,13 @@ export default function Todos() {
         return () => clearInterval(timerId);
     }, []);
 
-    const canUnmark = (todo: ShoppingTodo) => {
+    const canUnmark = (todo: ExpenseTodo) => {
         if (!todo.isCompleted || todo.completedBy === 'auto') return false;
         const completedAt = new Date(todo.completedAt || todo.createdAt || 0);
         return now > 0 && (now - completedAt.getTime()) < 5 * 60 * 1000;
     };
 
-    const canDeleteItem = (todo: ShoppingTodo) => {
+    const canDeleteItem = (todo: ExpenseTodo) => {
         if (!todo.isCompleted) {
             // Rule: Active item can be deleted ONLY by the person who added it
             return todo.addedBy === user?.email;

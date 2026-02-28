@@ -63,7 +63,7 @@ export interface Expense {
     settlementBetween?: string[];
 }
 
-export interface Todo {
+export interface ExpenseTodo {
     id: string;
     itemName: string;
     isCompleted: boolean;
@@ -108,8 +108,8 @@ export function useHouseData() {
     );
 
     // 3. Fetch Buy List (todos)
-    const { data: todos, error: todosError, isLoading: todosLoading, mutate: mutateTodos } = useSWR<Todo[]>(
-        house?.id ? `/api/shopping-todos?houseId=${house.id}` : null,
+    const { data: todos, error: todosError, isLoading: todosLoading, mutate: mutateTodos } = useSWR<ExpenseTodo[]>(
+        house?.id ? `/api/expense-todos?houseId=${house.id}` : null,
         fetcher
     );
 

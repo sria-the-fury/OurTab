@@ -994,7 +994,7 @@ export default function Dashboard() {
                                             color="primary"
                                             fullWidth
                                             startIcon={<AddIcon />}
-                                            onClick={() => router.push('/shopping')}
+                                            onClick={() => router.push('/expense')}
                                             sx={{
                                                 borderRadius: 3,
                                                 py: 1.2,

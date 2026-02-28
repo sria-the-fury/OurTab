@@ -59,7 +59,9 @@ export default function NotificationsPage() {
         switch (type) {
             case 'expense': return <ReceiptIcon fontSize="small" />;
             case 'settlement': return <PaymentsIcon fontSize="small" />;
-            case 'shopping': return <ShoppingCartIcon fontSize="small" />;
+            case 'shopping':
+            case 'expense_todo':
+                return <ShoppingCartIcon fontSize="small" />;
             case 'house': return <HomeIcon fontSize="small" />;
             default: return <NotificationsIcon fontSize="small" />;
         }
@@ -69,7 +71,9 @@ export default function NotificationsPage() {
         switch (type) {
             case 'expense': return 'rgba(108, 99, 255, 0.1)';
             case 'settlement': return 'rgba(0, 191, 165, 0.1)';
-            case 'shopping': return 'rgba(237, 108, 2, 0.1)';
+            case 'shopping':
+            case 'expense_todo':
+                return 'rgba(237, 108, 2, 0.1)';
             case 'house': return 'rgba(2, 136, 209, 0.1)';
             default: return 'rgba(0,0,0,0.05)';
         }
@@ -94,6 +98,7 @@ export default function NotificationsPage() {
                 router.push('/dashboard');
                 break;
             case 'shopping':
+            case 'expense_todo':
                 router.push('/buy-list');
                 break;
             case 'house':

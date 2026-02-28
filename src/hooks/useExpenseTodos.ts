@@ -1,7 +1,7 @@
 import useSWR from 'swr';
 import { useAuth } from '@/components/AuthContext';
 
-export interface ShoppingTodo {
+export interface ExpenseTodo {
     id: string;
     itemName: string;
     houseId: string;
@@ -15,11 +15,11 @@ export interface ShoppingTodo {
 
 const fetcher = (url: string) => fetch(url).then((res) => res.json());
 
-export function useShoppingTodos() {
+export function useExpenseTodos() {
     const { house } = useAuth();
 
     const { data: todos, error, isLoading, mutate } = useSWR<ShoppingTodo[]>(
-        house?.id ? `/api/shopping-todos?houseId=${house.id}` : null,
+        house?.id ? `/api/expense-todos?houseId=${house.id}` : null,
         fetcher
     );
 
@@ -27,7 +27,7 @@ export function useShoppingTodos() {
         if (!house?.id || items.length === 0) return;
 
         try {
-            const res = await fetch('/api/shopping-todos', {
+            const res = await fetch('/api/expense-todos', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ items, houseId: house.id, addedBy })
@@ -43,7 +43,7 @@ export function useShoppingTodos() {
 
     const toggleTodo = async (id: string, isCompleted: boolean, completedBy?: string) => {
         try {
-            const res = await fetch('/api/shopping-todos', {
+            const res = await fetch('/api/expense-todos', {
                 method: 'PATCH',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ id, isCompleted, completedBy })
@@ -58,7 +58,7 @@ export function useShoppingTodos() {
 
     const deleteTodo = async (id: string) => {
         try {
-            const res = await fetch(`/api/shopping-todos?id=${id}`, {
+            const res = await fetch(`/api/expense-todos?id=${id}`, {
                 method: 'DELETE'
             });
             if (res.ok) {

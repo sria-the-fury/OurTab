@@ -48,7 +48,7 @@ export default function BottomNav() {
                 {house?.typeOfHouse === 'meals_and_expenses' && (
                     <BottomNavigationAction label="Meals" value="/meals" icon={<RestaurantMenuIcon />} />
                 )}
-                <BottomNavigationAction label="Expense" value="/shopping" icon={<FormatListBulletedIcon />} />
+                <BottomNavigationAction label="Expense" value="/expense" icon={<FormatListBulletedIcon />} />
                 <BottomNavigationAction
                     label="Profile"
                     value="/profile"

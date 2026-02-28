@@ -45,7 +45,7 @@ export async function GET(request: Request) {
 
         return NextResponse.json(todos);
     } catch (error) {
-        console.error('Error fetching shopping todos:', error);
+        console.error('Error fetching expense todos:', error);
         return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
     }
 }
@@ -113,7 +113,7 @@ export async function POST(request: Request) {
                         .map((memberEmail: string) =>
                             createNotification({
                                 userId: memberEmail,
-                                type: 'shopping',
+                                type: 'expense_todo',
                                 message: `has been added items for buy.`,
                                 senderName: finalSenderName,
                                 senderPhotoUrl: finalSenderPhotoUrl,
@@ -134,7 +134,7 @@ export async function POST(request: Request) {
                         .map((member: any) =>
                             createNotification({
                                 userId: member.email,
-                                type: 'shopping',
+                                type: 'expense_todo',
                                 message: `has been added items for buy.`,
                                 senderName: finalSenderName,
                                 senderPhotoUrl: finalSenderPhotoUrl,
@@ -146,12 +146,12 @@ export async function POST(request: Request) {
                 }
             }
         } catch (notifError) {
-            console.error('Error sending shopping notifications:', notifError);
+            console.error('Error sending expense notifications:', notifError);
         }
 
         return NextResponse.json({ success: true, addedTodos });
     } catch (error) {
-        console.error('Error creating shopping todo batch:', error);
+        console.error('Error creating expense todo batch:', error);
         return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
     }
 }
@@ -207,7 +207,7 @@ export async function PATCH(request: Request) {
         await todoRef.update(updates);
         return NextResponse.json({ success: true, ...updates });
     } catch (error) {
-        console.error('Error updating shopping todo:', error);
+        console.error('Error updating expense todo:', error);
         return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
     }
 }
@@ -254,7 +254,7 @@ export async function DELETE(request: Request) {
         await todoRef.delete();
         return NextResponse.json({ success: true });
     } catch (error) {
-        console.error('Error deleting shopping todo:', error);
+        console.error('Error deleting expense todo:', error);
         return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
     }
 }
