@@ -2095,7 +2095,7 @@ export default function Dashboard() {
                                                         </Avatar>
                                                         <Box>
                                                             <Typography variant="subtitle1" sx={{ fontWeight: 'bold', lineHeight: 1.2 }}>{name}</Typography>
-                                                            <Typography variant="caption" color="text.secondary">{email}</Typography>
+
                                                         </Box>
                                                     </Box>
                                                     <Box sx={{ textAlign: 'right' }}>
