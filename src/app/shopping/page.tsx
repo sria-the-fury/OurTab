@@ -793,20 +793,27 @@ export default function Shopping() {
 
             // --- SETTLEMENT SECTION (For Standard Shared Houses) ---
             if (currentHouseData?.typeOfHouse !== 'meals_and_expenses') {
-                const finalY = (doc as any).lastAutoTable?.finalY + 10;
-
-                // For shared houses, we use the settlements calculated by simulateBalances or similar logic
-                // But for now, let's just show a note as per instructions "In user col -> there no need to mention the money for the 'Meals and Expenses' beacuse the money will spend from the central fund."
-                // Standard houses don't have central fund, so they still need settlements.
-                // However, the user specifically asked to show "House fund..." calculation exactly same formate for "Meals and Expneses Tracking"
+                const finalY = (doc as any).lastAutoTable?.finalY + 15;
 
                 doc.setFontSize(14);
                 doc.setFont('abril', 'bold');
                 doc.text("Settlement Plan", 14, finalY);
 
-                doc.setFontSize(10);
-                doc.setFont('helvetica', 'normal');
-                doc.text("All settled! Everyone paid their share.", 14, finalY + 8);
+                if (settlements.length > 0) {
+                    doc.setFontSize(10);
+                    doc.setFont('helvetica', 'normal');
+                    let settleY = finalY + 8;
+
+                    settlements.forEach((s) => {
+                        const text = `${s.creditorName} will get ${currentHouseData?.currency} ${s.amountStr} from ${s.debtorName}`;
+                        doc.text(text, 14, settleY);
+                        settleY += 6;
+                    });
+                } else {
+                    doc.setFontSize(10);
+                    doc.setFont('helvetica', 'normal');
+                    doc.text("All settled! Everyone paid their share.", 14, finalY + 8);
+                }
             }
 
             // --- FOOTER ---
