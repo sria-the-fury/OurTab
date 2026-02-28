@@ -61,7 +61,7 @@ import NotificationBell from '@/components/NotificationBell';
 import InputAdornment from '@mui/material/InputAdornment';
 import EmailIcon from '@mui/icons-material/Email';
 import CloseIcon from '@mui/icons-material/Close';
-import { formatDateLocale, formatTimeLocale } from '@/utils/date';
+import { formatDateLocale, formatTimeLocale, formatTimeStr } from '@/utils/date';
 
 
 const formatBirthday = (birthday?: string) => {
@@ -1200,7 +1200,7 @@ export default function Dashboard() {
                                         }}>
                                             <TimerOffIcon sx={{ color: 'text.disabled' }} />
                                             <Typography variant="body2" color="text.secondary">
-                                                Meal window closed. Opens at {windowStart}
+                                                Meal window closed. Opens at Today <strong>{formatTimeStr(windowStart)}</strong> and closes at Tomorrow <strong>{formatTimeStr(windowEnd)}</strong>.
                                             </Typography>
                                         </Paper>
                                     );
