@@ -360,7 +360,7 @@ export default function Dashboard() {
             const res = await fetch('/api/houses/add-member', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ email: newMemberEmail, houseId: house.id })
+                body: JSON.stringify({ email: newMemberEmail, houseId: house.id, addedBy: user?.email })
             });
 
             const data = await res.json();
@@ -1710,7 +1710,7 @@ export default function Dashboard() {
                                                                                         <>
                                                                                             <span style={{ margin: '0 4px', opacity: 0.5 }}>•</span>
                                                                                             <span style={{ opacity: 0.8 }}>
-                                                                                                {expense.contributors
+                                                                                                {expense.contributors?.[0] && expense.contributors
                                                                                                     .filter(c => c.email !== expense.userId)
                                                                                                     .map((c, i, arr) => {
                                                                                                         const contribMember = house?.members?.find(m => m.email === c.email);

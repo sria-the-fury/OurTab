@@ -41,7 +41,7 @@ export async function POST(request: Request) {
 
         await userRef.update({ houseId: houseId });
 
-        // Notify the user who was added
+        // Notify the user who was added and existing members
         try {
             let senderName = 'System';
             let senderPhotoUrl = '';
@@ -53,14 +53,33 @@ export async function POST(request: Request) {
                 }
             }
 
+            const newMemberName = userData.name || email.split('@')[0];
+
+            // 1. Notify the new member
             await createNotification({
                 userId: email,
                 type: 'house',
-                message: `has added you to the house: ${houseData.name || 'grocery house'}.`,
+                message: `added you to ${houseData.name || 'the house'}.`,
                 senderName,
                 senderPhotoUrl
             });
-        } catch (notifErr) { console.error('Error sending added-to-house notification:', notifErr); }
+
+            // 2. Notify ALL existing members (except the inviter)
+            const existingMembers = houseData.members || [];
+            const notifications = existingMembers
+                .filter((m: string) => m !== addedBy)
+                .map((m: string) =>
+                    createNotification({
+                        userId: m,
+                        type: 'house',
+                        message: `has added ${newMemberName} as a new member.`,
+                        senderName,
+                        senderPhotoUrl
+                    })
+                );
+            await Promise.all(notifications);
+
+        } catch (notifErr) { console.error('Error sending added-to-house notifications:', notifErr); }
 
         return NextResponse.json({ success: true });
     } catch (error) {
