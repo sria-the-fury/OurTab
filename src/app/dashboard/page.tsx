@@ -1817,7 +1817,7 @@ export default function Dashboard() {
                         }}>
                             <PersonAddIcon />
                         </Box>
-                        <Typography variant="h5" sx={{ fontWeight: 800 }}>Add Member</Typography>
+                        <Typography variant="h5" component="span" sx={{ fontWeight: 800 }}>Add Member</Typography>
                     </DialogTitle>
                     <DialogContent>
                         <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>

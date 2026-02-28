@@ -44,8 +44,30 @@ export async function GET(request: Request) {
             const baseData = memberSnap.exists ? { email: memberEmail, ...memberSnap.data() } : { email: memberEmail };
 
             // Inject memberDetails (role, rentAmount) from house document if it exists
-            const additionalDetails = houseData.memberDetails?.[memberEmail] || {};
-            return { ...baseData, ...additionalDetails };
+            let additionalDetails = houseData.memberDetails?.[memberEmail];
+
+            // --- HEALING MECHANISM ---
+            // If the key is missing but the email has a dot, Firestore might have nested it.
+            // e.g. memberDetails: { "user@gmail": { "com": { role: 'member', rentAmount: 0 } } }
+            if (!additionalDetails && memberEmail.includes('.')) {
+                const parts = memberEmail.split('.');
+                let current = houseData.memberDetails;
+                for (const part of parts) {
+                    current = current?.[part];
+                }
+                if (current && typeof current === 'object' && ('role' in current || 'rentAmount' in current)) {
+                    additionalDetails = current;
+                    // Proactively "heal" the document in background (don't await)
+                    adminDb.collection('houses').doc(resolvedHouseId).set({
+                        memberDetails: {
+                            [memberEmail]: current
+                        }
+                    }, { merge: true }).catch(e => console.error(`[healing] Failed to fix ${memberEmail} in ${resolvedHouseId}`, e));
+                }
+            }
+            // --------------------------
+
+            return { ...baseData, ...(additionalDetails || {}) };
         });
 
         const members = await Promise.all(memberPromises);

@@ -39,8 +39,13 @@ export async function POST(request: Request) {
             const newMembers = allMembers.filter(m => m !== userToApprove);
             delete leaveRequests[userToApprove];
 
+            const memberDetails = houseData.memberDetails || {};
+            if (memberDetails[userToApprove]) {
+                delete memberDetails[userToApprove];
+            }
+
             const batch = adminDb.batch();
-            batch.update(houseRef, { members: newMembers, leaveRequests });
+            batch.update(houseRef, { members: newMembers, leaveRequests, memberDetails });
 
             const userRef = adminDb.collection('users').doc(userToApprove);
             batch.update(userRef, { houseId: null });

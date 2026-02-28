@@ -31,13 +31,15 @@ export async function POST(request: Request) {
         }
         const houseData = houseSnap.data()!;
 
-        await houseRef.update({
+        await houseRef.set({
             members: FieldValue.arrayUnion(email),
-            [`memberDetails.${email}`]: {
-                role: 'member',
-                rentAmount: 0
+            memberDetails: {
+                [email]: {
+                    role: 'member',
+                    rentAmount: 0
+                }
             }
-        });
+        }, { merge: true });
 
         await userRef.update({ houseId: houseId });
 
