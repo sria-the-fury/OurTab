@@ -66,7 +66,7 @@ interface HouseMember {
 }
 
 
-export default function Shopping() {
+export default function ExpensePage() {
     const { user, currency, dbUser, house } = useAuth();
     const router = useRouter();
     const { showToast } = useToast();
@@ -78,7 +78,7 @@ export default function Shopping() {
     const [itemName, setItemName] = useState('');
     const [itemPrice, setItemPrice] = useState('');
 
-    // Optional note for the entire shopping trip
+    // Optional note for this expense
     const [note, setNote] = useState('');
 
     const [loading, setLoading] = useState(false);
@@ -261,7 +261,7 @@ export default function Shopping() {
                 throw new Error('Failed to create expense');
             }
 
-            showToast('Shopping list submitted successfully!', 'success');
+            showToast('Expense submitted successfully!', 'success');
             setItems([]);
             setNote('');
 
@@ -270,7 +270,7 @@ export default function Shopping() {
             }, 1000);
         } catch (err) {
             console.error('Error adding expense:', err);
-            showToast('Failed to submit shopping list. Please try again.', 'error');
+            showToast('Failed to submit expense. Please try again.', 'error');
         } finally {
             setLoading(false);
         }
@@ -894,7 +894,7 @@ export default function Shopping() {
                             lineHeight: 1.2,
                             letterSpacing: '-0.02em'
                         }}>
-                            Shopping List
+                            Expense
                         </Typography>
                         <IconButton
                             color="primary"
@@ -1165,7 +1165,7 @@ export default function Shopping() {
                     {items.length === 0 && (
                         <Box sx={{ textAlign: 'center', py: 4 }}>
                             <Typography color="text.secondary">
-                                Add items to your shopping list to get started
+                                Add items to your expense to get started
                             </Typography>
                         </Box>
                     )}

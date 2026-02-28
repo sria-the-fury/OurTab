@@ -44,11 +44,11 @@ export default function BottomNav() {
                 }}
             >
                 <BottomNavigationAction label="Dashboard" value="/dashboard" icon={<DashboardIcon />} />
-                <BottomNavigationAction label="Buy List" value="/buy-list" icon={<FormatListBulletedIcon />} />
+                <BottomNavigationAction label="Buy List" value="/buy-list" icon={<ShoppingCartIcon />} />
                 {house?.typeOfHouse === 'meals_and_expenses' && (
                     <BottomNavigationAction label="Meals" value="/meals" icon={<RestaurantMenuIcon />} />
                 )}
-                <BottomNavigationAction label="Shopping" value="/shopping" icon={<ShoppingCartIcon />} />
+                <BottomNavigationAction label="Expense" value="/shopping" icon={<FormatListBulletedIcon />} />
                 <BottomNavigationAction
                     label="Profile"
                     value="/profile"

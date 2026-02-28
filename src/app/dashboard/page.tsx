@@ -1208,10 +1208,26 @@ export default function Dashboard() {
                                     const isAfterMidnightPart = isCrossMidnight && currentHHMM <= windowEnd;
                                     const targetDate = new Date(now);
                                     if (!isAfterMidnightPart) targetDate.setDate(targetDate.getDate() + 1);
+                                    const targetDateStr = targetDate.toISOString().split('T')[0];
+
+                                    const myEmail = user?.email || '';
+                                    const myDetails = house.memberDetails?.[myEmail] || {};
+                                    const isOff = myDetails.mealsEnabled === false && myDetails.offFromDate && targetDateStr >= myDetails.offFromDate;
+
+                                    if (isOff) return (
+                                        <Paper className="glass" sx={{
+                                            p: 2, height: '100%', display: 'flex', alignItems: 'center', gap: 2,
+                                            bgcolor: 'rgba(255, 101, 132, 0.05)', border: '1px solid rgba(255, 101, 132, 0.2)'
+                                        }}>
+                                            <RestaurantIcon sx={{ color: '#FF6584' }} />
+                                            <Typography variant="body2" sx={{ fontWeight: 700, color: '#FF6584' }}>
+                                                Your meals are turned OFF starting from {myDetails.offFromDate}.
+                                            </Typography>
+                                        </Paper>
+                                    );
 
                                     const tomorrowStr = `${targetDate.getFullYear()}-${String(targetDate.getMonth() + 1).padStart(2, '0')}-${String(targetDate.getDate()).padStart(2, '0')}`;
                                     const tomorrowRecord = (meals || []).find(m => m.date === tomorrowStr);
-                                    const myEmail = user?.email || '';
                                     const myMeals = tomorrowRecord?.meals?.[myEmail] || {};
                                     const mealsPerDay = house.mealsPerDay || 3;
 

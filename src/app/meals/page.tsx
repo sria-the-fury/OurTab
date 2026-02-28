@@ -12,17 +12,8 @@ import { useHouseData } from '@/hooks/useHouseData';
 import Loader from '@/components/Loader';
 import BottomNav from '@/components/BottomNav';
 import AuthGuard from '@/components/AuthGuard';
-import Checkbox from '@mui/material/Checkbox';
 import Chip from '@mui/material/Chip';
-import Table from '@mui/material/Table';
-import TableBody from '@mui/material/TableBody';
-import TableCell from '@mui/material/TableCell';
-import TableContainer from '@mui/material/TableContainer';
-import TableHead from '@mui/material/TableHead';
-import TableRow from '@mui/material/TableRow';
 import IconButton from '@mui/material/IconButton';
-import ArrowBackIosIcon from '@mui/icons-material/ArrowBackIos';
-import ArrowForwardIosIcon from '@mui/icons-material/ArrowForwardIos';
 import { useToast } from '@/components/ToastContext';
 import RestaurantMenuIcon from '@mui/icons-material/RestaurantMenu';
 import Avatar from '@mui/material/Avatar';
@@ -38,8 +29,7 @@ import Divider from '@mui/material/Divider';
 
 export default function MealsPage() {
     const { user, loading: authLoading } = useAuth();
-    const { house, meals, loading: dataLoading, mutateMeals } = useHouseData();
-    const { showToast } = useToast();
+    const { house, meals, loading: dataLoading } = useHouseData();
 
     const [selectedDate, setSelectedDate] = useState(new Date());
 
@@ -65,35 +55,6 @@ export default function MealsPage() {
         setSelectedDate(newDate);
     };
 
-    const handleMealToggle = async (dateStr: string, email: string, mealType: 'breakfast' | 'lunch' | 'dinner', currentStatus: boolean) => {
-        if (!house?.id) return;
-
-        // Optimistic update logic could be added here, but SWR mutate will handle state update soon after
-
-        try {
-            const res = await fetch('/api/meals', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    houseId: house.id,
-                    date: dateStr,
-                    email,
-                    mealType,
-                    isTaking: !currentStatus
-                })
-            });
-
-            if (res.ok) {
-                mutateMeals();
-            } else {
-                showToast('Failed to update meal status', 'error');
-            }
-        } catch (error) {
-            console.error('Error toggling meal', error);
-            showToast('Error updating meal status', 'error');
-        }
-    };
-
     if (loading) return <Loader />;
 
     if (!house || house.typeOfHouse !== 'meals_and_expenses') {
@@ -110,6 +71,13 @@ export default function MealsPage() {
     }
 
     const { mealsPerDay = 3, members = [] } = house;
+
+    const isMealOff = (member: { mealsEnabled?: boolean; offFromDate?: string }, dateStr: string) => {
+        if (member.mealsEnabled === false && member.offFromDate && dateStr >= member.offFromDate) {
+            return true;
+        }
+        return false;
+    };
 
     const houseCreatedAt = house.createdAt ? new Date(house.createdAt) : null;
     const houseCreationDateOnly = houseCreatedAt
@@ -154,7 +122,7 @@ export default function MealsPage() {
                         mb: 0.1,
                         mx: { xs: -2, sm: -3 },
                         px: { xs: 2, sm: 3 },
-                        backgroundColor: 'transparent !important', // Let glass-nav handle it
+                        backgroundColor: 'transparent !important',
                     }}>
                         <Box>
                             <Typography variant="h4" component="h1" sx={{
@@ -177,7 +145,7 @@ export default function MealsPage() {
                         View and monitor household meal consumption
                     </Typography>
 
-                    {/* Month Navigator - Premium Glass Style */}
+                    {/* Month Navigator */}
                     <Paper className="glass" sx={{
                         display: 'flex',
                         alignItems: 'center',
@@ -227,7 +195,7 @@ export default function MealsPage() {
                         </IconButton>
                     </Paper>
 
-                    {/* Desktop View: Modern Grid */}
+                    {/* Desktop View */}
                     <Paper className="glass" sx={{
                         p: 3,
                         borderRadius: 4,
@@ -291,7 +259,7 @@ export default function MealsPage() {
                                             const l = memberMeals.lunch ?? true;
                                             const d = memberMeals.dinner ?? true;
 
-                                            const StatusChip = ({ active, icon: Icon }: { active: boolean, icon: any }) => (
+                                            const StatusChip = ({ active, icon: Icon }: { active: boolean, icon: React.ElementType }) => (
                                                 <Box sx={{
                                                     width: 30,
                                                     height: 30,
@@ -303,7 +271,8 @@ export default function MealsPage() {
                                                     color: active ? '#4caf50' : 'rgba(255, 255, 255, 0.2)',
                                                     border: active ? '1.5px solid rgba(76, 175, 80, 0.3)' : '1px solid rgba(255, 255, 255, 0.05)',
                                                     transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-                                                    cursor: 'default'
+                                                    cursor: 'default',
+                                                    opacity: isMealOff(member, dateStr) ? 0.3 : 1
                                                 }}>
                                                     <Icon sx={{ fontSize: 16 }} />
                                                 </Box>
@@ -311,9 +280,9 @@ export default function MealsPage() {
 
                                             return (
                                                 <Stack key={`${dateStr}-${member.email}`} direction="row" spacing={2} justifyContent="center">
-                                                    {mealsPerDay === 3 && <StatusChip active={b} icon={LightModeIcon} />}
-                                                    <StatusChip active={l} icon={WbSunnyIcon} />
-                                                    <StatusChip active={d} icon={BedtimeIcon} />
+                                                    {mealsPerDay === 3 && <StatusChip active={b && !isMealOff(member, dateStr)} icon={LightModeIcon} />}
+                                                    <StatusChip active={l && !isMealOff(member, dateStr)} icon={WbSunnyIcon} />
+                                                    <StatusChip active={d && !isMealOff(member, dateStr)} icon={BedtimeIcon} />
                                                 </Stack>
                                             );
                                         })}
@@ -323,7 +292,7 @@ export default function MealsPage() {
                         </Box>
                     </Paper>
 
-                    {/* Mobile View: High-End Cards */}
+                    {/* Mobile View */}
                     <Box sx={{ display: { xs: 'flex', md: 'none' }, flexDirection: 'column', gap: 2.5 }}>
                         {days.map(dateStr => {
                             const dateObj = new Date(dateStr);
@@ -364,7 +333,7 @@ export default function MealsPage() {
                                             const l = memberMeals.lunch ?? true;
                                             const d = memberMeals.dinner ?? true;
 
-                                            const MobileStatusIcon = ({ active, icon: Icon }: { active: boolean, icon: any }) => (
+                                            const MobileStatusIcon = ({ active, icon: Icon }: { active: boolean, icon: React.ElementType }) => (
                                                 <Box sx={{
                                                     display: 'flex',
                                                     alignItems: 'center',
@@ -375,7 +344,8 @@ export default function MealsPage() {
                                                     bgcolor: active ? 'rgba(76, 175, 80, 0.12)' : 'rgba(255, 255, 255, 0.03)',
                                                     color: active ? '#4caf50' : 'rgba(255, 255, 255, 0.2)',
                                                     border: active ? '1px solid rgba(76, 175, 80, 0.2)' : '1px solid rgba(255, 255, 255, 0.05)',
-                                                    transition: 'all 0.2s ease'
+                                                    transition: 'all 0.2s ease',
+                                                    opacity: isMealOff(member, dateStr) ? 0.3 : 1
                                                 }}>
                                                     <Icon sx={{ fontSize: 14 }} />
                                                 </Box>
@@ -392,9 +362,15 @@ export default function MealsPage() {
                                                         </Typography>
                                                     </Box>
                                                     <Box sx={{ display: 'flex', gap: 0.8 }}>
-                                                        {mealsPerDay === 3 && <MobileStatusIcon active={b} icon={LightModeIcon} />}
-                                                        <MobileStatusIcon active={l} icon={WbSunnyIcon} />
-                                                        <MobileStatusIcon active={d} icon={BedtimeIcon} />
+                                                        {isMealOff(member, dateStr) ? (
+                                                            <Typography variant="caption" sx={{ color: 'error.main', fontWeight: 700, opacity: 0.7 }}>OFF</Typography>
+                                                        ) : (
+                                                            <>
+                                                                {mealsPerDay === 3 && <MobileStatusIcon active={b} icon={LightModeIcon} />}
+                                                                <MobileStatusIcon active={l} icon={WbSunnyIcon} />
+                                                                <MobileStatusIcon active={d} icon={BedtimeIcon} />
+                                                            </>
+                                                        )}
                                                     </Box>
                                                 </Box>
                                             );
@@ -405,7 +381,7 @@ export default function MealsPage() {
                         })}
                     </Box>
 
-                    {/* Meal Summary Widget - Premium Stat Cards */}
+                    {/* Meal Summary Widget */}
                     <Box sx={{ mt: 8 }}>
                         <Box sx={{ mb: 3 }}>
                             <Typography variant="h5" sx={{ fontWeight: 800, mb: 1 }}>Monthly Consumption</Typography>
@@ -416,6 +392,8 @@ export default function MealsPage() {
                             {members.map(member => {
                                 let totalMealsConsumed = 0;
                                 days.forEach(dateStr => {
+                                    if (isMealOff(member, dateStr)) return;
+
                                     const dayRecord = currentMonthMeals.find(m => m.date === dateStr);
                                     const m = dayRecord?.meals?.[member.email] || {};
                                     if (mealsPerDay === 3 && (m.breakfast ?? true)) totalMealsConsumed++;

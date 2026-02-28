@@ -31,9 +31,17 @@ export function formatTimeStr(timeStr: string): string {
 }
 
 /**
- * Combines date and time in a locale-aware format.
+ * Combines date and time in a detailed locale-aware format.
+ * Format: "MMM DD, h:mm:ss A" (e.g., "Feb 28, 9:26:38 PM")
  */
-export function formatDateTimeLocale(date: Date | string): string {
+export function formatDetailedDateTime(date: Date | string): string {
     const d = typeof date === 'string' ? new Date(date) : date;
-    return `${formatDateLocale(d)}, ${formatTimeLocale(d)}`;
+    return d.toLocaleString(undefined, {
+        month: 'short',
+        day: 'numeric',
+        hour: 'numeric',
+        minute: 'numeric',
+        second: 'numeric',
+        hour12: true
+    });
 }

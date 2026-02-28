@@ -11,6 +11,10 @@ export interface House {
     mealsPerDay?: 2 | 3;
     mealUpdateWindowStart?: string; // e.g. "20:00" — when members can start updating next day meals
     mealUpdateWindowEnd?: string;   // e.g. "05:00" — when the update window closes (next morning)
+    mealOffRequests?: Record<string, {
+        requestedAt: string;
+        status: 'pending' | 'approved';
+    }>;
     members?: {
         email: string;
         name?: string;
@@ -23,8 +27,15 @@ export interface House {
         messenger?: string;
         iban?: string;
         wallet?: string;
+        mealsEnabled?: boolean;
+        offFromDate?: string; // YYYY-MM-DD
     }[];
-    memberDetails?: Record<string, { role: 'manager' | 'member', rentAmount: number }>;
+    memberDetails?: Record<string, {
+        role: 'manager' | 'member',
+        rentAmount: number,
+        mealsEnabled?: boolean,
+        offFromDate?: string
+    }>;
     pendingPayments?: {
         id: string;
         from: string;

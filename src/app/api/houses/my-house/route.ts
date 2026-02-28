@@ -41,7 +41,7 @@ export async function GET(request: Request) {
         // 3. Fetch details for all members
         const memberPromises = houseData.members.map(async (memberEmail: string) => {
             const memberSnap = await adminDb.collection('users').doc(memberEmail).get();
-            const baseData = memberSnap.exists ? { email: memberEmail, ...memberSnap.data() } : { email: memberEmail };
+            const baseData = memberSnap.exists ? { email: memberEmail, ...(memberSnap.data() as object) } : { email: memberEmail };
 
             // Inject memberDetails (role, rentAmount) from house document if it exists
             let additionalDetails = houseData.memberDetails?.[memberEmail];

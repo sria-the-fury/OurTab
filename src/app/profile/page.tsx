@@ -24,6 +24,9 @@ import EditIcon from '@mui/icons-material/Edit';
 import CheckIcon from '@mui/icons-material/Check';
 import CloseIcon from '@mui/icons-material/Close';
 import CakeIcon from '@mui/icons-material/Cake';
+import RestaurantMenuIcon from '@mui/icons-material/RestaurantMenu';
+import RestaurantIcon from '@mui/icons-material/Restaurant';
+import NoMealsIcon from '@mui/icons-material/NoMeals';
 import AccountBalanceIcon from '@mui/icons-material/AccountBalance';
 import HowToVoteIcon from '@mui/icons-material/HowToVote';
 import CancelIcon from '@mui/icons-material/Cancel';
@@ -41,6 +44,7 @@ import DialogContent from '@mui/material/DialogContent';
 import DialogContentText from '@mui/material/DialogContentText';
 import DialogActions from '@mui/material/DialogActions';
 import AuthGuard from '@/components/AuthGuard';
+import { formatDetailedDateTime } from '@/utils/date';
 
 export default function Profile() {
     const { user, currency, updateCurrency, loading: authLoading, dbUser, house, mutateUser, mutateHouse, logout } = useAuth();
@@ -771,6 +775,134 @@ export default function Profile() {
                         </Paper>
                     )}
 
+                    {/* ── Card 4: Meal Status ── */}
+                    {hasHouse && houseDetails?.typeOfHouse === 'meals_and_expenses' && (
+                        <Paper className="glass animate-stagger" sx={{ p: 3, background: 'transparent', transitionDelay: '0.35s' }}>
+                            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 3 }}>
+                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                                    <Box sx={{ p: 1, borderRadius: '10px', background: 'rgba(255, 101, 132, 0.1)' }}>
+                                        <RestaurantMenuIcon sx={{ color: '#FF6584', fontSize: 20 }} />
+                                    </Box>
+                                    <Typography variant="subtitle1" fontWeight={900}>Meal Status</Typography>
+                                </Box>
+                            </Box>
+
+                            {(() => {
+                                const myDetails = houseDetails.members?.find(m => m.email === user.email);
+                                const isOff = myDetails?.mealsEnabled === false;
+                                const pendingReq = houseDetails.mealOffRequests?.[user.email];
+                                const offFrom = myDetails?.offFromDate;
+
+                                if (isOff) {
+                                    return (
+                                        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                                            <Alert icon={<NoMealsIcon fontSize="inherit" />} severity="warning" sx={{ borderRadius: '12px', bgcolor: 'rgba(237, 108, 2, 0.05)' }}>
+                                                Your meals are <strong>OFF</strong>. No meals counting from {offFrom || 'N/A'}.
+                                            </Alert>
+                                            <Button
+                                                variant="contained"
+                                                color="success"
+                                                onClick={async () => {
+                                                    setLoading(true);
+                                                    try {
+                                                        const res = await fetch('/api/meals/turn-on', {
+                                                            method: 'POST',
+                                                            headers: { 'Content-Type': 'application/json' },
+                                                            body: JSON.stringify({ houseId: houseDetails.id, email: user.email })
+                                                        });
+                                                        if (res.ok) {
+                                                            showToast('Meals turned back ON!', 'success');
+                                                            mutateHouse();
+                                                        } else {
+                                                            showToast('Failed to turn on meals', 'error');
+                                                        }
+                                                    } catch { showToast('Error turning on meals', 'error'); }
+                                                    setLoading(false);
+                                                }}
+                                                sx={{ borderRadius: '12px' }}
+                                                disabled={loading}
+                                            >
+                                                Turn Meals ON
+                                            </Button>
+                                        </Box>
+                                    );
+                                }
+
+                                if (pendingReq) {
+                                    return (
+                                        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                                            <Alert severity="info" sx={{ borderRadius: '12px', bgcolor: 'rgba(2, 136, 209, 0.05)' }}>
+                                                Request to turn off meals is <strong>pending approval</strong> from house manager.
+                                            </Alert>
+                                            <Typography variant="caption" sx={{ opacity: 0.6, textAlign: 'center' }}>
+                                                Requested on {formatDetailedDateTime(pendingReq.requestedAt)}
+                                            </Typography>
+                                            <Button
+                                                size="small"
+                                                variant="text"
+                                                color="inherit"
+                                                onClick={async () => {
+                                                    setLoading(true);
+                                                    try {
+                                                        const res = await fetch('/api/meals/cancel-off-request', {
+                                                            method: 'POST',
+                                                            headers: { 'Content-Type': 'application/json' },
+                                                            body: JSON.stringify({ houseId: house.id, email: user.email })
+                                                        });
+                                                        if (res.ok) {
+                                                            showToast('Request cancelled', 'success');
+                                                            mutateHouse();
+                                                        } else {
+                                                            showToast('Failed to cancel request', 'error');
+                                                        }
+                                                    } catch { showToast('Error canceling request', 'error'); }
+                                                    setLoading(false);
+                                                }}
+                                                sx={{ opacity: 0.5, '&:hover': { opacity: 1 } }}
+                                                disabled={loading}
+                                            >
+                                                Cancel Request
+                                            </Button>
+                                        </Box>
+                                    );
+                                }
+
+                                return (
+                                    <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                                        <Alert icon={<RestaurantIcon fontSize="inherit" />} severity="success" sx={{ borderRadius: '12px', bgcolor: 'rgba(76, 175, 80, 0.05)' }}>
+                                            Your meals are <strong>ON</strong> and being counted.
+                                        </Alert>
+                                        <Button
+                                            variant="outlined"
+                                            color="error"
+                                            onClick={async () => {
+                                                setLoading(true);
+                                                try {
+                                                    const res = await fetch('/api/meals/request-off', {
+                                                        method: 'POST',
+                                                        headers: { 'Content-Type': 'application/json' },
+                                                        body: JSON.stringify({ houseId: houseDetails.id, email: user.email })
+                                                    });
+                                                    if (res.ok) {
+                                                        showToast('Meal off request sent to manager', 'success');
+                                                        mutateHouse();
+                                                    } else {
+                                                        showToast('Failed to send request', 'error');
+                                                    }
+                                                } catch { showToast('Error sending request', 'error'); }
+                                                setLoading(false);
+                                            }}
+                                            sx={{ borderRadius: '12px' }}
+                                            disabled={loading}
+                                        >
+                                            Request to Turn Off Meals
+                                        </Button>
+                                    </Box>
+                                );
+                            })()}
+                        </Paper>
+                    )}
+
                     {/* ── Card 4: House Management ── */}
                     <Paper className="glass animate-stagger" sx={{ p: 3, background: 'transparent', transitionDelay: '0.4s' }}>
 
@@ -780,6 +912,52 @@ export default function Profile() {
                                 {/* Manager Settings (Only for meals_and_expenses) */}
                                 {houseDetails.typeOfHouse === 'meals_and_expenses' && (
                                     <Box sx={{ mt: 2 }}>
+                                        {/* Pending Meal-Off Requests */}
+                                        {isManager && houseDetails.mealOffRequests && Object.keys(houseDetails.mealOffRequests).length > 0 && (
+                                            <Box sx={{ mb: 4, p: 2, borderRadius: '12px', border: '1px solid rgba(255, 101, 132, 0.2)', bgcolor: 'rgba(255, 101, 132, 0.02)' }}>
+                                                <Typography variant="subtitle2" sx={{ fontWeight: 900, mb: 1, color: '#FF6584' }}>Pending Meal-Off Requests</Typography>
+                                                {Object.entries(houseDetails.mealOffRequests).map(([email, req]: [string, any]) => {
+                                                    const m = houseDetails.members?.find(mem => mem.email === email);
+                                                    return (
+                                                        <Box key={email} sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', py: 1, borderBottom: '1px solid rgba(255,255,255,0.05)', '&:last-child': { borderBottom: 'none' } }}>
+                                                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                                                                <Avatar src={m?.photoUrl} sx={{ width: 32, height: 32 }} />
+                                                                <Box>
+                                                                    <Typography variant="body2" fontWeight={700}>{m?.name || email.split('@')[0]}</Typography>
+                                                                    <Typography variant="caption" sx={{ opacity: 0.5 }}>Requested {formatDetailedDateTime(req.requestedAt)}</Typography>
+                                                                </Box>
+                                                            </Box>
+                                                            <Button
+                                                                size="small"
+                                                                variant="contained"
+                                                                color="success"
+                                                                onClick={async () => {
+                                                                    setLoading(true);
+                                                                    try {
+                                                                        const res = await fetch('/api/meals/approve-off', {
+                                                                            method: 'POST',
+                                                                            headers: { 'Content-Type': 'application/json' },
+                                                                            body: JSON.stringify({ houseId: houseDetails.id, email, managerEmail: user.email })
+                                                                        });
+                                                                        if (res.ok) {
+                                                                            showToast('Request approved!', 'success');
+                                                                            mutateHouse();
+                                                                        } else {
+                                                                            showToast('Failed to approve request', 'error');
+                                                                        }
+                                                                    } catch { showToast('Error approving request', 'error'); }
+                                                                    setLoading(false);
+                                                                }}
+                                                                sx={{ borderRadius: '8px' }}
+                                                            >
+                                                                Approve
+                                                            </Button>
+                                                        </Box>
+                                                    );
+                                                })}
+                                            </Box>
+                                        )}
+
                                         <Typography variant="subtitle2" sx={{ mb: 1.5, fontWeight: 'bold' }}>Member Settings</Typography>
                                         {houseDetails.members?.map((member) => (
                                             <Paper key={member.email} variant="outlined" sx={{ p: 1.5, mb: 1, display: 'flex', flexDirection: 'column', gap: 1 }}>
