@@ -1211,7 +1211,8 @@ export default function Dashboard() {
                                     const targetDateStr = targetDate.toISOString().split('T')[0];
 
                                     const myEmail = user?.email || '';
-                                    const myDetails = house.memberDetails?.[myEmail] || {};
+                                    const myDetails = (house.memberDetails?.[myEmail] || {}) as any;
+
                                     const isOff = myDetails.mealsEnabled === false && myDetails.offFromDate && targetDateStr >= myDetails.offFromDate;
 
                                     if (isOff) return (

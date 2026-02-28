@@ -131,11 +131,11 @@ export default function Profile() {
         mealUpdateWindowEnd?: string;
     }
     const hasHouse = !!dbUser?.houseId;
-    const houseDetails = house as HouseDetails | null;
+    const houseDetails = house as any;
     const effectiveCreator = houseDetails?.createdBy || (houseDetails?.members && houseDetails.members[0]?.email);
     const isCreator = effectiveCreator === user?.email;
-    const isManager = isCreator || (houseDetails?.members?.find(m => m.email === user?.email)?.role === 'manager');
-    const creatorLeft = Boolean(houseDetails?.createdBy && houseDetails?.members && !houseDetails.members.some(m => m.email === houseDetails.createdBy));
+    const isManager = isCreator || (houseDetails?.members?.find((m: any) => m.email === user?.email)?.role === 'manager');
+    const creatorLeft = Boolean(houseDetails?.createdBy && houseDetails?.members && !houseDetails.members.some((m: any) => m.email === houseDetails.createdBy));
     const canDeleteHouse = isCreator || creatorLeft;
     const deletionRequest = houseDetails?.deletionRequest;
     const memberCount = (houseDetails?.members || []).length;
@@ -788,9 +788,9 @@ export default function Profile() {
                             </Box>
 
                             {(() => {
-                                const myDetails = houseDetails.members?.find(m => m.email === user.email);
+                                const myDetails = (houseDetails.members?.find((m: any) => m.email === user.email)) as any;
                                 const isOff = myDetails?.mealsEnabled === false;
-                                const pendingReq = houseDetails.mealOffRequests?.[user.email];
+                                const pendingReq = user.email ? houseDetails.mealOffRequests?.[user.email] : null;
                                 const offFrom = myDetails?.offFromDate;
 
                                 if (isOff) {
@@ -847,7 +847,7 @@ export default function Profile() {
                                                         const res = await fetch('/api/meals/cancel-off-request', {
                                                             method: 'POST',
                                                             headers: { 'Content-Type': 'application/json' },
-                                                            body: JSON.stringify({ houseId: house.id, email: user.email })
+                                                            body: JSON.stringify({ houseId: houseDetails?.id, email: user.email })
                                                         });
                                                         if (res.ok) {
                                                             showToast('Request cancelled', 'success');
@@ -916,8 +916,8 @@ export default function Profile() {
                                         {isManager && houseDetails.mealOffRequests && Object.keys(houseDetails.mealOffRequests).length > 0 && (
                                             <Box sx={{ mb: 4, p: 2, borderRadius: '12px', border: '1px solid rgba(255, 101, 132, 0.2)', bgcolor: 'rgba(255, 101, 132, 0.02)' }}>
                                                 <Typography variant="subtitle2" sx={{ fontWeight: 900, mb: 1, color: '#FF6584' }}>Pending Meal-Off Requests</Typography>
-                                                {Object.entries(houseDetails.mealOffRequests).map(([email, req]: [string, any]) => {
-                                                    const m = houseDetails.members?.find(mem => mem.email === email);
+                                                {Object.entries(houseDetails.mealOffRequests || {}).map(([email, req]: [string, any]) => {
+                                                    const m = (houseDetails.members as any[])?.find((mem: any) => mem.email === email);
                                                     return (
                                                         <Box key={email} sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', py: 1, borderBottom: '1px solid rgba(255,255,255,0.05)', '&:last-child': { borderBottom: 'none' } }}>
                                                             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
@@ -959,7 +959,7 @@ export default function Profile() {
                                         )}
 
                                         <Typography variant="subtitle2" sx={{ mb: 1.5, fontWeight: 'bold' }}>Member Settings</Typography>
-                                        {houseDetails.members?.map((member) => (
+                                        {((houseDetails.members || []) as any[]).map((member: any) => (
                                             <Paper key={member.email} variant="outlined" sx={{ p: 1.5, mb: 1, display: 'flex', flexDirection: 'column', gap: 1 }}>
                                                 <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                                                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
@@ -1097,9 +1097,9 @@ export default function Profile() {
                                     </Alert>
                                 )}
 
-                                {otherLeaveRequests.map(([email, req]: [string, { approvals?: string[] }]) => {
+                                {otherLeaveRequests.map(([email, req]: [any, any]) => {
                                     const hasApprovedLeave = req.approvals?.includes(user?.email ?? '');
-                                    const requesterObj = houseDetails?.members?.find(m => m.email === email);
+                                    const requesterObj = (houseDetails?.members as any[])?.find((m: any) => m.email === email);
                                     const requesterName = requesterObj?.name || email.split('@')[0];
                                     const requesterPhotoUrl = requesterObj?.photoUrl || '';
                                     return (
@@ -1126,7 +1126,7 @@ export default function Profile() {
                                 )}
 
                                 {deletionRequest && deletionRequest.initiatedBy !== user?.email && !hasApproved && (() => {
-                                    const initiatorObj = houseDetails?.members?.find(m => m.email === deletionRequest.initiatedBy);
+                                    const initiatorObj = (houseDetails?.members as any[])?.find((m: any) => m.email === deletionRequest.initiatedBy);
                                     const initiatorName = initiatorObj?.name || deletionRequest.initiatedBy?.split('@')[0] || 'A member';
                                     const initiatorPhotoUrl = initiatorObj?.photoUrl || '';
                                     return (
