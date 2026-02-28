@@ -6,48 +6,47 @@
 
 ## ✨ Features
 
-### 🔐 Authentication
-- **Google Sign-In** via Firebase Authentication
-- Protected routes — unauthenticated users are redirected to the login page
-- Persistent sessions across page refreshes
+### 🔐 Authentication & Security
+- **Google Sign-In** via Firebase Authentication.
+- **Protected Routes** — unauthenticated users are redirected to the login page.
+- **Persistent Sessions** across page refreshes.
+- **Permission-based Access** — only house members can view expenses, and only owners can edit them within a 48-hour window.
 
 ### 🏠 House Management
-- Create a **named house** and invite members by email
-- View all house members with their profile photos
-- Collaborative **house deletion** flow: creator initiates, all members must approve before data is wiped
-- House creator can cancel a pending deletion at any time
+- **Named Households** — create or join a house via invite.
+- **Role System** — **Managers** can update member settings (Rent, Role) and approve requests. **Members** have standard access.
+- **Manager Promotion** — dynamic role switching; if a non-creator manager promotes someone else, they revert to member status.
+- **Meal Management** — toggle "Meals On/Off" with a manager approval flow and automatic transition periods.
+- **Fund Deposits** — members can deposit funds into the house account (e.g., for rent or utilities), requiring manager verification.
+- **Collaborative Deletion** — house deletion requires approval from all members to prevent accidental data loss.
 
-### 📊 Dashboard
-A real-time overview of your household finances featuring:
-- **Total Expenses** for the current month
-- **My Expenses** — your personal spending this month
-- **My House** — a quick view of members with their avatars
-- **Buy List Preview** — shows your top 3 pending shopping items, clickable to navigate straight to the full list
-- **Month Navigation** — arrow buttons to browse previous months' expenses
-- **Settlements panel** — shows exactly who owes whom and how much
-- **Expense list** — most recent expenses for the month, expand to show all
+### 📊 Financial Dashboard
+- **Real-time Overview** — total house expenses vs. your personal monthly spending.
+- **Smart Settlements** — automated calculation of who owes whom, optimized to minimize transaction count.
+- **Expense History** — browse recent expenses or navigate through previous months with ease.
+- **Currency Support** — configurable house currency ($, ₹, £, etc.).
+- **PDF Export** — generate professional expense reports with one click (via jsPDF).
 
-### 🧾 Shopping / Add Expense
-- Build a shopping trip by adding individual **items + prices**
-- Add an optional note for the whole trip
-- **Split contributions** with housemates — select who contributed and how much
-- Auto-fills "Your contribution" as the remaining amount
-- One-click **"I Pay All"** or **"Split Equally"** shortcuts
-- Generates a beautiful **PDF Expense Report** with settlements and member breakdown (via jsPDF)
+### 🧾 Shopping & Expenses
+- **Multi-Contributor Splitting** — split bills by absolute amounts or percentages.
+- **Shortcut Actions** — "I Pay All" or "Split Equally" for rapid entry.
+- **Interactive Buy List** — shared list with auto-capitalization and check-off history.
+- **✨ Smart Auto-Mark** — when an expense is added (e.g., "Bread"), the matching item on the buy list is automatically ticked.
+- **Cleanup Automation** — completed items auto-delete after 12 hours, with a 5-minute safety window for accidental unmarking.
 
-### 🛍️ Buy List
-- Shared buy list visible to the whole house
-- Add items with auto-capitalize on first letter
-- **Check off** items when purchased — shows who marked it or **✨ Auto marked** if triggered automatically
-- Auto-marking: when an expense is submitted that mentions an item by name, that item is auto-ticked
-- Completed items **auto-delete after 12 hours** to keep the list clean
-- Completed items cannot be manually deleted or unmarked
+---
 
-### 👤 Profile
-- View and manage your account details
-- House management — add members, initiate / approve / cancel house deletion
-- **Dark / Light theme toggle** (moon/sun icon in the navbar) with preference saved to `localStorage`
-- Logout button (only visible on the Profile page)
+## 🔔 Notifications System
+
+OurTab keeps the whole house in sync with real-time, categorized alerts:
+
+- **🛒 Shopping Alerts** — notified when housemates add items to the Buy List.
+- **🧾 Expense Alerts** — stay updated whenever a new bill is added or an old one is edited.
+- **💳 Payment & Funds** — alerts for payment requests, approval of fund deposits, or settled debts.
+- **🏠 House Management** — notifications for new members joining, role changes (promoted to Manager), or house deletion requests.
+- **🍽️ Meal Requests** — managers are notified when a member requests to turn off their meals for upcoming days.
+- **🎂 Special Occasions** — automated birthday reminders for house members.
+- **🔊 Live Feedback** — visual "pulse" indicators for unread alerts and custom notification sounds.
 
 ---
 
@@ -130,32 +129,50 @@ Open [http://localhost:3000](http://localhost:3000) in your browser.
 src/
 ├── app/
 │   ├── api/                  # Next.js API routes (Firestore operations)
+│   │   ├── auth/             # Firebase Authentication logic
 │   │   ├── expenses/         # Create, read, update, delete expenses
-│   │   ├── houses/           # House management, member add/delete
+│   │   ├── fund-deposits/    # Managing house fund deposits and approvals
+│   │   ├── houses/           # House management, member add/delete, roles
+│   │   ├── meals/            # Meals On/Off toggles and manager approval
+│   │   ├── notifications/    # Notifications CRUD and read flags
 │   │   ├── settlements/      # Settlement calculation logic
-│   │   ├── shopping-todos/   # Buy List CRUD
+│   │   ├── shopping-todos/   # Buy List CRUD and auto-marking
 │   │   └── users/            # User profile data
 │   ├── buy-list/             # Buy List page
-│   ├── dashboard/            # Dashboard page
-│   ├── profile/              # Profile & house management page
-│   └── shopping/             # Add Expense / Shopping page
+│   ├── dashboard/            # Core financial overview & settlements page
+│   ├── meals/                # Meals management UI
+│   ├── notifications/        # Alerts & notifications page
+│   ├── profile/              # Account & household settings page
+│   ├── shopping/             # Live shopping / expense entry page
+│   ├── globals.css           # Global styles and design system
+│   └── layout.tsx            # Main application layout wrapper
 ├── components/
-│   ├── AuthContext.tsx       # Firebase auth state & user context
-│   ├── AuthGuard.tsx         # Route protection wrapper
-│   ├── BottomNav.tsx         # Mobile bottom navigation
-│   ├── Navbar.tsx            # Top navigation bar with theme toggle
-│   ├── ThemeRegistry.tsx     # MUI theme provider
-│   └── ToastContext.tsx      # Global toast notification system
+│   ├── AuthContext.tsx       # Global Firebase auth & user provider
+│   ├── AuthGuard.tsx         # HOC to protect authenticated routes
+│   ├── BottomNav.tsx         # Mobile-first bottom navigation
+│   ├── Navbar.tsx            # Sticky top bar with theme toggle
+│   ├── NotificationBell.tsx  # Drawer-based notification UI
+│   ├── ThemeRegistry.tsx     # MUI Emotion & SSR provider
+│   └── ToastContext.tsx      # Global dynamic toast alerts
 ├── hooks/
-│   ├── useHouseData.ts       # Fetches house, expenses & todos with SWR
-│   ├── useShoppingTodos.ts   # Fetches and mutates the buy list
-│   └── useUserData.ts        # Fetches user's current house state
+│   ├── useHouseData.ts       # Central data fetcher (houses, expenses, todos)
+│   ├── useNotifications.ts   # Notification polling & mutation
+│   ├── useShoppingTodos.ts   # Specialized Buy List hook
+│   └── useUserData.ts        # Fetches authenticated user's profile
 ├── lib/
-│   ├── firebase.ts           # Firebase client initialization
-│   └── firebaseAdmin.ts      # Firebase admin initialization for API routes
+│   ├── firebase.ts           # Firebase client-side initialization
+│   ├── firebaseAdmin.ts      # Server-side Admin SDK initialization
+│   └── notifications.ts      # Unified server-side notification trigger
 ├── types/
-│   └── settlement-types.ts   # TypeScript interfaces for settlements
-└── theme.ts                  # MUI theme factory (light + dark)
+│   ├── fund-types.ts         # Deposit & refund interfaces
+│   ├── meal-types.ts         # User meal state interfaces
+│   ├── notification.ts       # Unified notification schema
+│   └── settlement-types.ts   # Debt & credit interfaces
+├── utils/
+│   ├── currency.ts           # Currency formatting & symbol helpers
+│   ├── date.ts               # Locale-aware time & frequency formatting
+│   └── notificationSound.ts  # Feedback audio utility
+└── theme.ts                  # Shared MUI Light/Dark theme definition
 ```
 
 ---
