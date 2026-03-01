@@ -67,7 +67,9 @@ export async function POST(request: Request) {
                 message,
                 relatedId: newPayment.id,
                 senderName,
-                senderPhotoUrl
+                senderPhotoUrl,
+                actionType: 'approve_payment',
+                metadata: { houseId, senderEmail: fromEmail }
             });
         } catch (e) { console.error('Error notifying request payment', e); }
 

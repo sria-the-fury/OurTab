@@ -147,3 +147,21 @@ export async function PATCH(request: Request) {
         return NextResponse.json({ error: 'Error updating notifications' }, { status: 500 });
     }
 }
+
+export async function DELETE(request: Request) {
+    try {
+        const { searchParams } = new URL(request.url);
+        const notificationId = searchParams.get('id');
+
+        if (!notificationId) {
+            return NextResponse.json({ error: 'Missing notification id' }, { status: 400 });
+        }
+
+        await adminDb.collection('notifications').doc(notificationId).delete();
+        return NextResponse.json({ success: true });
+    } catch (error) {
+        console.error('Error deleting notification:', error);
+        return NextResponse.json({ error: 'Error deleting notification' }, { status: 500 });
+    }
+}
+

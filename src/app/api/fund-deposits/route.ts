@@ -70,7 +70,9 @@ export async function POST(request: Request) {
                             message: `requested to deposit ${currencySymbol}${Number(amount).toFixed(2)} to the house fund.`,
                             senderName: finalSenderName,
                             senderPhotoUrl: finalSenderPhotoUrl,
-                            relatedId: docRef.id
+                            relatedId: docRef.id,
+                            actionType: 'approve_fund_deposit',
+                            metadata: { houseId, depositId: docRef.id, senderEmail: email }
                         })
                     );
                     await Promise.all(notifications);

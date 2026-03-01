@@ -164,7 +164,9 @@ export async function POST(request: Request) {
                     type: 'house',
                     message: `${userName} has requested to turn off meals. Meals will stop from ${formattedDate}.`,
                     senderName: userName,
-                    senderPhotoUrl: userPhotoUrl
+                    senderPhotoUrl: userPhotoUrl,
+                    actionType: 'approve_meal_off',
+                    metadata: { houseId, senderEmail: email }
                 })
             );
             await Promise.all(notifications);

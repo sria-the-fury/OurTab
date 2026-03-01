@@ -132,7 +132,9 @@ export async function DELETE(request: Request) {
                             type: 'house',
                             message: `has initiated to delete ${houseName}. Please approve carefully or all data will be lost.`,
                             senderName: userName,
-                            senderPhotoUrl: userPhotoUrl
+                            senderPhotoUrl: userPhotoUrl,
+                            actionType: 'approve_deletion',
+                            metadata: { houseId }
                         })
                     );
                 await Promise.all(notifications);

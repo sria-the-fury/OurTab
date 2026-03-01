@@ -1,48 +1,49 @@
 'use client';
 
+import { useState } from 'react';
 import Container from '@mui/material/Container';
 import Typography from '@mui/material/Typography';
 import Box from '@mui/material/Box';
 import Paper from '@mui/material/Paper';
 import List from '@mui/material/List';
-import ListItem from '@mui/material/ListItem';
-import ListItemText from '@mui/material/ListItemText';
 import Button from '@mui/material/Button';
 import IconButton from '@mui/material/IconButton';
 import Avatar from '@mui/material/Avatar';
+import CircularProgress from '@mui/material/CircularProgress';
 import NotificationsIcon from '@mui/icons-material/Notifications';
 import ReceiptIcon from '@mui/icons-material/Receipt';
 import PaymentsIcon from '@mui/icons-material/Payments';
 import ShoppingCartIcon from '@mui/icons-material/ShoppingCart';
 import HomeIcon from '@mui/icons-material/Home';
 import DoneAllIcon from '@mui/icons-material/DoneAll';
+import CheckCircleIcon from '@mui/icons-material/CheckCircle';
+import CancelIcon from '@mui/icons-material/Cancel';
 import { useNotifications } from '@/hooks/useNotifications';
 import { useHouseData } from '@/hooks/useHouseData';
+import { useAuth } from '@/components/AuthContext';
 import { getCurrencySymbol } from '@/utils/currency';
 import { formatTimeLocale, formatTimeStr } from '@/utils/date';
 import BottomNav from '@/components/BottomNav';
 import AuthGuard from '@/components/AuthGuard';
 import { useRouter } from 'next/navigation';
-import { AppNotification } from '@/types/notification';
+import { AppNotification, NotificationActionType } from '@/types/notification';
 
 export default function NotificationsPage() {
     const router = useRouter();
-    const { notifications, markAsRead, markAllAsRead, isLoading } = useNotifications();
-    const { house } = useHouseData();
+    const { notifications, markAsRead, markAllAsRead, isLoading, mutate } = useNotifications();
+    const { house, mutateHouse } = useHouseData();
+    const { user } = useAuth();
+
+    // Track loading state per notification id
+    const [actionLoading, setActionLoading] = useState<Record<string, boolean>>({});
 
     const currencySymbol = getCurrencySymbol(house?.currency);
 
     const processMessage = (message: string) => {
-        // Replace all instances of $ with the current house currency symbol
-        // This handles cases where old notifications might have hardcoded $
         let processed = message.replaceAll('$', currencySymbol);
-
-        // 1. Replace HH:mm times (e.g. 20:00) with locale-aware times
         processed = processed.replace(/\b([01]\d|2[0-3]):[0-5]\d\b/g, (match) => {
             return formatTimeStr(match);
         });
-
-        // 2. Replace h:mm AM/PM (e.g. 8:00 PM) with locale-aware times for legacy notifications
         processed = processed.replace(/\b(1[0-2]|0?[1-9]):([0-5]\d)\s*([AaPp][Mm])\b/g, (match, h, m, p) => {
             let hours = parseInt(h);
             const minutes = parseInt(m);
@@ -51,7 +52,6 @@ export default function NotificationsPage() {
             if (ampm === 'am' && hours === 12) hours = 0;
             return formatTimeStr(`${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`);
         });
-
         return processed;
     };
 
@@ -89,9 +89,8 @@ export default function NotificationsPage() {
 
     const handleNotificationClick = async (notification: AppNotification) => {
         if (!notification.read && notification.id) {
-            markAsRead([notification.id]); // Optimistic background update
+            markAsRead([notification.id]);
         }
-
         switch (notification.type) {
             case 'expense':
             case 'settlement':
@@ -109,6 +108,181 @@ export default function NotificationsPage() {
         }
     };
 
+    const handleAction = async (
+        e: React.MouseEvent,
+        notification: AppNotification,
+        action: 'approve' | 'reject'
+    ) => {
+        e.stopPropagation();
+        const id = notification.id!;
+        if (!user?.email || !notification.actionType) return;
+
+        setActionLoading(prev => ({ ...prev, [id]: true }));
+
+        try {
+            const meta = notification.metadata || {};
+            let res: Response | null = null;
+
+            switch (notification.actionType as NotificationActionType) {
+                case 'approve_payment':
+                    if (action === 'approve') {
+                        res = await fetch('/api/houses/approve-payment', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                houseId: meta.houseId,
+                                paymentId: notification.relatedId,
+                                approverEmail: user.email
+                            })
+                        });
+                    } else {
+                        res = await fetch('/api/houses/cancel-payment', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                houseId: meta.houseId,
+                                paymentId: notification.relatedId,
+                                cancellerEmail: user.email
+                            })
+                        });
+                    }
+                    break;
+
+                case 'approve_leave':
+                    res = await fetch('/api/houses/approve-leave', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            houseId: meta.houseId,
+                            userEmail: user.email,
+                            userToApprove: meta.senderEmail
+                        })
+                    });
+                    break;
+
+                case 'approve_deletion':
+                    res = await fetch('/api/houses/approve-deletion', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            houseId: meta.houseId,
+                            userEmail: user.email
+                        })
+                    });
+                    break;
+
+                case 'approve_fund_deposit':
+                    res = await fetch('/api/fund-deposits/approve', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            depositId: meta.depositId,
+                            action: action === 'approve' ? 'approve' : 'reject',
+                            managerEmail: user.email
+                        })
+                    });
+                    break;
+
+                case 'approve_meal_off':
+                    res = await fetch('/api/meals/approve-off', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            houseId: meta.houseId,
+                            email: meta.senderEmail,
+                            managerEmail: user.email
+                        })
+                    });
+                    break;
+            }
+
+            if (res && res.ok) {
+                // 1. Optimistically remove from local list immediately so buttons vanish
+                mutate(notifications.filter(n => n.id !== id), false);
+                // 2. Delete from Firestore so it doesn't reappear on next poll
+                fetch(`/api/notifications?id=${encodeURIComponent(id)}`, { method: 'DELETE' }).catch(() => { });
+                // 3. Refresh house data
+                mutateHouse();
+            }
+        } catch (err) {
+            console.error('Action error', err);
+        } finally {
+            setActionLoading(prev => ({ ...prev, [id]: false }));
+        }
+    };
+
+    const getActionButtons = (notification: AppNotification) => {
+        if (!notification.actionType || !notification.id) return null;
+        const id = notification.id;
+        const loading = actionLoading[id];
+
+        const showReject =
+            notification.actionType === 'approve_payment' ||
+            notification.actionType === 'approve_fund_deposit';
+
+        return (
+            <Box sx={{ mt: 1.5, display: 'flex', gap: 1, flexWrap: 'wrap' }} onClick={e => e.stopPropagation()}>
+                <Button
+                    size="small"
+                    variant="contained"
+                    disabled={loading}
+                    onClick={(e) => handleAction(e, notification, 'approve')}
+                    startIcon={loading ? <CircularProgress size={12} color="inherit" /> : <CheckCircleIcon />}
+                    sx={{
+                        borderRadius: '20px',
+                        px: 2,
+                        py: 0.4,
+                        fontSize: '0.75rem',
+                        fontWeight: 700,
+                        minHeight: 0,
+                        textTransform: 'none',
+                        bgcolor: 'rgba(76, 175, 80, 0.15)',
+                        color: '#4caf50',
+                        border: '1px solid rgba(76,175,80,0.3)',
+                        boxShadow: 'none',
+                        '&:hover': {
+                            bgcolor: 'rgba(76, 175, 80, 0.25)',
+                            boxShadow: '0 4px 12px rgba(76,175,80,0.2)',
+                        },
+                        '&:disabled': { opacity: 0.5 }
+                    }}
+                >
+                    {loading ? 'Processing…' : 'Approve'}
+                </Button>
+
+                {showReject && (
+                    <Button
+                        size="small"
+                        variant="contained"
+                        disabled={loading}
+                        onClick={(e) => handleAction(e, notification, 'reject')}
+                        startIcon={<CancelIcon />}
+                        sx={{
+                            borderRadius: '20px',
+                            px: 2,
+                            py: 0.4,
+                            fontSize: '0.75rem',
+                            fontWeight: 700,
+                            minHeight: 0,
+                            textTransform: 'none',
+                            bgcolor: 'rgba(244, 67, 54, 0.1)',
+                            color: '#f44336',
+                            border: '1px solid rgba(244,67,54,0.25)',
+                            boxShadow: 'none',
+                            '&:hover': {
+                                bgcolor: 'rgba(244, 67, 54, 0.2)',
+                                boxShadow: '0 4px 12px rgba(244,67,54,0.15)',
+                            },
+                            '&:disabled': { opacity: 0.5 }
+                        }}
+                    >
+                        Reject
+                    </Button>
+                )}
+            </Box>
+        );
+    };
+
     return (
         <AuthGuard>
             <main style={{ minHeight: '100vh', position: 'relative' }}>
@@ -123,16 +297,13 @@ export default function NotificationsPage() {
                         mx: { xs: -2, sm: -3 },
                         px: { xs: 2, sm: 3 },
                         animation: 'fadeInDown 0.8s ease-out',
-
                         backgroundColor: 'transparent !important',
                         display: 'flex',
                         flexDirection: 'column',
                         gap: 1,
-
                     }}>
                         <Box sx={{
                             display: 'flex',
-
                             justifyContent: 'space-between',
                             alignItems: 'center',
                         }}>
@@ -173,8 +344,8 @@ export default function NotificationsPage() {
                                 </Button>
                             )}
                         </Box>
-
                     </Box>
+
                     <Typography variant="body2" sx={{ color: 'text.secondary', marginBottom: 2, fontWeight: 600, letterSpacing: '0.05em', textTransform: 'uppercase', fontSize: '0.7rem', opacity: 0.7 }}>
                         Stay updated with your house
                     </Typography>
@@ -239,95 +410,104 @@ export default function NotificationsPage() {
                         </Box>
                     ) : (
                         <List sx={{ display: 'flex', flexDirection: 'column', gap: 2, p: 0 }}>
-                            {notifications.map((notification, idx) => (
-                                <Paper
-                                    key={notification.id}
-                                    onClick={() => handleNotificationClick(notification)}
-                                    sx={{
-                                        borderRadius: '24px',
-                                        p: 2,
-                                        cursor: 'pointer',
-                                        background: notification.read ? 'background.paper' : 'rgba(108, 99, 255, 0.03)',
-                                        border: '1px solid',
-                                        borderColor: notification.read ? 'rgba(0,0,0,0.05)' : 'rgba(108, 99, 255, 0.15)',
-                                        transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-                                        position: 'relative',
-                                        animation: `itemAppear 0.5s ease-out forwards ${idx * 0.05}s`,
-                                        opacity: 0,
-                                        boxShadow: notification.read ? '0 4px 12px rgba(0,0,0,0.02)' : '0 10px 25px rgba(108, 99, 255, 0.08)',
-                                        '&:hover': {
-                                            borderColor: '#6C63FF',
-                                            transform: 'translateY(-2px) scale(1.01)',
-                                            boxShadow: '0 20px 40px rgba(0,0,0,0.08)',
-                                            background: notification.read ? 'rgba(108, 99, 255, 0.01)' : 'rgba(108, 99, 255, 0.05)',
-                                        }
-                                    }}
-                                >
-                                    <Box sx={{ display: 'flex', gap: 2, alignItems: 'center' }}>
-                                        <Box sx={{ position: 'relative' }}>
-                                            <Avatar
-                                                src={notification.senderPhotoUrl}
-                                                sx={{
-                                                    width: 48,
-                                                    height: 48,
-                                                    borderRadius: '16px',
-                                                    bgcolor: getBgColorForType(notification.type),
-                                                    color: 'primary.main',
-                                                    border: '1px solid rgba(0,0,0,0.05)',
-                                                    boxShadow: '0 8px 16px rgba(0,0,0,0.05)'
-                                                }}
-                                            >
-                                                {!notification.senderPhotoUrl && getIconForType(notification.type)}
-                                            </Avatar>
-                                            {!notification.read && (
-                                                <Box sx={{
-                                                    position: 'absolute',
-                                                    top: -4,
-                                                    right: -4,
-                                                    width: 12,
-                                                    height: 12,
-                                                    borderRadius: '50%',
-                                                    bgcolor: '#6C63FF',
-                                                    border: '2px solid white',
-                                                    boxShadow: '0 0 10px rgba(108, 99, 255, 0.5)',
-                                                    animation: 'pulse 2s infinite'
-                                                }} />
-                                            )}
-                                        </Box>
-                                        <Box sx={{ flex: 1 }}>
-                                            <Typography
-                                                variant="body2"
-                                                sx={{
-                                                    fontWeight: !notification.read ? 700 : 500,
-                                                    color: !notification.read ? 'text.primary' : 'text.secondary',
-                                                    fontSize: '0.9rem',
-                                                    mb: 0.5,
-                                                    lineHeight: 1.4
-                                                }}
-                                            >
-                                                {(() => {
-                                                    let displayMessage = processMessage(notification.message);
-                                                    if (notification.senderName) {
-                                                        if (displayMessage.startsWith(notification.senderName)) {
-                                                            displayMessage = displayMessage.substring(notification.senderName.length).trim();
+                            {notifications.map((notification, idx) => {
+                                const actionButtons = getActionButtons(notification);
+                                const isActionable = !!notification.actionType;
+
+                                return (
+                                    <Paper
+                                        key={notification.id}
+                                        onClick={() => !isActionable && handleNotificationClick(notification)}
+                                        sx={{
+                                            borderRadius: '24px',
+                                            p: 2,
+                                            cursor: isActionable ? 'default' : 'pointer',
+                                            background: notification.read ? 'background.paper' : 'rgba(108, 99, 255, 0.03)',
+                                            border: '1px solid',
+                                            borderColor: notification.read ? 'rgba(0,0,0,0.05)' : 'rgba(108, 99, 255, 0.15)',
+                                            transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+                                            position: 'relative',
+                                            animation: `itemAppear 0.5s ease-out forwards ${idx * 0.05}s`,
+                                            opacity: 0,
+                                            boxShadow: notification.read ? '0 4px 12px rgba(0,0,0,0.02)' : '0 10px 25px rgba(108, 99, 255, 0.08)',
+                                            '&:hover': isActionable ? {} : {
+                                                borderColor: '#6C63FF',
+                                                transform: 'translateY(-2px) scale(1.01)',
+                                                boxShadow: '0 20px 40px rgba(0,0,0,0.08)',
+                                                background: notification.read ? 'rgba(108, 99, 255, 0.01)' : 'rgba(108, 99, 255, 0.05)',
+                                            }
+                                        }}
+                                    >
+                                        <Box sx={{ display: 'flex', gap: 2, alignItems: 'flex-start' }}>
+                                            <Box sx={{ position: 'relative', flexShrink: 0 }}>
+                                                <Avatar
+                                                    src={notification.senderPhotoUrl}
+                                                    sx={{
+                                                        width: 48,
+                                                        height: 48,
+                                                        borderRadius: '16px',
+                                                        bgcolor: getBgColorForType(notification.type),
+                                                        color: 'primary.main',
+                                                        border: '1px solid rgba(0,0,0,0.05)',
+                                                        boxShadow: '0 8px 16px rgba(0,0,0,0.05)'
+                                                    }}
+                                                >
+                                                    {!notification.senderPhotoUrl && getIconForType(notification.type)}
+                                                </Avatar>
+                                                {!notification.read && (
+                                                    <Box sx={{
+                                                        position: 'absolute',
+                                                        top: -4,
+                                                        right: -4,
+                                                        width: 12,
+                                                        height: 12,
+                                                        borderRadius: '50%',
+                                                        bgcolor: '#6C63FF',
+                                                        border: '2px solid white',
+                                                        boxShadow: '0 0 10px rgba(108, 99, 255, 0.5)',
+                                                        animation: 'pulse 2s infinite'
+                                                    }} />
+                                                )}
+                                            </Box>
+
+                                            <Box sx={{ flex: 1, minWidth: 0 }}>
+                                                <Typography
+                                                    variant="body2"
+                                                    sx={{
+                                                        fontWeight: !notification.read ? 700 : 500,
+                                                        color: !notification.read ? 'text.primary' : 'text.secondary',
+                                                        fontSize: '0.9rem',
+                                                        mb: 0.5,
+                                                        lineHeight: 1.4
+                                                    }}
+                                                >
+                                                    {(() => {
+                                                        let displayMessage = processMessage(notification.message);
+                                                        if (notification.senderName) {
+                                                            if (displayMessage.startsWith(notification.senderName)) {
+                                                                displayMessage = displayMessage.substring(notification.senderName.length).trim();
+                                                            }
+                                                            return (
+                                                                <>
+                                                                    <Box component="span" sx={{ color: 'primary.main', fontWeight: 800 }}>{notification.senderName} </Box>
+                                                                    {displayMessage}
+                                                                </>
+                                                            );
                                                         }
-                                                        return (
-                                                            <>
-                                                                <Box component="span" sx={{ color: 'primary.main', fontWeight: 800 }}>{notification.senderName} </Box>
-                                                                {displayMessage}
-                                                            </>
-                                                        );
-                                                    }
-                                                    return displayMessage;
-                                                })()}
-                                            </Typography>
-                                            <Typography variant="caption" sx={{ color: 'text.disabled', fontWeight: 600, fontSize: '0.7rem', display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                                                {formatTime(notification.createdAt)}
-                                            </Typography>
+                                                        return displayMessage;
+                                                    })()}
+                                                </Typography>
+                                                <Typography variant="caption" sx={{ color: 'text.disabled', fontWeight: 600, fontSize: '0.7rem', display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                                                    {formatTime(notification.createdAt)}
+                                                </Typography>
+
+                                                {/* Inline action buttons */}
+                                                {actionButtons}
+                                            </Box>
                                         </Box>
-                                    </Box>
-                                </Paper>
-                            ))}
+                                    </Paper>
+                                );
+                            })}
                         </List>
                     )}
                 </Container>

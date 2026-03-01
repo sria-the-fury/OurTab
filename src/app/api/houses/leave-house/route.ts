@@ -82,7 +82,9 @@ export async function POST(request: Request) {
                             type: 'house',
                             message: `wants to leave. Please check any remaining settlement and approve.`,
                             senderName: userName,
-                            senderPhotoUrl: userPhotoUrl
+                            senderPhotoUrl: userPhotoUrl,
+                            actionType: 'approve_leave',
+                            metadata: { houseId, senderEmail: userEmail }
                         })
                     );
                 await Promise.all(notifications);
