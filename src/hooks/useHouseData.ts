@@ -116,7 +116,8 @@ export function useHouseData() {
     // 4. Fetch Fund Deposits
     const { data: fundDeposits, error: fundDepositsError, isLoading: fundDepositsLoading, mutate: mutateFundDeposits } = useSWR<any[]>(
         house?.id ? `/api/fund-deposits?houseId=${house.id}` : null,
-        fetcher
+        fetcher,
+        { refreshInterval: 5000, revalidateOnFocus: true }
     );
 
     // 5. Fetch Meal Statuses

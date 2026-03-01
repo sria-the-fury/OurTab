@@ -31,7 +31,7 @@ import { AppNotification, NotificationActionType } from '@/types/notification';
 export default function NotificationsPage() {
     const router = useRouter();
     const { notifications, markAsRead, markAllAsRead, isLoading, mutate } = useNotifications();
-    const { house, mutateHouse } = useHouseData();
+    const { house, mutateHouse, mutateFundDeposits } = useHouseData();
     const { user } = useAuth();
 
     // Track loading state per notification id
@@ -203,6 +203,7 @@ export default function NotificationsPage() {
                 fetch(`/api/notifications?id=${encodeURIComponent(id)}`, { method: 'DELETE' }).catch(() => { });
                 // 3. Refresh house data
                 mutateHouse();
+                mutateFundDeposits();
             }
         } catch (err) {
             console.error('Action error', err);
