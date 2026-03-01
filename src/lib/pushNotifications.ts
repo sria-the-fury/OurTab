@@ -1,6 +1,6 @@
 import { adminDb, adminMessaging } from './firebaseAdmin';
 
-export async function sendPushNotification(email: string, title: string, body: string, data?: any) {
+export async function sendPushNotification(email: string, title: string, body: string, data?: any, iconUrl?: string) {
     try {
         const userDoc = await adminDb.collection('users').doc(email).get();
         if (!userDoc.exists) {
@@ -16,6 +16,8 @@ export async function sendPushNotification(email: string, title: string, body: s
             return;
         }
 
+        const notificationIcon = iconUrl || 'https://ourtab.vercel.app/icon-192.png';
+
         const message: any = {
             notification: {
                 title,
@@ -28,7 +30,9 @@ export async function sendPushNotification(email: string, title: string, body: s
                 notification: {
                     sound: 'default',
                     channelId: 'default',
-                    color: '#6C63FF'
+                    color: '#6C63FF',
+                    icon: 'stock_ticker_update', // standard resource if fallback needed
+                    image: notificationIcon
                 },
             },
             apns: {
@@ -39,6 +43,9 @@ export async function sendPushNotification(email: string, title: string, body: s
                         mutableContent: true,
                     },
                 },
+                fcm_options: {
+                    image: notificationIcon
+                }
             },
             webpush: {
                 headers: {
@@ -46,7 +53,7 @@ export async function sendPushNotification(email: string, title: string, body: s
                 },
                 notification: {
                     body,
-                    icon: '/icon-192.png',
+                    icon: notificationIcon,
                     badge: '/icon-192.png',
                     requireInteraction: true,
                 },

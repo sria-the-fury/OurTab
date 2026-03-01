@@ -44,17 +44,30 @@ export async function GET(request: Request) {
                     if (!notifSnap.exists) {
                         const title = 'Birthday Celebration! 🎂';
                         const message = `Tomorrow is ${memberData.name || memberEmail}'s birthday! Get ready to celebrate! 🎉`;
+
+                        // Fetch member photo for the push notification icon
+                        let memberPhotoUrl = '';
+                        try {
+                            const memberUserSnap = await adminDb.collection('users').doc(memberEmail).get();
+                            if (memberUserSnap.exists) {
+                                memberPhotoUrl = memberUserSnap.data()?.photoUrl || '';
+                            }
+                        } catch (e) {
+                            console.error('Error fetching member photo for birthday notif:', e);
+                        }
+
                         await notifRef.set({
                             userId: userId,
                             title,
                             message,
                             type: 'birthday',
                             read: false,
+                            senderPhotoUrl: memberPhotoUrl,
                             createdAt: new Date().toISOString()
                         });
 
-                        // Send push notification
-                        await sendPushNotification(userId, title, message);
+                        // Send push notification with member photo as icon
+                        await sendPushNotification(userId, title, message, null, memberPhotoUrl);
                     }
                 }
             }

@@ -14,7 +14,8 @@ export async function createNotification(notification: Omit<AppNotification, 'id
         // Send push notification
         const pushTitle = notification.title || (notification.senderName ? `${notification.senderName}` : 'House Update');
         const pushBody = notification.message;
-        await sendPushNotification(notification.userId, pushTitle, pushBody);
+        const iconUrl = notification.senderPhotoUrl;
+        await sendPushNotification(notification.userId, pushTitle, pushBody, null, iconUrl);
     } catch (error) {
         console.error('Error creating notification:', error);
     }
