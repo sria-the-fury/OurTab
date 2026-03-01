@@ -50,15 +50,8 @@ export async function GET(request: Request) {
         ];
 
         for (const notif of notifications) {
-            const docRef = adminDb.collection('notifications').doc();
-            batch.set(docRef, {
-                ...notif,
-                read: false,
-                createdAt: new Date().toISOString()
-            });
+            await createNotification(notif);
         }
-
-        await batch.commit();
 
         return NextResponse.json({ success: true, count: notifications.length, message: `Generated ${notifications.length} notifications for ${userId}` });
     } catch (error) {
