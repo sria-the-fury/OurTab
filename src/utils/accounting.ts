@@ -1,6 +1,6 @@
 import { House, Expense } from '@/hooks/useHouseData';
 import { FundDeposit } from '@/types/fund-types';
-import { MealStatus } from '@/types/meal-types';
+import { isTakingMeal } from './meals';
 
 export interface MemberAccounting {
     deposits: number;
@@ -34,7 +34,7 @@ export function calculateMemberFundAccounting(
     house: House | null | undefined,
     expenses: Expense[],
     fundDeposits: FundDeposit[],
-    meals: MealStatus[]
+    meals: any[]
 ): HouseAccountingResult {
     const emptyResult: HouseAccountingResult = {
         members: {},
@@ -94,17 +94,17 @@ export function calculateMemberFundAccounting(
         const monthlyMemberMeals: { [key: string]: number } = {};
         members.forEach(m => monthlyMemberMeals[getEmail(m)] = 0);
 
-        if (meals && meals.length > 0) {
-            meals.filter(m => m.date.startsWith(monthStr)).forEach(dayRecord => {
-                members.forEach(m => {
-                    const mEmail = getEmail(m);
-                    const mMeals = dayRecord.meals?.[mEmail] || {};
-                    if (mealsPerDay === 3 && (mMeals.breakfast ?? true)) monthlyMemberMeals[mEmail]++;
-                    if (mMeals.lunch ?? true) monthlyMemberMeals[mEmail]++;
-                    if (mMeals.dinner ?? true) monthlyMemberMeals[mEmail]++;
-                });
+        // Calculate meals for this month
+        meals.filter(m => m.date.startsWith(monthStr)).forEach(dayRecord => {
+            members.forEach(m => {
+                const mEmail = getEmail(m);
+                const dateStr = dayRecord.date;
+
+                if (mealsPerDay === 3 && isTakingMeal(mEmail, dateStr, 'breakfast', house, meals)) monthlyMemberMeals[mEmail]++;
+                if (isTakingMeal(mEmail, dateStr, 'lunch', house, meals)) monthlyMemberMeals[mEmail]++;
+                if (isTakingMeal(mEmail, dateStr, 'dinner', house, meals)) monthlyMemberMeals[mEmail]++;
             });
-        }
+        });
 
         const monthlyMealsConsumed = Object.values(monthlyMemberMeals).reduce((sum, count) => sum + count, 0);
         houseTotalMeals += monthlyMealsConsumed;

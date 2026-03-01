@@ -12,6 +12,7 @@ import { useHouseData } from '@/hooks/useHouseData';
 import Loader from '@/components/Loader';
 import BottomNav from '@/components/BottomNav';
 import AuthGuard from '@/components/AuthGuard';
+import { isTakingMeal, countMemberMeals } from '@/utils/meals';
 import Chip from '@mui/material/Chip';
 import IconButton from '@mui/material/IconButton';
 import { useToast } from '@/components/ToastContext';
@@ -71,13 +72,6 @@ export default function MealsPage() {
     }
 
     const { mealsPerDay = 3, members = [] } = house;
-
-    const isMealOff = (member: { mealsEnabled?: boolean; offFromDate?: string }, dateStr: string) => {
-        if (member.mealsEnabled === false && member.offFromDate && dateStr >= member.offFromDate) {
-            return true;
-        }
-        return false;
-    };
 
     const houseCreatedAt = house.createdAt ? new Date(house.createdAt) : null;
     const houseCreationDateOnly = houseCreatedAt
@@ -272,7 +266,7 @@ export default function MealsPage() {
                                                     border: active ? '1.5px solid rgba(76, 175, 80, 0.3)' : '1px solid rgba(255, 255, 255, 0.05)',
                                                     transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
                                                     cursor: 'default',
-                                                    opacity: isMealOff(member, dateStr) ? 0.3 : 1
+                                                    opacity: countMemberMeals(member.email, dateStr, house, meals) === 0 ? 0.3 : 1
                                                 }}>
                                                     <Icon sx={{ fontSize: 16 }} />
                                                 </Box>
@@ -280,9 +274,9 @@ export default function MealsPage() {
 
                                             return (
                                                 <Stack key={`${dateStr}-${member.email}`} direction="row" spacing={2} justifyContent="center">
-                                                    {mealsPerDay === 3 && <StatusChip active={b && !isMealOff(member, dateStr)} icon={LightModeIcon} />}
-                                                    <StatusChip active={l && !isMealOff(member, dateStr)} icon={WbSunnyIcon} />
-                                                    <StatusChip active={d && !isMealOff(member, dateStr)} icon={BedtimeIcon} />
+                                                    {mealsPerDay === 3 && <StatusChip active={isTakingMeal(member.email, dateStr, 'breakfast', house, meals)} icon={LightModeIcon} />}
+                                                    <StatusChip active={isTakingMeal(member.email, dateStr, 'lunch', house, meals)} icon={WbSunnyIcon} />
+                                                    <StatusChip active={isTakingMeal(member.email, dateStr, 'dinner', house, meals)} icon={BedtimeIcon} />
                                                 </Stack>
                                             );
                                         })}
@@ -345,11 +339,13 @@ export default function MealsPage() {
                                                     color: active ? '#4caf50' : 'rgba(255, 255, 255, 0.2)',
                                                     border: active ? '1px solid rgba(76, 175, 80, 0.2)' : '1px solid rgba(255, 255, 255, 0.05)',
                                                     transition: 'all 0.2s ease',
-                                                    opacity: isMealOff(member, dateStr) ? 0.3 : 1
+                                                    opacity: countMemberMeals(member.email, dateStr, house, meals) === 0 ? 0.3 : 1
                                                 }}>
                                                     <Icon sx={{ fontSize: 14 }} />
                                                 </Box>
                                             );
+
+                                            const memberMealCount = countMemberMeals(member.email, dateStr, house, meals);
 
                                             return (
                                                 <Box key={member.email} sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -362,13 +358,13 @@ export default function MealsPage() {
                                                         </Typography>
                                                     </Box>
                                                     <Box sx={{ display: 'flex', gap: 0.8 }}>
-                                                        {isMealOff(member, dateStr) ? (
+                                                        {memberMealCount === 0 ? (
                                                             <Typography variant="caption" sx={{ color: 'error.main', fontWeight: 700, opacity: 0.7 }}>OFF</Typography>
                                                         ) : (
                                                             <>
-                                                                {mealsPerDay === 3 && <MobileStatusIcon active={b} icon={LightModeIcon} />}
-                                                                <MobileStatusIcon active={l} icon={WbSunnyIcon} />
-                                                                <MobileStatusIcon active={d} icon={BedtimeIcon} />
+                                                                {mealsPerDay === 3 && <MobileStatusIcon active={isTakingMeal(member.email, dateStr, 'breakfast', house, meals)} icon={LightModeIcon} />}
+                                                                <MobileStatusIcon active={isTakingMeal(member.email, dateStr, 'lunch', house, meals)} icon={WbSunnyIcon} />
+                                                                <MobileStatusIcon active={isTakingMeal(member.email, dateStr, 'dinner', house, meals)} icon={BedtimeIcon} />
                                                             </>
                                                         )}
                                                     </Box>
@@ -392,13 +388,7 @@ export default function MealsPage() {
                             {members.map(member => {
                                 let totalMealsConsumed = 0;
                                 days.forEach(dateStr => {
-                                    if (isMealOff(member, dateStr)) return;
-
-                                    const dayRecord = currentMonthMeals.find(m => m.date === dateStr);
-                                    const m = dayRecord?.meals?.[member.email] || {};
-                                    if (mealsPerDay === 3 && (m.breakfast ?? true)) totalMealsConsumed++;
-                                    if (m.lunch ?? true) totalMealsConsumed++;
-                                    if (m.dinner ?? true) totalMealsConsumed++;
+                                    totalMealsConsumed += countMemberMeals(member.email, dateStr, house, meals);
                                 });
 
                                 return (

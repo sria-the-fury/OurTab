@@ -62,6 +62,7 @@ import InputAdornment from '@mui/material/InputAdornment';
 import EmailIcon from '@mui/icons-material/Email';
 import CloseIcon from '@mui/icons-material/Close';
 import { formatDateLocale, formatTimeLocale, formatTimeStr } from '@/utils/date';
+import { isTakingMeal, countMemberMeals } from '@/utils/meals';
 
 
 const formatBirthday = (birthday?: string) => {
@@ -156,10 +157,8 @@ export default function Dashboard() {
         (meals || []).forEach(dayRecord => {
             (house?.members || []).forEach(m => {
                 const email = typeof m === 'string' ? m : m.email;
-                const mMeals = dayRecord.meals?.[email] || {};
-                if (mealsPerDay === 3 && (mMeals.breakfast ?? true)) totalMealsCount++;
-                if (mMeals.lunch ?? true) totalMealsCount++;
-                if (mMeals.dinner ?? true) totalMealsCount++;
+                const dateStr = dayRecord.date;
+                totalMealsCount += countMemberMeals(email, dateStr, house, meals);
             });
         });
 
@@ -1329,11 +1328,10 @@ export default function Dashboard() {
 
                                             <Box sx={{ display: 'flex', gap: 1.5, overflowX: 'auto', pb: 1, flexGrow: 1, alignItems: 'center', '::-webkit-scrollbar': { height: 4 } }}>
                                                 {(house.members || []).map(member => {
-                                                    const mMeals = summaryRecord?.meals?.[member.email] || {};
-                                                    const b = mMeals.breakfast ?? true;
-                                                    const l = mMeals.lunch ?? true;
-                                                    const d = mMeals.dinner ?? true;
-                                                    const hasAny = (mealsPerDay === 3 ? b : false) || l || d;
+                                                    const mb = isTakingMeal(member.email, summaryStr, 'breakfast', house, meals);
+                                                    const ml = isTakingMeal(member.email, summaryStr, 'lunch', house, meals);
+                                                    const md = isTakingMeal(member.email, summaryStr, 'dinner', house, meals);
+                                                    const hasAny = (mealsPerDay === 3 ? mb : false) || ml || md;
 
                                                     return (
                                                         <Box key={member.email} sx={{
@@ -1357,9 +1355,9 @@ export default function Dashboard() {
                                                             </Typography>
                                                             <Box sx={{ display: 'flex', gap: 0.5 }}>
                                                                 {[
-                                                                    { id: 'b', show: mealsPerDay === 3, active: b },
-                                                                    { id: 'l', show: true, active: l },
-                                                                    { id: 'd', show: true, active: d }
+                                                                    { id: 'b', show: mealsPerDay === 3, active: mb },
+                                                                    { id: 'l', show: true, active: ml },
+                                                                    { id: 'd', show: true, active: md }
                                                                 ].filter(m => m.show).map(m => (
                                                                     <Box key={m.id} sx={{
                                                                         width: 16, height: 16, borderRadius: '50%',
