@@ -485,7 +485,7 @@ export default function Profile() {
                                         {user.displayName}
                                     </Typography>
                                     <Typography variant="body2" sx={{ opacity: 0.6, mb: 2, fontWeight: 500 }}>
-                                        {user.email}
+                                        {user.email.split('@')[0]}
                                     </Typography>
 
                                     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
@@ -1342,7 +1342,7 @@ export default function Profile() {
                             disabled={!feedbackSubject.trim() || !feedbackMessage.trim()}
                             onClick={() => {
                                 const subject = encodeURIComponent(feedbackSubject.trim());
-                                const body = encodeURIComponent(`${feedbackMessage.trim()}\n\n— Sent by ${user?.displayName || user?.email}`);
+                                const body = encodeURIComponent(`${feedbackMessage.trim()}\n\n— Sent by ${user?.displayName || user?.email?.split('@')[0]}`);
                                 window.open(`mailto:jakariamsria@gmail.com?subject=${subject}&body=${body}`, '_blank');
                                 setFeedbackSubject('');
                                 setFeedbackMessage('');

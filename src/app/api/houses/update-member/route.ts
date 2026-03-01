@@ -69,8 +69,8 @@ export async function POST(request: Request) {
                     // Fetch requester's info for the notification
                     const userSnap = await adminDb.collection('users').doc(userEmail).get();
                     const userData = userSnap.exists ? userSnap.data() : null;
-                    const senderName = userData?.displayName || userEmail;
-                    const senderPhotoUrl = userData?.photoURL || '';
+                    const senderName = userData?.name || userEmail.split('@')[0];
+                    const senderPhotoUrl = userData?.photoUrl || '';
 
                     await createNotification({
                         userId: targetEmail,

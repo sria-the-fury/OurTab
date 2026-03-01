@@ -858,7 +858,7 @@ export default function Dashboard() {
 
                                         <Box sx={{ display: 'flex', flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 1, mb: 3 }}>
                                             {house.members?.map((member) => (
-                                                <Tooltip key={member.email} title={member.name || member.email}>
+                                                <Tooltip key={member.email} title={member.name || member.email.split('@')[0]}>
                                                     <Avatar
                                                         alt={member.name}
                                                         src={member.photoUrl}
@@ -874,17 +874,21 @@ export default function Dashboard() {
                                                     />
                                                 </Tooltip>
                                             ))}
-                                            <IconButton
-                                                size="small"
-                                                onClick={() => setOpenAddMember(true)}
-                                                sx={{
-                                                    bgcolor: 'rgba(2, 136, 209, 0.1)',
-                                                    color: 'info.main',
-                                                    '&:hover': { bgcolor: 'rgba(2, 136, 209, 0.2)' }
-                                                }}
-                                            >
-                                                <PersonAddIcon fontSize="small" />
-                                            </IconButton>
+                                            <Tooltip title="Add Member">
+                                                <IconButton
+                                                    onClick={() => setOpenAddMember(true)}
+                                                    sx={{
+                                                        width: 40,
+                                                        height: 40,
+                                                        bgcolor: 'rgba(2, 136, 209, 0.1)',
+                                                        color: 'info.main',
+                                                        transition: 'all 0.2s',
+                                                        '&:hover': { bgcolor: 'rgba(2, 136, 209, 0.2)', transform: 'scale(1.1)' }
+                                                    }}
+                                                >
+                                                    <PersonAddIcon />
+                                                </IconButton>
+                                            </Tooltip>
                                         </Box>
                                         <Button
                                             variant="contained"
