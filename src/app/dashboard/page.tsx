@@ -31,6 +31,8 @@ import DoneAllIcon from '@mui/icons-material/DoneAll';
 import CalendarMonthIcon from '@mui/icons-material/CalendarMonth';
 import KeyboardArrowLeftIcon from '@mui/icons-material/KeyboardArrowLeft';
 import KeyboardArrowRightIcon from '@mui/icons-material/KeyboardArrowRight';
+import HistoryIcon from '@mui/icons-material/History';
+import AccessTimeIcon from '@mui/icons-material/AccessTime';
 import Tooltip from '@mui/material/Tooltip';
 import Stack from '@mui/material/Stack';
 import { useAuth } from '@/components/AuthContext';
@@ -114,6 +116,16 @@ export default function Dashboard() {
         return todos?.filter(todo => !todo.isCompleted) || [];
     }, [todos]);
 
+    const pendingDeposits = useMemo(() => {
+        return fundDeposits?.filter(d => d.status === 'pending') || [];
+    }, [fundDeposits]);
+
+    const myPendingAmount = useMemo(() => {
+        return pendingDeposits
+            .filter(d => d.email === user?.email)
+            .reduce((sum, d) => sum + Number(d.amount), 0);
+    }, [pendingDeposits, user]);
+
     // Combine loading states
     const loading = authLoading || (!!user && dataLoading && !house && expenses.length === 0);
 
@@ -125,6 +137,7 @@ export default function Dashboard() {
 
     const [selectedDate, setSelectedDate] = useState(new Date());
     const monthName = selectedDate.toLocaleString(undefined, { month: 'long' });
+    const getYYYYMM = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
 
     const currencyIcons: { [key: string]: React.ElementType } = {
         'USD': AttachMoneyIcon,
@@ -309,6 +322,23 @@ export default function Dashboard() {
         }
     };
 
+    const handleCancelDeposit = async (depositId: string) => {
+        try {
+            const res = await fetch(`/api/fund-deposits?depositId=${depositId}&email=${user?.email}`, {
+                method: 'DELETE'
+            });
+            if (res.ok) {
+                showToast('Deposit request cancelled', 'success');
+                mutateFundDeposits();
+            } else {
+                const data = await res.json();
+                showToast(data.error || 'Failed to cancel deposit', 'error');
+            }
+        } catch {
+            showToast('Error cancelling deposit', 'error');
+        }
+    };
+
 
     const handlePreviousMonth = () => {
         const newDate = new Date(selectedDate);
@@ -354,7 +384,6 @@ export default function Dashboard() {
 
     // Calculate per-member accounting for the Fund Dialog
     const accountingResult = useMemo(() => {
-        const getYYYYMM = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
         return calculateMemberFundAccounting(house, expenses, fundDeposits, meals, getYYYYMM(selectedDate));
     }, [house, expenses, fundDeposits, meals, selectedDate]);
 
@@ -599,9 +628,20 @@ export default function Dashboard() {
                                         <AccountBalanceIcon sx={{ fontSize: 110 }} />
                                     </Box>
 
-                                    <Typography variant="subtitle2" sx={{ fontWeight: 800, color: 'success.main', textTransform: 'uppercase', letterSpacing: '0.1em', mb: 2 }}>
-                                        House Fund
-                                    </Typography>
+                                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+                                        <Typography variant="subtitle2" sx={{ fontWeight: 800, color: 'success.main', textTransform: 'uppercase', letterSpacing: '0.1em' }}>
+                                            House Fund
+                                        </Typography>
+                                        {pendingDeposits.length > 0 && (
+                                            <Chip
+                                                label={`${pendingDeposits.length} Pending`}
+                                                size="small"
+                                                color="warning"
+                                                variant="outlined"
+                                                sx={{ height: 20, fontSize: '0.65rem', fontWeight: 600 }}
+                                            />
+                                        )}
+                                    </Box>
 
                                     <Box sx={{ flexGrow: 1 }}>
                                         <Typography variant="h3" sx={{ fontWeight: 900, mb: 2, display: 'flex', alignItems: 'baseline' }}>
@@ -636,9 +676,16 @@ export default function Dashboard() {
                                     }}>
                                         <Box>
                                             <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 600 }}>My Contribution ({monthName})</Typography>
-                                            <Typography variant="subtitle2" sx={{ fontWeight: 800, color: 'success.main' }}>
-                                                {displayCurrency}{(memberFundAccounting[user?.email || '']?.periodicDeposits || 0).toFixed(2)}
-                                            </Typography>
+                                            <Box sx={{ display: 'flex', alignItems: 'baseline', gap: 1 }}>
+                                                <Typography variant="subtitle2" sx={{ fontWeight: 800, color: 'success.main' }}>
+                                                    {displayCurrency}{(memberFundAccounting[user?.email || '']?.periodicDeposits || 0).toFixed(2)}
+                                                </Typography>
+                                                {myPendingAmount > 0 && (
+                                                    <Typography variant="caption" sx={{ color: 'warning.main', fontWeight: 600 }}>
+                                                        ({displayCurrency}{myPendingAmount.toFixed(0)} pending)
+                                                    </Typography>
+                                                )}
+                                            </Box>
                                         </Box>
                                         <Button
                                             variant="contained"
@@ -1963,169 +2010,206 @@ export default function Dashboard() {
                     <DialogContent>
                         {(() => {
                             const approvedDeposits = (fundDeposits || []).filter(d => d.status === 'approved');
-                            if (approvedDeposits.length === 0) {
-                                return (
-                                    <Typography color="text.secondary" sx={{ py: 2, textAlign: 'center' }}>
-                                        No approved deposits yet.
-                                    </Typography>
-                                );
-                            }
-                            // Aggregate per email
-                            const perMember: Record<string, number> = {};
-                            approvedDeposits.forEach(d => {
-                                perMember[d.email] = (perMember[d.email] || 0) + Number(d.amount);
-                            });
                             const members = house?.members || [];
+                            const monthStr = getYYYYMM(selectedDate);
 
                             return (
-                                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, mt: 1 }}>
-                                    {members.map((m: any) => {
-                                        const email = typeof m === 'string' ? m : m.email;
-                                        const mStats = memberFundAccounting[email] || {
-                                            deposits: 0, rent: 0, utilities: 0, wage: 0, mealCount: 0, mealCost: 0,
-                                            periodicDeposits: 0, periodicRent: 0, periodicUtilities: 0, periodicWage: 0,
-                                            periodicMealCount: 0, periodicMealCost: 0,
-                                            openingBalance: 0, closingBalance: 0
-                                        };
-                                        const name = (typeof m === 'object' && m?.name) || email.split('@')[0];
-                                        const photoUrl = typeof m === 'object' ? m?.photoUrl : undefined;
-                                        const remaining = mStats.closingBalance;
+                                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3, mt: 1 }}>
+                                    {/* Pending Deposits Section */}
+                                    {pendingDeposits.length > 0 && (
+                                        <Box>
+                                            <Typography variant="subtitle2" sx={{ mb: 1.5, fontWeight: 'bold', color: 'warning.main', display: 'flex', alignItems: 'center', gap: 1 }}>
+                                                <AccessTimeIcon sx={{ fontSize: '1.2rem' }} /> Pending Requests
+                                            </Typography>
+                                            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+                                                {pendingDeposits.map((d: any) => {
+                                                    const isMyDeposit = d.email === user?.email;
+                                                    const name = (house?.members?.find((m: any) => (typeof m === 'string' ? m : m.email) === d.email)?.name) || d.email.split('@')[0];
 
-                                        return (
-                                            <Box key={email} sx={{ p: 2, bgcolor: 'rgba(0,0,0,0.02)', borderRadius: 2, border: '1px solid', borderColor: 'divider' }}>
-                                                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1.5 }}>
-                                                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-                                                        <Avatar src={photoUrl} sx={{ width: 40, height: 40, bgcolor: 'primary.main', fontSize: '1rem' }}>
-                                                            {name[0]?.toUpperCase()}
-                                                        </Avatar>
-                                                        <Box>
-                                                            <Typography variant="subtitle1" sx={{ fontWeight: 'bold', lineHeight: 1.2 }}>{name}</Typography>
+                                                    return (
+                                                        <Box key={d.id} sx={{ p: 1.5, bgcolor: 'rgba(237, 108, 2, 0.05)', borderRadius: 2, border: '1px solid', borderColor: 'warning.light', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                                                            <Box>
+                                                                <Typography variant="body2" sx={{ fontWeight: 'bold' }}>{displayCurrency}{d.amount.toFixed(2)}</Typography>
+                                                                <Typography variant="caption" color="text.secondary">{name} • {formatDateLocale(d.createdAt)} • {formatTimeLocale(d.createdAt)}</Typography>
+                                                            </Box>
+                                                            {isMyDeposit && (
+                                                                <Button
+                                                                    size="small"
+                                                                    color="error"
+                                                                    onClick={() => handleCancelDeposit(d.id)}
+                                                                >
+                                                                    Cancel
+                                                                </Button>
+                                                            )}
+                                                        </Box>
+                                                    );
+                                                })}
+                                            </Box>
+                                        </Box>
+                                    )}
 
+                                    {/* Member Breakdown Section */}
+                                    <Box>
+                                        <Typography variant="subtitle2" sx={{ mb: 1.5, fontWeight: 'bold', color: 'text.secondary', textTransform: 'uppercase', letterSpacing: 1 }}>
+                                            Monthly Breakdown ({monthName})
+                                        </Typography>
+                                        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                                            {members.map((m: any) => {
+                                                const email = typeof m === 'string' ? m : m.email;
+                                                const mStats = memberFundAccounting[email] || {
+                                                    deposits: 0, rent: 0, utilities: 0, wage: 0, mealCount: 0, mealCost: 0,
+                                                    periodicDeposits: 0, periodicRent: 0, periodicUtilities: 0, periodicWage: 0,
+                                                    periodicMealCount: 0, periodicMealCost: 0,
+                                                    openingBalance: 0, closingBalance: 0
+                                                };
+                                                const name = (typeof m === 'object' && m?.name) || email.split('@')[0];
+                                                const photoUrl = typeof m === 'object' ? m?.photoUrl : undefined;
+                                                const remaining = mStats.closingBalance;
+
+                                                return (
+                                                    <Box key={email} sx={{ p: 2, bgcolor: 'rgba(0,0,0,0.02)', borderRadius: 2, border: '1px solid', borderColor: 'divider' }}>
+                                                        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1.5 }}>
+                                                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                                                                <Avatar src={photoUrl} sx={{ width: 40, height: 40, bgcolor: 'primary.main', fontSize: '1rem' }}>
+                                                                    {name[0]?.toUpperCase()}
+                                                                </Avatar>
+                                                                <Box>
+                                                                    <Typography variant="subtitle1" sx={{ fontWeight: 'bold', lineHeight: 1.2 }}>{name}</Typography>
+                                                                </Box>
+                                                            </Box>
+                                                            <Box sx={{ textAlign: 'right' }}>
+                                                                <Typography variant="caption" color="text.secondary" display="block">Opening Balance</Typography>
+                                                                <Typography variant="subtitle1" sx={{ fontWeight: 'bold', color: mStats.openingBalance >= 0 ? 'success.main' : 'error.main' }}>
+                                                                    {displayCurrency}{mStats.openingBalance.toFixed(2)}
+                                                                </Typography>
+                                                            </Box>
+                                                        </Box>
+
+                                                        <Box sx={{ pl: 1, display: 'flex', flexDirection: 'column', gap: 0.75 }}>
+                                                            <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                                                                <Typography variant="body2" color="text.secondary">Deposits ({monthName})</Typography>
+                                                                <Typography variant="body2" sx={{ fontWeight: 'medium', color: 'success.main' }}>
+                                                                    + {displayCurrency}{mStats.periodicDeposits.toFixed(2)}
+                                                                </Typography>
+                                                            </Box>
+                                                            <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                                                                <Typography variant="body2" color="text.secondary">Rent ({monthName})</Typography>
+                                                                <Typography variant="body2" sx={{ fontWeight: 'medium', color: 'error.main' }}>
+                                                                    - {displayCurrency}{mStats.periodicRent.toFixed(2)}
+                                                                </Typography>
+                                                            </Box>
+                                                            <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                                                                <Typography variant="body2" color="text.secondary">Utilities ({monthName})</Typography>
+                                                                <Typography variant="body2" sx={{ fontWeight: 'medium', color: 'error.main' }}>
+                                                                    - {displayCurrency}{mStats.periodicUtilities.toFixed(2)}
+                                                                </Typography>
+                                                            </Box>
+                                                            <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                                                                <Typography variant="body2" color="text.secondary">Worker Wage ({monthName})</Typography>
+                                                                <Typography variant="body2" sx={{ fontWeight: 'medium', color: 'error.main' }}>
+                                                                    - {displayCurrency}{mStats.periodicWage.toFixed(2)}
+                                                                </Typography>
+                                                            </Box>
+                                                            <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                                                                <Typography variant="body2" color="text.secondary">
+                                                                    Meals ({mStats.periodicMealCount})
+                                                                </Typography>
+                                                                <Typography variant="body2" sx={{ fontWeight: 'medium', color: 'error.main' }}>
+                                                                    - {displayCurrency}{mStats.periodicMealCost.toFixed(2)}
+                                                                </Typography>
+                                                            </Box>
+
+                                                            <Divider sx={{ my: 1, opacity: 0.6 }} />
+
+                                                            <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                                                                <Typography variant="body2" sx={{ fontWeight: 'bold' }}>Closing Balance</Typography>
+                                                                <Typography variant="body2" sx={{ fontWeight: 'bold', color: remaining >= 0 ? 'success.main' : 'error.main' }}>
+                                                                    {remaining >= 0 ? '' : '-'}{displayCurrency}{Math.abs(remaining).toFixed(2)}
+                                                                </Typography>
+                                                            </Box>
                                                         </Box>
                                                     </Box>
-                                                    <Box sx={{ textAlign: 'right' }}>
-                                                        <Typography variant="caption" color="text.secondary" display="block">Opening Balance</Typography>
-                                                        <Typography variant="subtitle1" sx={{ fontWeight: 'bold', color: mStats.openingBalance >= 0 ? 'success.main' : 'error.main' }}>
-                                                            {displayCurrency}{mStats.openingBalance.toFixed(2)}
-                                                        </Typography>
-                                                    </Box>
+                                                );
+                                            })}
+
+                                            <Box sx={{ mt: 1, pt: 2, borderTop: '2px dashed', borderColor: 'divider' }}>
+                                                <Typography variant="subtitle2" sx={{ mb: 1.5, fontWeight: 'bold', color: 'text.secondary', textTransform: 'uppercase', letterSpacing: 1 }}>
+                                                    House Totals Summary
+                                                </Typography>
+                                                <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.5 }}>
+                                                    <Typography variant="body2">Previous Remaining</Typography>
+                                                    <Typography variant="body2" sx={{ fontWeight: 'bold', color: houseFundStatsResult.previousMonthsRemaining >= 0 ? 'success.main' : 'error.main' }}>
+                                                        {displayCurrency}{houseFundStatsResult.previousMonthsRemaining.toFixed(2)}
+                                                    </Typography>
                                                 </Box>
-
-                                                <Box sx={{ pl: 1, display: 'flex', flexDirection: 'column', gap: 0.75 }}>
-                                                    <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-                                                        <Typography variant="body2" color="text.secondary">Deposits ({monthName})</Typography>
-                                                        <Typography variant="body2" sx={{ fontWeight: 'medium', color: 'success.main' }}>
-                                                            + {displayCurrency}{mStats.periodicDeposits.toFixed(2)}
-                                                        </Typography>
-                                                    </Box>
-                                                    <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-                                                        <Typography variant="body2" color="text.secondary">Rent ({monthName})</Typography>
-                                                        <Typography variant="body2" sx={{ fontWeight: 'medium', color: 'error.main' }}>
-                                                            - {displayCurrency}{mStats.periodicRent.toFixed(2)}
-                                                        </Typography>
-                                                    </Box>
-                                                    <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-                                                        <Typography variant="body2" color="text.secondary">Utilities ({monthName})</Typography>
-                                                        <Typography variant="body2" sx={{ fontWeight: 'medium', color: 'error.main' }}>
-                                                            - {displayCurrency}{mStats.periodicUtilities.toFixed(2)}
-                                                        </Typography>
-                                                    </Box>
-                                                    <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-                                                        <Typography variant="body2" color="text.secondary">Worker Wage ({monthName})</Typography>
-                                                        <Typography variant="body2" sx={{ fontWeight: 'medium', color: 'error.main' }}>
-                                                            - {displayCurrency}{mStats.periodicWage.toFixed(2)}
-                                                        </Typography>
-                                                    </Box>
-                                                    <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-                                                        <Typography variant="body2" color="text.secondary">
-                                                            Meals in {monthName} ({mStats.periodicMealCount}): Cost
-                                                        </Typography>
-                                                        <Typography variant="body2" sx={{ fontWeight: 'medium', color: 'error.main' }}>
-                                                            - {displayCurrency}{mStats.periodicMealCost.toFixed(2)}
-                                                        </Typography>
-                                                    </Box>
-
-                                                    <Divider sx={{ my: 1, opacity: 0.6 }} />
-
-                                                    <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-                                                        <Typography variant="body2" sx={{ fontWeight: 'bold' }}>Closing Balance ({monthName})</Typography>
-                                                        <Typography variant="body2" sx={{ fontWeight: 'bold', color: remaining >= 0 ? 'success.main' : 'error.main' }}>
-                                                            {remaining >= 0 ? '' : '-'}{displayCurrency}{Math.abs(remaining).toFixed(2)}
-                                                        </Typography>
-                                                    </Box>
+                                                <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.5 }}>
+                                                    <Typography variant="body2">Collected ({monthName})</Typography>
+                                                    <Typography variant="body2" sx={{ fontWeight: 'bold', color: 'success.main' }}>
+                                                        + {displayCurrency}{houseFundStatsResult.periodicTotalDeposits.toFixed(2)}
+                                                    </Typography>
+                                                </Box>
+                                                <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.5 }}>
+                                                    <Typography variant="body2">Rent ({monthName})</Typography>
+                                                    <Typography variant="body2" sx={{ fontWeight: 'bold', color: 'error.main' }}>
+                                                        - {displayCurrency}{houseFundStatsResult.periodicTotalRent.toFixed(2)}
+                                                    </Typography>
+                                                </Box>
+                                                <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.5 }}>
+                                                    <Typography variant="body2">Utilities ({monthName})</Typography>
+                                                    <Typography variant="body2" sx={{ fontWeight: 'bold', color: 'error.main' }}>
+                                                        - {displayCurrency}{houseFundStatsResult.periodicTotalUtilities.toFixed(2)}
+                                                    </Typography>
+                                                </Box>
+                                                <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.5 }}>
+                                                    <Typography variant="body2">Worker Wage ({monthName})</Typography>
+                                                    <Typography variant="body2" sx={{ fontWeight: 'bold', color: 'error.main' }}>
+                                                        - {displayCurrency}{houseFundStatsResult.periodicTotalWages.toFixed(2)}
+                                                    </Typography>
+                                                </Box>
+                                                <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.5 }}>
+                                                    <Typography variant="body2">Groceries ({monthName})</Typography>
+                                                    <Typography variant="body2" sx={{ fontWeight: 'bold', color: 'error.main' }}>
+                                                        - {displayCurrency}{houseFundStatsResult.periodicTotalGroceries.toFixed(2)}
+                                                    </Typography>
+                                                </Box>
+                                                <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 1, pt: 1, borderTop: '1px solid', borderColor: 'divider' }}>
+                                                    <Typography variant="subtitle1" sx={{ fontWeight: 'bold' }}>Remaining Fund</Typography>
+                                                    <Typography variant="subtitle1" sx={{ fontWeight: 'bold', color: houseFundStatsResult.remainingFund >= 0 ? 'success.main' : 'error.main' }}>
+                                                        {displayCurrency}{houseFundStatsResult.remainingFund.toFixed(2)}
+                                                    </Typography>
                                                 </Box>
                                             </Box>
-                                        );
-                                    })}
+                                        </Box>
+                                    </Box>
 
-                                    <Box sx={{ mt: 1, pt: 2, borderTop: '2px dashed', borderColor: 'divider' }}>
-                                        <Typography variant="subtitle2" sx={{ mb: 1.5, fontWeight: 'bold', color: 'text.secondary', textTransform: 'uppercase', letterSpacing: 1 }}>
-                                            House Totals Summary
+                                    {/* Deposit History Section */}
+                                    <Box>
+                                        <Typography variant="subtitle2" sx={{ mb: 1.5, fontWeight: 'bold', color: 'text.secondary', textTransform: 'uppercase', letterSpacing: 1, display: 'flex', alignItems: 'center', gap: 1 }}>
+                                            <HistoryIcon sx={{ fontSize: '1.2rem' }} /> Deposit History ({monthName})
                                         </Typography>
-                                        <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.5 }}>
-                                            <Typography variant="body2">Previous Months Remaining</Typography>
-                                            <Typography variant="body2" sx={{ fontWeight: 'bold', color: houseFundStatsResult.previousMonthsRemaining >= 0 ? 'success.main' : 'error.main' }}>
-                                                {displayCurrency}{houseFundStatsResult.previousMonthsRemaining.toFixed(2)}
-                                            </Typography>
-                                        </Box>
-                                        <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.5 }}>
-                                            <Typography variant="body2">Fund Collected ({monthName})</Typography>
-                                            <Typography variant="body2" sx={{ fontWeight: 'bold', color: 'success.main' }}>
-                                                {displayCurrency}{houseFundStatsResult.periodicTotalDeposits.toFixed(2)}
-                                            </Typography>
-                                        </Box>
-                                        <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.5 }}>
-                                            <Typography variant="body2">Rent Deducted ({monthName})</Typography>
-                                            <Typography variant="body2" sx={{ fontWeight: 'bold', color: 'error.main' }}>
-                                                - {displayCurrency}{houseFundStatsResult.periodicTotalRent.toFixed(2)}
-                                            </Typography>
-                                        </Box>
-                                        <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.5 }}>
-                                            <Typography variant="body2">Utilities ({monthName})</Typography>
-                                            <Typography variant="body2" sx={{ fontWeight: 'bold', color: 'error.main' }}>
-                                                - {displayCurrency}{houseFundStatsResult.periodicTotalUtilities.toFixed(2)}
-                                            </Typography>
-                                        </Box>
-                                        <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.5 }}>
-                                            <Typography variant="body2">Worker Wage ({monthName})</Typography>
-                                            <Typography variant="body2" sx={{ fontWeight: 'bold', color: 'error.main' }}>
-                                                - {displayCurrency}{houseFundStatsResult.periodicTotalWages.toFixed(2)}
-                                            </Typography>
-                                        </Box>
-                                        <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1, pb: 1, borderBottom: '1px solid', borderColor: 'divider' }}>
-                                            <Typography variant="body2">Groceries ({monthName})</Typography>
-                                            <Typography variant="body2" sx={{ fontWeight: 'bold', color: 'error.main' }}>
-                                                - {displayCurrency}{houseFundStatsResult.periodicTotalGroceries.toFixed(2)}
-                                            </Typography>
-                                        </Box>
-                                        <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 1 }}>
-                                            <Typography variant="subtitle2" sx={{ fontWeight: 'bold' }}>Closing Balance ({monthName})</Typography>
-                                            <Typography variant="subtitle2" sx={{ fontWeight: 'bold', color: houseFundStatsResult.remainingFund >= 0 ? 'success.main' : 'error.main' }}>
-                                                {displayCurrency}{houseFundStatsResult.remainingFund.toFixed(2)}
-                                            </Typography>
-                                        </Box>
-
-                                        <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.5, mt: 1 }}>
-                                            <Typography variant="body2" color="text.secondary">Total Meals ({monthName})</Typography>
-                                            <Typography variant="body2" sx={{ fontWeight: 'bold' }}>
-                                                {houseFundStatsResult.periodicTotalMeals}
-                                            </Typography>
-                                        </Box>
-                                        <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.5 }}>
-                                            <Typography variant="body2" color="text.secondary">Cost per Meal ({monthName})</Typography>
-                                            <Typography variant="body2" sx={{ fontWeight: 'bold', color: 'primary.main' }}>
-                                                {displayCurrency}{houseFundStatsResult.periodicCostPerMeal.toFixed(2)}
-                                            </Typography>
-                                        </Box>
-                                        <Typography variant="caption" color="text.secondary" sx={{ fontStyle: 'italic', display: 'block', mt: 0.5 }}>
-                                            * Includes tomorrow's planned meals in total count
-                                        </Typography>
-
-                                        <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 1, pt: 1, borderTop: '1px solid', borderColor: 'divider' }}>
-                                            <Typography variant="h6" sx={{ fontSize: '1rem', fontWeight: 'bold' }}>Remaining House Fund</Typography>
-                                            <Typography variant="h6" sx={{ fontSize: '1rem', fontWeight: 'bold', color: 'success.main' }}>
-                                                {displayCurrency}{houseFundStatsResult.remainingFund.toFixed(2)}
-                                            </Typography>
+                                        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+                                            {approvedDeposits.filter(d => d.date.startsWith(monthStr)).length === 0 ? (
+                                                <Typography variant="body2" color="text.secondary" sx={{ textAlign: 'center', py: 2 }}>
+                                                    No approved deposits this month.
+                                                </Typography>
+                                            ) : (
+                                                approvedDeposits
+                                                    .filter(d => d.date.startsWith(monthStr))
+                                                    .map((d: any) => {
+                                                        const name = (house?.members?.find((m: any) => (typeof m === 'string' ? m : m.email) === d.email)?.name) || d.email.split('@')[0];
+                                                        return (
+                                                            <Box key={d.id} sx={{ p: 1, bgcolor: 'rgba(0,0,0,0.02)', borderRadius: 1, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                                                <Box>
+                                                                    <Typography variant="body2" sx={{ fontWeight: 'bold' }}>{displayCurrency}{d.amount.toFixed(2)}</Typography>
+                                                                    <Typography variant="caption" color="text.secondary">{name}</Typography>
+                                                                </Box>
+                                                                <Typography variant="caption" color="text.secondary">
+                                                                    {formatDateLocale(d.approvedAt || d.createdAt)} • {formatTimeLocale(d.approvedAt || d.createdAt)}
+                                                                </Typography>
+                                                            </Box>
+                                                        );
+                                                    })
+                                            )}
                                         </Box>
                                     </Box>
                                 </Box>

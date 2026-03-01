@@ -116,3 +116,50 @@ export async function GET(request: Request) {
         return NextResponse.json({ error: error?.message || 'Internal Server Error' }, { status: 500 });
     }
 }
+
+export async function DELETE(request: Request) {
+    const { searchParams } = new URL(request.url);
+    const depositId = searchParams.get('depositId');
+    const userEmail = searchParams.get('email');
+
+    if (!depositId || !userEmail) {
+        return NextResponse.json({ error: 'Deposit ID and Email are required' }, { status: 400 });
+    }
+
+    try {
+        const depositRef = adminDb.collection('fundDeposits').doc(depositId);
+        const depositSnap = await depositRef.get();
+
+        if (!depositSnap.exists) {
+            return NextResponse.json({ error: 'Deposit not found' }, { status: 404 });
+        }
+
+        const depositData = depositSnap.data()!;
+
+        if (depositData.status !== 'pending') {
+            return NextResponse.json({ error: 'Only pending deposits can be cancelled' }, { status: 400 });
+        }
+
+        const houseRef = adminDb.collection('houses').doc(depositData.houseId);
+        const houseSnap = await houseRef.get();
+
+        if (!houseSnap.exists) {
+            return NextResponse.json({ error: 'House not found' }, { status: 404 });
+        }
+
+        const houseData = houseSnap.data()!;
+        const isOwner = depositData.email === userEmail;
+        const isManager = houseData.memberDetails?.[userEmail]?.role === 'manager' || houseData.createdBy === userEmail;
+
+        if (!isOwner && !isManager) {
+            return NextResponse.json({ error: 'Unauthorized. You can only cancel your own deposit or if you are a manager.' }, { status: 403 });
+        }
+
+        await depositRef.delete();
+
+        return NextResponse.json({ success: true, message: 'Deposit request cancelled successfully' });
+    } catch (error: any) {
+        console.error('Error cancelling deposit:', error);
+        return NextResponse.json({ error: error?.message || 'Internal Server Error' }, { status: 500 });
+    }
+}
