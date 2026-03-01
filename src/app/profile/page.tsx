@@ -485,7 +485,7 @@ export default function Profile() {
                                         {user.displayName}
                                     </Typography>
                                     <Typography variant="body2" sx={{ opacity: 0.6, mb: 2, fontWeight: 500 }}>
-                                        {user.email.split('@')[0]}
+                                        {user.email?.split('@')[0]}
                                     </Typography>
 
                                     <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
