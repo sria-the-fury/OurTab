@@ -2,76 +2,84 @@
 
 import { createContext, useContext, useEffect, useState } from 'react';
 import { User, onAuthStateChanged, signInWithPopup, GoogleAuthProvider, signOut } from 'firebase/auth';
-import { auth } from '@/lib/firebase';
+import { auth, messaging } from '@/lib/firebase';
+import { getToken } from 'firebase/messaging';
 import { useRouter } from 'next/navigation';
 import useSWR from 'swr';
 import { House } from '@/hooks/useHouseData';
-import { UserData } from '@/hooks/useUserData';
 
 interface AuthContextType {
     user: User | null;
+    house: House | null;
+    currency?: string;
+    dbUser: any;
     loading: boolean;
-    currency: string;
+    signIn: () => Promise<void>;
     signInWithGoogle: () => Promise<void>;
+    logOut: () => Promise<void>;
     logout: () => Promise<void>;
     updateCurrency: (newCurrency: string) => Promise<void>;
-    // Expose cached data
-    dbUser: UserData | null;
-    house: House | null;
-    mutateUser: () => Promise<unknown>;
-    mutateHouse: () => Promise<unknown>;
+    mutateUser: () => void;
+    mutateHouse: () => void;
 }
 
 const AuthContext = createContext<AuthContextType>({
     user: null,
+    house: null,
+    currency: undefined,
+    dbUser: null,
     loading: true,
-    currency: 'USD',
+    signIn: async () => { },
     signInWithGoogle: async () => { },
+    logOut: async () => { },
     logout: async () => { },
     updateCurrency: async () => { },
-    dbUser: null,
-    house: null,
-    mutateUser: async () => undefined,
-    mutateHouse: async () => undefined,
+    mutateUser: () => { },
+    mutateHouse: () => { },
 });
 
-export const useAuth = () => useContext(AuthContext);
-
-export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
+export function AuthProvider({ children }: { children: React.ReactNode }) {
     const [user, setUser] = useState<User | null>(null);
-    const [authLoading, setAuthLoading] = useState(true);
-
+    const [loading, setLoading] = useState(true);
     const router = useRouter();
 
-    // Define fetcher
-    const fetcher = (url: string) => fetch(url).then(res => res.json());
-
-    // 1. Fetch User Data
-    const { data: userData, mutate: mutateUser } = useSWR<UserData>(
+    // Use SWR to keep house data accessible globally in context
+    const { data: userData, mutate: mutateUser } = useSWR(
         user?.email ? `/api/users?email=${user.email}` : null,
-        fetcher
+        url => fetch(url).then(res => res.json())
     );
 
-    // 2. Fetch House Data (fetches via email; server handles no-house case)
-    const { data: houseData, mutate: mutateHouse } = useSWR<House>(
+    // Use SWR to keep house details accessible
+    const { data: house, mutate: mutateHouse } = useSWR(
         user?.email ? `/api/houses/my-house?email=${user.email}` : null,
-        fetcher
+        url => fetch(url).then(res => res.json()),
+        { refreshInterval: 5000 }
     );
 
-    // Derived state
-    // Currency always comes from the house; default to USD before joining one
-    const currency = houseData?.currency || 'USD';
-
-    // Overall loading state: Auth is initial load, but we might want to wait for data?
-    // Usually only wait for Auth (user presence). Data can pop in.
-    const loading = authLoading;
+    const updateCurrency = async (newCurrency: string) => {
+        if (!house?.id) return;
+        try {
+            const res = await fetch('/api/houses/update-currency', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ houseId: house.id, currency: newCurrency }),
+            });
+            if (res.ok) {
+                mutateHouse();
+            }
+        } catch (error) {
+            console.error("Error updating currency:", error);
+        }
+    };
 
     useEffect(() => {
         const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+            setUser(firebaseUser);
             if (firebaseUser) {
                 // Sync user to DB (fire and forget / optimistic)
                 // We do this to ensure Google Auth users exist in our DB
                 try {
+                    // 1. Sync user basic info
                     fetch('/api/users', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
@@ -85,64 +93,96 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
                             mutateUser(); // Revalidate user data after sync
                         }
                     });
+
+                    // 2. Handle Push Notifications
+                    if (messaging && typeof window !== 'undefined' && 'serviceWorker' in navigator) {
+                        Notification.requestPermission().then(async (permission) => {
+                            if (permission === 'granted') {
+                                try {
+                                    // Register service worker with config as query params to avoid hardcoding secrets in public file
+                                    const configParams = new URLSearchParams({
+                                        apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY || '',
+                                        authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN || '',
+                                        projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID || '',
+                                        storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET || '',
+                                        messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID || '',
+                                        appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID || ''
+                                    }).toString();
+
+                                    const swRegistration = await navigator.serviceWorker.register(`/firebase-messaging-sw.js?${configParams}`);
+
+                                    const currentToken = await getToken(messaging!, {
+                                        vapidKey: process.env.NEXT_PUBLIC_FIREBASE_VAPID_KEY,
+                                        serviceWorkerRegistration: swRegistration
+                                    });
+
+                                    if (currentToken) {
+                                        console.log('FCM Token received:', currentToken);
+                                        // Send token to server
+                                        fetch('/api/users', {
+                                            method: 'POST',
+                                            headers: { 'Content-Type': 'application/json' },
+                                            body: JSON.stringify({
+                                                email: firebaseUser.email,
+                                                fcmToken: currentToken
+                                            }),
+                                        });
+                                    } else {
+                                        console.log('No registration token available. Request permission to generate one.');
+                                    }
+                                } catch (err) {
+                                    console.log('An error occurred while retrieving token. ', err);
+                                }
+                            }
+                        });
+                    }
                 } catch (error) {
                     console.error("Error syncing user with DB:", error);
                 }
             }
-            setUser(firebaseUser);
-            setAuthLoading(false);
+            setLoading(false);
         });
 
         return () => unsubscribe();
     }, [mutateUser]);
 
-    const signInWithGoogle = async () => {
+    const signIn = async () => {
         const provider = new GoogleAuthProvider();
         try {
             await signInWithPopup(auth, provider);
         } catch (error) {
-            console.error("Error signing in with Google", error);
+            console.error("Error signing in:", error);
         }
     };
 
-    const logout = async () => {
+    const logOut = async () => {
         try {
             await signOut(auth);
+            setUser(null);
             router.push('/');
         } catch (error) {
-            console.error("Error signing out", error);
-        }
-    };
-
-    const updateCurrency = async (newCurrency: string) => {
-        if (user?.email && houseData?.id) {
-            try {
-                await fetch('/api/houses/update', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ houseId: houseData.id, currency: newCurrency, userEmail: user.email })
-                });
-                mutateHouse();
-            } catch (error) {
-                console.error('Failed to update house currency', error);
-            }
+            console.error("Error signing out:", error);
         }
     };
 
     return (
         <AuthContext.Provider value={{
             user,
+            house: house || null,
+            currency: house?.currency,
+            dbUser: userData,
             loading,
-            currency,
-            signInWithGoogle,
-            logout,
+            signIn,
+            signInWithGoogle: signIn,
+            logOut,
+            logout: logOut,
             updateCurrency,
-            dbUser: userData || null,
-            house: houseData || null,
             mutateUser,
             mutateHouse
         }}>
             {children}
         </AuthContext.Provider>
     );
-};
+}
+
+export const useAuth = () => useContext(AuthContext);

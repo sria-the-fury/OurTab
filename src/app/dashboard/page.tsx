@@ -145,8 +145,8 @@ export default function Dashboard() {
         'BDT': CurrencyExchangeIcon
     };
 
-    const CurrencyIcon = currencyIcons[currency] || AttachMoneyIcon;
-    const displayCurrency = currencySymbols[currency] || '$';
+    const CurrencyIcon = currencyIcons[currency as keyof typeof currencyIcons] || AttachMoneyIcon;
+    const displayCurrency = currencySymbols[currency as keyof typeof currencySymbols] || '$';
 
     const { showToast } = useToast();
     const [openAddMember, setOpenAddMember] = useState(false);

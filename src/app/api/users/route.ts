@@ -1,18 +1,16 @@
 import { NextResponse } from 'next/server';
 import { adminDb } from '@/lib/firebaseAdmin';
 
-// Create or Update User
 export async function POST(request: Request) {
     try {
         const body = await request.json();
-        const { email, name, photoUrl, profession, whatsapp, messenger, birthday, iban } = body;
+        const { email, name, photoUrl, profession, whatsapp, messenger, birthday, iban, fcmToken } = body;
 
         if (!email) {
             return NextResponse.json({ error: 'Email is required' }, { status: 400 });
         }
 
         const userRef = adminDb.collection('users').doc(email);
-        const userSnap = await userRef.get();
 
         interface UserRecord {
             email: string;
@@ -23,6 +21,7 @@ export async function POST(request: Request) {
             messenger?: string;
             birthday?: string;
             iban?: string;
+            fcmToken?: string;
         }
 
         let userData: UserRecord = { email };
@@ -33,42 +32,37 @@ export async function POST(request: Request) {
         if (whatsapp !== undefined) userData.whatsapp = whatsapp;
         if (messenger !== undefined) userData.messenger = messenger;
         if (iban !== undefined) userData.iban = iban;
+        if (fcmToken !== undefined) userData.fcmToken = fcmToken;
         // Removed bkash, nagad, upay
         if (birthday !== undefined) userData.birthday = birthday; // Added birthday
 
-        if (userSnap.exists) {
-            const existing = userSnap.data()!;
-            userData = { ...existing, ...userData };
-        }
-
         await userRef.set(userData, { merge: true });
 
-        return NextResponse.json({ id: email, ...userData });
+        return NextResponse.json({ success: true, user: userData });
     } catch (error) {
-        console.error('Error creating user:', error);
+        console.error('Error in users POST:', error);
         return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
     }
 }
 
-// Get all users or single user
 export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
     const email = searchParams.get('email');
 
+    if (!email) {
+        return NextResponse.json({ error: 'Email is required' }, { status: 400 });
+    }
+
     try {
-        if (email) {
-            const userSnap = await adminDb.collection('users').doc(email).get();
-            if (userSnap.exists) {
-                return NextResponse.json({ id: userSnap.id, ...userSnap.data() });
-            } else {
-                return NextResponse.json({ error: 'User not found' }, { status: 404 });
-            }
-        } else {
-            const snapshot = await adminDb.collection('users').get();
-            const users = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-            return NextResponse.json(users);
+        const userDoc = await adminDb.collection('users').doc(email).get();
+
+        if (!userDoc.exists) {
+            return NextResponse.json({ error: 'User not found' }, { status: 404 });
         }
-    } catch {
+
+        return NextResponse.json(userDoc.data());
+    } catch (error) {
+        console.error('Error in users GET:', error);
         return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
     }
 }

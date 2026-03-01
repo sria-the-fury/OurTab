@@ -1,5 +1,6 @@
 import { adminDb } from '@/lib/firebaseAdmin';
 import { AppNotification } from '@/types/notification';
+import { sendPushNotification } from './pushNotifications';
 
 export async function createNotification(notification: Omit<AppNotification, 'id' | 'createdAt' | 'read'>) {
     try {
@@ -9,6 +10,11 @@ export async function createNotification(notification: Omit<AppNotification, 'id
             createdAt: new Date().toISOString()
         };
         await adminDb.collection('notifications').add(newDoc);
+
+        // Send push notification
+        const pushTitle = notification.title || (notification.senderName ? `${notification.senderName}` : 'House Update');
+        const pushBody = notification.message;
+        await sendPushNotification(notification.userId, pushTitle, pushBody);
     } catch (error) {
         console.error('Error creating notification:', error);
     }
