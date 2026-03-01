@@ -37,6 +37,22 @@ export async function POST(request: Request) {
         // Delete the payment document
         await paymentRef.delete();
 
+        // Find and delete the associated payment notification
+        try {
+            const notificationsSnap = await adminDb.collection('notifications')
+                .where('relatedId', '==', paymentId)
+                .where('actionType', '==', 'approve_payment')
+                .get();
+
+            if (!notificationsSnap.empty) {
+                const batch = adminDb.batch();
+                notificationsSnap.docs.forEach(doc => batch.delete(doc.ref));
+                await batch.commit();
+            }
+        } catch (notifErr) {
+            console.error('Error cleaning up payment notifications:', notifErr);
+        }
+
         return NextResponse.json({ success: true });
     } catch (error) {
         console.error('Error cancelling payment:', error);

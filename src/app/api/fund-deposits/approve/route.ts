@@ -50,10 +50,26 @@ export async function POST(request: Request) {
         const currencySymbol = houseData.currency === 'EUR' ? '€' : (houseData.currency === 'GBP' ? '£' : '$');
 
         if (action === 'reject') {
-            // Notify rejection before deleting
+            // Find and delete all pending notifications for this deposit
+            try {
+                const notificationsSnap = await adminDb.collection('notifications')
+                    .where('relatedId', '==', depositId)
+                    .where('actionType', '==', 'approve_fund_deposit')
+                    .get();
+
+                if (!notificationsSnap.empty) {
+                    const batch = adminDb.batch();
+                    notificationsSnap.docs.forEach(doc => batch.delete(doc.ref));
+                    await batch.commit();
+                }
+            } catch (notifErr) {
+                console.error('Error cleaning up deposit notifications on reject:', notifErr);
+            }
+
+            // Notify rejection before deleting deposit
             try {
                 await createNotification({
-                    userId: depositData.userId,
+                    userId: depositData.email,
                     type: 'house',
                     message: `has rejected your fund deposit request of ${currencySymbol}${depositData.amount}.`,
                     senderName: managerName,
@@ -72,10 +88,26 @@ export async function POST(request: Request) {
             approvedAt: new Date().toISOString()
         });
 
+        // Find and delete all pending notifications for this deposit
+        try {
+            const notificationsSnap = await adminDb.collection('notifications')
+                .where('relatedId', '==', depositId)
+                .where('actionType', '==', 'approve_fund_deposit')
+                .get();
+
+            if (!notificationsSnap.empty) {
+                const batch = adminDb.batch();
+                notificationsSnap.docs.forEach(doc => batch.delete(doc.ref));
+                await batch.commit();
+            }
+        } catch (notifErr) {
+            console.error('Error cleaning up deposit notifications on approve:', notifErr);
+        }
+
         // Notify approval
         try {
             await createNotification({
-                userId: depositData.userId,
+                userId: depositData.email,
                 type: 'house',
                 message: `has approved your fund deposit request of ${currencySymbol}${depositData.amount}.`,
                 senderName: managerName,

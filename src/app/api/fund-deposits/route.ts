@@ -159,6 +159,24 @@ export async function DELETE(request: Request) {
 
         await depositRef.delete();
 
+        // Find and delete any notifications related to this deposit
+        try {
+            const notificationsSnap = await adminDb.collection('notifications')
+                .where('relatedId', '==', depositId)
+                .where('actionType', '==', 'approve_fund_deposit')
+                .get();
+
+            if (!notificationsSnap.empty) {
+                const batch = adminDb.batch();
+                notificationsSnap.docs.forEach(doc => {
+                    batch.delete(doc.ref);
+                });
+                await batch.commit();
+            }
+        } catch (notifErr) {
+            console.error('Error cleaning up deposit notifications:', notifErr);
+        }
+
         return NextResponse.json({ success: true, message: 'Deposit request cancelled successfully' });
     } catch (error: any) {
         console.error('Error cancelling deposit:', error);
