@@ -6,7 +6,7 @@ import Badge from '@mui/material/Badge';
 import NotificationsIcon from '@mui/icons-material/Notifications';
 import { useRouter } from 'next/navigation';
 import { useNotifications } from '@/hooks/useNotifications';
-import { playNotificationSound } from '@/utils/notificationSound';
+import { playNotificationSound, initAudio } from '@/utils/notificationSound';
 
 async function requestBrowserPermission() {
     if (typeof window === 'undefined' || !('Notification' in window)) return;
@@ -35,6 +35,7 @@ export default function NotificationBell() {
     useEffect(() => {
         setMounted(true);
         requestBrowserPermission();
+        initAudio(); // Listen for first interaction to unlock audio
     }, []);
 
     useEffect(() => {
