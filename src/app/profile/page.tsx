@@ -38,6 +38,7 @@ import FacebookIcon from '@mui/icons-material/Facebook';
 import WorkIcon from '@mui/icons-material/Work';
 import ContactSupportIcon from '@mui/icons-material/ContactSupport';
 import AccountTreeIcon from '@mui/icons-material/AccountTree';
+import NotificationsIcon from '@mui/icons-material/Notifications';
 import Dialog from '@mui/material/Dialog';
 import DialogTitle from '@mui/material/DialogTitle';
 import DialogContent from '@mui/material/DialogContent';
@@ -47,7 +48,7 @@ import AuthGuard from '@/components/AuthGuard';
 import { formatDetailedDateTime } from '@/utils/date';
 
 export default function Profile() {
-    const { user, currency, updateCurrency, loading: authLoading, dbUser, house, mutateUser, mutateHouse, logout } = useAuth();
+    const { user, currency, updateCurrency, loading: authLoading, dbUser, house, mutateUser, mutateHouse, logout, isNotificationSupported, notificationPermission, requestNotificationPermission } = useAuth();
     const [newHouseCurrency, setNewHouseCurrency] = useState('USD'); // local picker for Create House form
     const [typeOfHouse, setTypeOfHouse] = useState<'expenses' | 'meals_and_expenses'>('expenses');
     const [mealsPerDay, setMealsPerDay] = useState<2 | 3>(3);
@@ -828,6 +829,44 @@ export default function Profile() {
                                     </Typography>
                                 </Box>
                             )}
+                        </Paper>
+                    )}
+
+                    {/* ── Card 4: Notification Settings ── */}
+                    {isNotificationSupported && (
+                        <Paper className="glass animate-stagger" sx={{ p: 3, background: 'transparent', transitionDelay: '0.4s' }}>
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 3 }}>
+                                <Box sx={{ p: 1, borderRadius: '10px', background: 'rgba(108, 99, 255, 0.1)' }}>
+                                    <NotificationsIcon sx={{ fontSize: 20, color: '#6C63FF' }} />
+                                </Box>
+                                <Typography variant="subtitle1" fontWeight={900}>Notification Settings</Typography>
+                            </Box>
+
+                            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                                <Box>
+                                    <Typography variant="body2" sx={{ fontWeight: 700 }}>Push Notifications</Typography>
+                                    <Typography variant="caption" sx={{ color: 'text.secondary' }}>
+                                        {notificationPermission === 'granted' ? 'Currently enabled on this device' :
+                                            notificationPermission === 'denied' ? 'Blocked by browser' : 'Not yet enabled'}
+                                    </Typography>
+                                </Box>
+                                <Button
+                                    size="small"
+                                    variant={notificationPermission === 'granted' ? "outlined" : "contained"}
+                                    onClick={requestNotificationPermission}
+                                    disabled={notificationPermission === 'granted'}
+                                    sx={{
+                                        borderRadius: '12px',
+                                        textTransform: 'none',
+                                        fontWeight: 700,
+                                        bgcolor: notificationPermission === 'granted' ? 'transparent' : '#6C63FF',
+                                        color: notificationPermission === 'granted' ? '#6C63FF' : 'white',
+                                        '&:hover': { bgcolor: notificationPermission === 'granted' ? 'rgba(108, 99, 255, 0.05)' : '#5b54e6' }
+                                    }}
+                                >
+                                    {notificationPermission === 'granted' ? 'Enabled' : 'Enable'}
+                                </Button>
+                            </Box>
                         </Paper>
                     )}
 

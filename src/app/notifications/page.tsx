@@ -32,7 +32,14 @@ export default function NotificationsPage() {
     const router = useRouter();
     const { notifications, markAsRead, markAllAsRead, isLoading, mutate } = useNotifications();
     const { house, mutateHouse, mutateFundDeposits } = useHouseData();
-    const { user } = useAuth();
+    const { user, isNotificationSupported, notificationPermission, requestNotificationPermission } = useAuth();
+    const [permissionLoading, setPermissionLoading] = useState(false);
+
+    const handleRequestPermission = async () => {
+        setPermissionLoading(true);
+        await requestNotificationPermission();
+        setPermissionLoading(false);
+    };
 
     // Track loading state per notification id
     const [actionLoading, setActionLoading] = useState<Record<string, boolean>>({});
@@ -350,6 +357,48 @@ export default function NotificationsPage() {
                     <Typography variant="body2" sx={{ color: 'text.secondary', marginBottom: 2, fontWeight: 600, letterSpacing: '0.05em', textTransform: 'uppercase', fontSize: '0.7rem', opacity: 0.7 }}>
                         Stay updated with your house
                     </Typography>
+
+                    {/* --- Notification Permission Call to Action --- */}
+                    {isNotificationSupported && notificationPermission !== 'granted' && (
+                        <Paper sx={{
+                            mb: 3,
+                            p: 2.5,
+                            borderRadius: '24px',
+                            background: 'linear-gradient(135deg, rgba(108, 99, 255, 0.08) 0%, rgba(255, 101, 132, 0.05) 100%)',
+                            border: '1px solid rgba(108, 99, 255, 0.15)',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            gap: 2,
+                            animation: 'fadeIn 1s'
+                        }}>
+                            <Box sx={{ display: 'flex', gap: 2, alignItems: 'center' }}>
+                                <Avatar sx={{ bgcolor: 'rgba(108, 99, 255, 0.1)', color: '#6C63FF' }}>
+                                    <NotificationsIcon />
+                                </Avatar>
+                                <Box>
+                                    <Typography variant="subtitle2" sx={{ fontWeight: 800 }}>Enable Push Notifications</Typography>
+                                    <Typography variant="caption" sx={{ color: 'text.secondary' }}>Receive native alerts for approvals and expenses.</Typography>
+                                </Box>
+                            </Box>
+                            <Button
+                                fullWidth
+                                variant="contained"
+                                onClick={handleRequestPermission}
+                                disabled={permissionLoading}
+                                startIcon={permissionLoading ? <CircularProgress size={16} color="inherit" /> : <CheckCircleIcon />}
+                                sx={{
+                                    borderRadius: '16px',
+                                    textTransform: 'none',
+                                    fontWeight: 700,
+                                    boxShadow: '0 4px 12px rgba(108, 99, 255, 0.2)',
+                                    bgcolor: '#6C63FF',
+                                    '&:hover': { bgcolor: '#5b54e6' }
+                                }}
+                            >
+                                {permissionLoading ? 'Allowing...' : 'Enable Now'}
+                            </Button>
+                        </Paper>
+                    )}
 
                     {/* --- Notifications Content --- */}
                     {isLoading ? (

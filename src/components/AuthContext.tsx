@@ -21,6 +21,9 @@ interface AuthContextType {
     updateCurrency: (newCurrency: string) => Promise<void>;
     mutateUser: () => void;
     mutateHouse: () => void;
+    notificationPermission: NotificationPermission;
+    isNotificationSupported: boolean;
+    requestNotificationPermission: () => Promise<boolean>;
 }
 
 const AuthContext = createContext<AuthContextType>({
@@ -36,6 +39,9 @@ const AuthContext = createContext<AuthContextType>({
     updateCurrency: async () => { },
     mutateUser: () => { },
     mutateHouse: () => { },
+    notificationPermission: 'default',
+    isNotificationSupported: false,
+    requestNotificationPermission: async () => false,
 });
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
@@ -72,14 +78,69 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }
     };
 
+    const [notificationPermission, setNotificationPermission] = useState<NotificationPermission>('default');
+    const [isNotificationSupported, setIsNotificationSupported] = useState(false);
+
+    // Initial check for support and existing permission
+    useEffect(() => {
+        if (typeof window !== 'undefined') {
+            setIsNotificationSupported('Notification' in window && 'serviceWorker' in navigator && !!messaging);
+            setNotificationPermission(Notification.permission);
+        }
+    }, []);
+
+    const requestNotificationPermission = async () => {
+        if (!user || !isNotificationSupported || !messaging) return false;
+
+        try {
+            const permission = await Notification.requestPermission();
+            setNotificationPermission(permission);
+
+            if (permission === 'granted') {
+                // Register service worker with config as query params
+                const configParams = new URLSearchParams({
+                    apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY || '',
+                    authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN || '',
+                    projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID || '',
+                    storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET || '',
+                    messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID || '',
+                    appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID || ''
+                }).toString();
+
+                const swRegistration = await navigator.serviceWorker.register(`/firebase-messaging-sw.js?${configParams}`);
+
+                const currentToken = await getToken(messaging, {
+                    vapidKey: process.env.NEXT_PUBLIC_FIREBASE_VAPID_KEY,
+                    serviceWorkerRegistration: swRegistration
+                });
+
+                if (currentToken) {
+                    console.log('FCM Token received:', currentToken);
+                    await fetch('/api/users', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            email: user.email,
+                            fcmToken: currentToken
+                        }),
+                    });
+                    mutateUser();
+                    return true;
+                }
+            }
+            return false;
+        } catch (err) {
+            console.error('Error requesting notification permission:', err);
+            return false;
+        }
+    };
+
     useEffect(() => {
         const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
             setUser(firebaseUser);
             if (firebaseUser) {
-                // Sync user to DB (fire and forget / optimistic)
-                // We do this to ensure Google Auth users exist in our DB
+                // Sync user to DB
                 try {
-                    // 1. Sync user basic info
                     fetch('/api/users', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
@@ -90,51 +151,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                         }),
                     }).then(res => {
                         if (res.ok) {
-                            mutateUser(); // Revalidate user data after sync
+                            mutateUser();
                         }
                     });
 
-                    // 2. Handle Push Notifications
-                    if (messaging && typeof window !== 'undefined' && 'serviceWorker' in navigator) {
-                        Notification.requestPermission().then(async (permission) => {
-                            if (permission === 'granted') {
-                                try {
-                                    // Register service worker with config as query params to avoid hardcoding secrets in public file
-                                    const configParams = new URLSearchParams({
-                                        apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY || '',
-                                        authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN || '',
-                                        projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID || '',
-                                        storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET || '',
-                                        messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID || '',
-                                        appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID || ''
-                                    }).toString();
-
-                                    const swRegistration = await navigator.serviceWorker.register(`/firebase-messaging-sw.js?${configParams}`);
-
-                                    const currentToken = await getToken(messaging!, {
-                                        vapidKey: process.env.NEXT_PUBLIC_FIREBASE_VAPID_KEY,
-                                        serviceWorkerRegistration: swRegistration
-                                    });
-
-                                    if (currentToken) {
-                                        console.log('FCM Token received:', currentToken);
-                                        // Send token to server
-                                        fetch('/api/users', {
-                                            method: 'POST',
-                                            headers: { 'Content-Type': 'application/json' },
-                                            body: JSON.stringify({
-                                                email: firebaseUser.email,
-                                                fcmToken: currentToken
-                                            }),
-                                        });
-                                    } else {
-                                        console.log('No registration token available. Request permission to generate one.');
-                                    }
-                                } catch (err) {
-                                    console.error('An error occurred while retrieving token. ', err);
-                                }
-                            }
-                        });
+                    // If permission is already granted, try to refresh token silently
+                    if ('Notification' in window && Notification.permission === 'granted' && messaging) {
+                        // We don't block login on this
+                        requestNotificationPermission().catch(() => { });
                     }
                 } catch (error) {
                     console.error("Error syncing user with DB:", error);
@@ -144,7 +168,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         });
 
         return () => unsubscribe();
-    }, [mutateUser]);
+    }, [mutateUser, isNotificationSupported]);
 
     const signIn = async () => {
         const provider = new GoogleAuthProvider();
@@ -178,7 +202,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             logout: logOut,
             updateCurrency,
             mutateUser,
-            mutateHouse
+            mutateHouse,
+            notificationPermission,
+            isNotificationSupported,
+            requestNotificationPermission
         }}>
             {children}
         </AuthContext.Provider>

@@ -28,7 +28,6 @@ export async function sendPushNotification(email: string, title: string, body: s
                 notification: {
                     sound: 'default',
                     channelId: 'default',
-                    icon: 'stock_ticker_update',
                     color: '#6C63FF'
                 },
             },
