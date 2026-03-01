@@ -16,13 +16,45 @@ export async function sendPushNotification(email: string, title: string, body: s
             return;
         }
 
-        const message = {
+        const message: any = {
             notification: {
                 title,
                 body,
             },
             data: data || {},
             token: fcmToken,
+            android: {
+                priority: 'high',
+                notification: {
+                    sound: 'default',
+                    channelId: 'default',
+                    icon: 'stock_ticker_update',
+                    color: '#6C63FF'
+                },
+            },
+            apns: {
+                payload: {
+                    aps: {
+                        sound: 'default',
+                        contentAvailable: true,
+                        mutableContent: true,
+                    },
+                },
+            },
+            webpush: {
+                headers: {
+                    Urgency: 'high'
+                },
+                notification: {
+                    body,
+                    icon: '/icon-192.png',
+                    badge: '/icon-192.png',
+                    requireInteraction: true,
+                },
+                fcmOptions: {
+                    link: '/'
+                }
+            }
         };
 
         const response = await adminMessaging.send(message);
