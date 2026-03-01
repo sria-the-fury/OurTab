@@ -139,7 +139,7 @@ export function useHouseData() {
         fundDeposits: Array.isArray(fundDeposits) ? fundDeposits : [],
         meals: Array.isArray(meals) ? meals : [],
         settlements: Array.isArray(settlements) ? settlements : [],
-        loading: houseLoading || (!!house?.id && (expensesLoading || todosLoading || fundDepositsLoading || mealsLoading || settlementsLoading)),
+        loading: houseLoading || (!!house?.id && (expensesLoading || fundDepositsLoading || (house.typeOfHouse === 'meals_and_expenses' && mealsLoading))),
         error: houseError || expensesError || todosError || fundDepositsError || mealsError || settlementsError,
         mutateHouse,
         mutateExpenses,

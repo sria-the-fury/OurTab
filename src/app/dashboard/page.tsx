@@ -127,7 +127,7 @@ export default function Dashboard() {
     }, [pendingDeposits, user]);
 
     // Combine loading states
-    const loading = authLoading || (!!user && dataLoading && !house && expenses.length === 0);
+    const loading = authLoading || (!!user && dataLoading);
 
     const currencySymbols: { [key: string]: string } = {
         'USD': '$',
