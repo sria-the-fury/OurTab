@@ -114,75 +114,6 @@ export default function Dashboard() {
         return todos?.filter(todo => !todo.isCompleted) || [];
     }, [todos]);
 
-    // House Fund Stats (total collected, spent, rentDeducted, remaining)
-    const houseFundStats = useMemo(() => {
-        if (!house || house.typeOfHouse !== 'meals_and_expenses') return { collected: 0, spent: 0, rentDeducted: 0, remaining: 0 };
-        const collected = (fundDeposits || [])
-            .filter(d => d.status === 'approved')
-            .reduce((sum, d) => sum + Number(d.amount), 0);
-        const spentGroceries = (expenses || [])
-            .filter(e => !e.isSettlementPayment && (e.category === 'groceries' || !e.category))
-            .reduce((sum, e) => sum + Number(e.amount), 0);
-        const spentUtilities = (expenses || [])
-            .filter(e => !e.isSettlementPayment && e.category === 'utilities')
-            .reduce((sum, e) => sum + Number(e.amount), 0);
-        const spentWage = (expenses || [])
-            .filter(e => !e.isSettlementPayment && e.category === 'wage')
-            .reduce((sum, e) => sum + Number(e.amount), 0);
-        const spentMisc = (expenses || [])
-            .filter(e => !e.isSettlementPayment && e.category === 'other')
-            .reduce((sum, e) => sum + Number(e.amount), 0);
-
-        const totalSpent = Number(spentGroceries) + Number(spentUtilities) + Number(spentWage) + Number(spentMisc);
-
-        const getYYYYMM = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
-
-        // Collect all unique months across all history
-        const months = new Set<string>();
-        (expenses || []).forEach(e => months.add(getYYYYMM(new Date(e.date))));
-        (fundDeposits || []).filter(d => d.status === 'approved').forEach(d => {
-            months.add(getYYYYMM(new Date(d.createdAt)));
-        });
-        (meals || []).forEach(m => months.add(m.date.substring(0, 7)));
-
-        const targetMonth = getYYYYMM(new Date());
-        months.add(targetMonth);
-
-        const sortedMonths = Array.from(months).sort();
-        let totalRentDeducted = 0;
-        let totalMealsCount = 0;
-        const totalMonthlyRent = (house?.members || []).reduce((sum, m) => sum + Number(m.rentAmount || 0), 0);
-
-        const mealsPerDay = house?.mealsPerDay || 3;
-        (meals || []).forEach(dayRecord => {
-            (house?.members || []).forEach(m => {
-                const email = typeof m === 'string' ? m : m.email;
-                const dateStr = dayRecord.date;
-                totalMealsCount += countMemberMeals(email, dateStr, house, meals);
-            });
-        });
-
-        for (const monthStr of sortedMonths) {
-            if (monthStr > targetMonth) break;
-            totalRentDeducted += totalMonthlyRent;
-        }
-
-        const avgMealCost = totalMealsCount > 0 ? (spentGroceries / totalMealsCount) : 0;
-
-        return {
-            collected,
-            spent: totalSpent,
-            spentGroceries,
-            spentUtilities,
-            spentWage,
-            spentMisc,
-            totalMealsCount,
-            avgMealCost,
-            rentDeducted: Number(totalRentDeducted),
-            remaining: collected - totalSpent - Number(totalRentDeducted)
-        };
-    }, [fundDeposits, expenses, meals, house]);
-
     // Combine loading states
     const loading = authLoading || (!!user && dataLoading && !house && expenses.length === 0);
 
@@ -193,6 +124,7 @@ export default function Dashboard() {
     };
 
     const [selectedDate, setSelectedDate] = useState(new Date());
+    const monthName = selectedDate.toLocaleString(undefined, { month: 'long' });
 
     const currencyIcons: { [key: string]: React.ElementType } = {
         'USD': AttachMoneyIcon,
@@ -422,11 +354,31 @@ export default function Dashboard() {
 
     // Calculate per-member accounting for the Fund Dialog
     const accountingResult = useMemo(() => {
-        return calculateMemberFundAccounting(house, expenses, fundDeposits, meals);
-    }, [house, expenses, fundDeposits, meals]);
+        const getYYYYMM = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+        return calculateMemberFundAccounting(house, expenses, fundDeposits, meals, getYYYYMM(selectedDate));
+    }, [house, expenses, fundDeposits, meals, selectedDate]);
 
     const memberFundAccounting = accountingResult.members;
     const houseFundStatsResult = accountingResult.summary;
+
+    // House Fund Stats (total collected, spent, rentDeducted, remaining)
+    const houseFundStats = useMemo(() => {
+        if (!house || house.typeOfHouse !== 'meals_and_expenses') return { collected: 0, spent: 0, rentDeducted: 0, remaining: 0 };
+
+        // Use the centralized accounting result for consistency
+        return {
+            collected: houseFundStatsResult.periodicTotalDeposits,
+            spent: houseFundStatsResult.periodicTotalGroceries + houseFundStatsResult.periodicTotalUtilities + houseFundStatsResult.periodicTotalWages,
+            spentGroceries: houseFundStatsResult.periodicTotalGroceries,
+            spentUtilities: houseFundStatsResult.periodicTotalUtilities,
+            spentWage: houseFundStatsResult.periodicTotalWages,
+            spentMisc: 0, // Misc is already folded into utilities in accounting.ts
+            totalMealsCount: houseFundStatsResult.periodicTotalMeals,
+            avgMealCost: houseFundStatsResult.periodicCostPerMeal,
+            rentDeducted: houseFundStatsResult.periodicTotalRent,
+            remaining: houseFundStatsResult.remainingFund // This is the closing balance for the selected month
+        };
+    }, [houseFundStatsResult, house]);
 
     // Memoize settlement calculation to prevent re-render issues
     const settlements = useMemo(() => {
@@ -434,18 +386,15 @@ export default function Dashboard() {
 
         const members = house.members;
         const memberBalances: { [key: string]: number } = {};
+        members.forEach(m => memberBalances[m.email] = 0);
 
         // === 1. EXPENSES ONLY TRACKING (Legacy/Default) ===
         if (house.typeOfHouse !== 'meals_and_expenses') {
-            members.forEach(m => memberBalances[m.email] = 0);
-
             expenses.forEach((exp: Expense) => {
                 if (exp.isSettlementPayment && exp.settlementBetween && exp.settlementBetween.length === 2) {
                     const [payer, receiver] = [exp.userId, exp.settlementBetween.find(e => e !== exp.userId)!];
                     if (memberBalances[payer] !== undefined) memberBalances[payer] += exp.amount;
-                    else memberBalances[payer] = exp.amount;
                     if (memberBalances[receiver] !== undefined) memberBalances[receiver] -= exp.amount;
-                    else memberBalances[receiver] = -exp.amount;
                     return;
                 }
 
@@ -455,19 +404,15 @@ export default function Dashboard() {
                     exp.contributors.forEach(contributor => {
                         if (memberBalances[contributor.email] !== undefined) {
                             memberBalances[contributor.email] += contributor.amount;
-                        } else {
-                            memberBalances[contributor.email] = contributor.amount;
                         }
                         contributorTotal += contributor.amount;
                     });
                     const remainder = exp.amount - contributorTotal;
                     if (remainder > 0.01) {
                         if (memberBalances[exp.userId] !== undefined) memberBalances[exp.userId] += remainder;
-                        else memberBalances[exp.userId] = remainder;
                     }
                 } else {
                     if (memberBalances[exp.userId] !== undefined) memberBalances[exp.userId] += exp.amount;
-                    else memberBalances[exp.userId] = exp.amount;
                 }
 
                 const sharePerPerson = exp.amount / members.length;
@@ -477,100 +422,10 @@ export default function Dashboard() {
             });
         }
         // === 2. MEALS AND EXPENSES TRACKING ===
-        else {
-            const getYYYYMM = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
-            const targetMonth = getYYYYMM(selectedDate);
-
-            // Collect all unique months across all history
-            const months = new Set<string>();
-            expenses.forEach(e => months.add(getYYYYMM(new Date(e.date))));
-            if (fundDeposits) {
-                fundDeposits.filter(d => d.status === 'approved').forEach(d => {
-                    months.add(getYYYYMM(new Date(d.createdAt)));
-                });
-            }
-            if (meals) {
-                meals.forEach(m => months.add(m.date.substring(0, 7))); // meals date is YYYY-MM-DD
-            }
-
-            // Make sure the target month is included so rent is deducted even if there are no expenses yet
-            months.add(targetMonth);
-
-            const sortedMonths = Array.from(months).sort();
-
-            members.forEach(m => {
-                memberBalances[m.email] = 0;
+        else if (memberFundAccounting) {
+            Object.keys(memberFundAccounting).forEach(email => {
+                memberBalances[email] = memberFundAccounting[email].closingBalance;
             });
-
-            // Calculate running balance month by month up to selected target month
-            for (const monthStr of sortedMonths) {
-                if (monthStr > targetMonth) break;
-
-                const mealsPerDay = house.mealsPerDay || 3;
-                let monthlyMealsConsumed = 0;
-                const monthlyMemberMeals: { [key: string]: number } = {};
-                members.forEach(m => monthlyMemberMeals[m.email] = 0);
-
-                if (meals && meals.length > 0) {
-                    meals.filter(m => m.date.startsWith(monthStr)).forEach(dayRecord => {
-                        members.forEach(m => {
-                            const mMeals = dayRecord.meals?.[m.email] || {};
-                            if (mealsPerDay === 3 && (mMeals.breakfast ?? true)) monthlyMemberMeals[m.email]++;
-                            if (mMeals.lunch ?? true) monthlyMemberMeals[m.email]++;
-                            if (mMeals.dinner ?? true) monthlyMemberMeals[m.email]++;
-                        });
-                    });
-                }
-
-                monthlyMealsConsumed = Object.values(monthlyMemberMeals).reduce((sum, count) => sum + count, 0);
-
-                // Deposits for this month
-                if (fundDeposits) {
-                    fundDeposits
-                        .filter(d => d.status === 'approved' && getYYYYMM(new Date(d.createdAt)) === monthStr)
-                        .forEach(d => {
-                            if (memberBalances[d.email] !== undefined) memberBalances[d.email] += d.amount;
-                        });
-                }
-
-                // Rent for this month (Deduct once per month)
-                members.forEach(m => {
-                    const rent = m.rentAmount || 0;
-                    memberBalances[m.email] -= rent;
-                });
-
-                // Expenses for this month
-                let monthlyGroceries = 0;
-                let monthlyOther = 0;
-
-                expenses
-                    .filter(e => getYYYYMM(new Date(e.date)) === monthStr)
-                    .forEach((exp: Expense) => {
-                        if (exp.isSettlementPayment && exp.settlementBetween && exp.settlementBetween.length === 2) {
-                            const [payer, receiver] = [exp.userId, exp.settlementBetween.find(e => e !== exp.userId)!];
-                            if (memberBalances[payer] !== undefined) memberBalances[payer] += exp.amount;
-                            else memberBalances[payer] = exp.amount;
-                            if (memberBalances[receiver] !== undefined) memberBalances[receiver] -= exp.amount;
-                            else memberBalances[receiver] = -exp.amount;
-                            return;
-                        }
-
-                        if (exp.category === 'groceries' || !exp.category) {
-                            monthlyGroceries += exp.amount;
-                        } else {
-                            monthlyOther += exp.amount;
-                        }
-                    });
-
-                const otherSharePerPerson = members.length > 0 ? (monthlyOther / members.length) : 0;
-                const mealUnitPrice = monthlyMealsConsumed > 0 ? (monthlyGroceries / monthlyMealsConsumed) : 0;
-
-                members.forEach(m => {
-                    memberBalances[m.email] -= otherSharePerPerson;
-                    const memberGroceryCost = monthlyMemberMeals[m.email] * mealUnitPrice;
-                    memberBalances[m.email] -= memberGroceryCost;
-                });
-            }
         }
 
         // Calculate net balances (Positive = is owed money, Negative = owes money)
@@ -587,15 +442,12 @@ export default function Dashboard() {
         const payers = netBalances.filter(b => b.amount < -0.01).sort((a, b) => a.amount - b.amount);
 
         const calculatedSettlements = [];
-
         let r = 0;
         let p = 0;
 
         while (r < receivers.length && p < payers.length) {
             const receiver = receivers[r];
             const payer = payers[p];
-
-            // The amount to settle is the minimum of what payer owes and receiver is owed
             const amount = Math.min(Math.abs(payer.amount), receiver.amount);
 
             if (amount > 0.01) {
@@ -606,7 +458,6 @@ export default function Dashboard() {
                 });
             }
 
-            // Adjust balances
             receiver.amount -= amount;
             payer.amount += amount;
 
@@ -615,7 +466,7 @@ export default function Dashboard() {
         }
 
         return calculatedSettlements;
-    }, [house, expenses]);
+    }, [house, expenses, memberFundAccounting]);
 
     const myDebt = useMemo(() => {
         if (!user?.email || !settlements) return 0;
@@ -784,9 +635,9 @@ export default function Dashboard() {
                                         borderTop: '1px solid rgba(76, 175, 80, 0.1)'
                                     }}>
                                         <Box>
-                                            <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 600 }}>My Contribution</Typography>
+                                            <Typography variant="caption" sx={{ color: 'text.secondary', fontWeight: 600 }}>My Contribution ({monthName})</Typography>
                                             <Typography variant="subtitle2" sx={{ fontWeight: 800, color: 'success.main' }}>
-                                                {displayCurrency}{(memberFundAccounting[user?.email || '']?.deposits || 0).toFixed(2)}
+                                                {displayCurrency}{(memberFundAccounting[user?.email || '']?.periodicDeposits || 0).toFixed(2)}
                                             </Typography>
                                         </Box>
                                         <Button
@@ -1482,7 +1333,7 @@ export default function Dashboard() {
                     {house?.typeOfHouse === 'meals_and_expenses' && (
                         <Box sx={{ mt: 6 }}>
                             <Typography variant="h6" sx={{ fontWeight: 800, mb: 3, display: 'flex', alignItems: 'center', gap: 1 }}>
-                                <AccountBalanceWalletIcon color="primary" /> Monthly Summary
+                                <AccountBalanceWalletIcon color="primary" /> Monthly Summary — {selectedDate.toLocaleString(undefined, { month: 'long', year: 'numeric' })}
                             </Typography>
                             <Paper className="glass" sx={{ p: 3, borderRadius: 4, background: 'rgba(255, 255, 255, 0.02)', border: '1px solid rgba(255,255,255,0.1)' }}>
                                 <Grid container spacing={4}>
@@ -1514,16 +1365,21 @@ export default function Dashboard() {
                                                     <Typography variant="caption" sx={{ flex: 1, fontWeight: 800, textAlign: 'right' }}>Balance</Typography>
                                                 </Box>
                                                 {(house.members || []).map(member => {
-                                                    const mStats = memberFundAccounting[member.email] || { deposits: 0, rent: 0, utilities: 0, wage: 0, mealCount: 0, mealCost: 0 };
-                                                    const remaining = mStats.deposits - mStats.rent - mStats.utilities - mStats.wage - mStats.mealCost;
+                                                    const mStats = memberFundAccounting[member.email] || {
+                                                        deposits: 0, rent: 0, utilities: 0, wage: 0, mealCount: 0, mealCost: 0,
+                                                        periodicDeposits: 0, periodicRent: 0, periodicUtilities: 0, periodicWage: 0,
+                                                        periodicMealCount: 0, periodicMealCost: 0,
+                                                        openingBalance: 0, closingBalance: 0
+                                                    };
+                                                    const remaining = mStats.closingBalance;
                                                     return (
                                                         <Box key={member.email} sx={{ display: 'flex', alignItems: 'center' }}>
                                                             <Box sx={{ flex: 1.5, display: 'flex', alignItems: 'center', gap: 1 }}>
                                                                 <Avatar src={member.photoUrl} sx={{ width: 20, height: 20, fontSize: '0.6rem' }}>{member.name?.[0]}</Avatar>
                                                                 <Typography variant="body2" sx={{ fontWeight: 600, fontSize: '0.8rem' }}>{member.name?.split(' ').slice(0, 2).join(' ')}</Typography>
                                                             </Box>
-                                                            <Typography variant="body2" sx={{ flex: 1, textAlign: 'center' }}>{mStats.mealCount}</Typography>
-                                                            <Typography variant="body2" sx={{ flex: 1, textAlign: 'center' }}>{displayCurrency}{mStats.mealCost.toFixed(0)}</Typography>
+                                                            <Typography variant="body2" sx={{ flex: 1, textAlign: 'center' }}>{mStats.periodicMealCount}</Typography>
+                                                            <Typography variant="body2" sx={{ flex: 1, textAlign: 'center' }}>{displayCurrency}{mStats.periodicMealCost.toFixed(0)}</Typography>
                                                             <Typography variant="body2" sx={{ flex: 1, textAlign: 'right', fontWeight: 800, color: remaining >= 0 ? 'success.main' : 'error.main' }}>
                                                                 {displayCurrency}{remaining.toFixed(0)}
                                                             </Typography>
@@ -1532,10 +1388,10 @@ export default function Dashboard() {
                                                 })}
                                                 <Box sx={{ display: 'flex', mt: 1, pt: 1, borderTop: '1px dashed rgba(0,0,0,0.1)' }}>
                                                     <Typography variant="body2" sx={{ flex: 1.5, fontWeight: 800, fontSize: '0.8rem' }}>Total</Typography>
-                                                    <Typography variant="body2" sx={{ flex: 1, textAlign: 'center', fontWeight: 800, fontSize: '0.8rem' }}>{houseFundStatsResult.totalMeals}</Typography>
-                                                    <Typography variant="body2" sx={{ flex: 1, textAlign: 'center', fontWeight: 800, fontSize: '0.8rem' }}>{displayCurrency}{houseFundStatsResult.totalGroceries.toFixed(0)}</Typography>
+                                                    <Typography variant="body2" sx={{ flex: 1, textAlign: 'center', fontWeight: 800, fontSize: '0.8rem' }}>{houseFundStatsResult.periodicTotalMeals}</Typography>
+                                                    <Typography variant="body2" sx={{ flex: 1, textAlign: 'center', fontWeight: 800, fontSize: '0.8rem' }}>{displayCurrency}{houseFundStatsResult.periodicTotalGroceries.toFixed(0)}</Typography>
                                                     <Typography variant="body2" sx={{ flex: 1, textAlign: 'right', fontWeight: 800, color: 'primary.main', fontSize: '0.75rem' }}>
-                                                        {displayCurrency}{houseFundStatsResult.costPerMeal.toFixed(2)}/meal
+                                                        {displayCurrency}{houseFundStatsResult.periodicCostPerMeal.toFixed(2)}/meal
                                                     </Typography>
                                                 </Box>
                                             </Box>
@@ -2125,10 +1981,15 @@ export default function Dashboard() {
                                 <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2, mt: 1 }}>
                                     {members.map((m: any) => {
                                         const email = typeof m === 'string' ? m : m.email;
-                                        const mStats = memberFundAccounting[email] || { deposits: 0, rent: 0, utilities: 0, wage: 0, mealCount: 0, mealCost: 0 };
+                                        const mStats = memberFundAccounting[email] || {
+                                            deposits: 0, rent: 0, utilities: 0, wage: 0, mealCount: 0, mealCost: 0,
+                                            periodicDeposits: 0, periodicRent: 0, periodicUtilities: 0, periodicWage: 0,
+                                            periodicMealCount: 0, periodicMealCost: 0,
+                                            openingBalance: 0, closingBalance: 0
+                                        };
                                         const name = (typeof m === 'object' && m?.name) || email.split('@')[0];
                                         const photoUrl = typeof m === 'object' ? m?.photoUrl : undefined;
-                                        const remaining = mStats.deposits - mStats.rent - mStats.utilities - mStats.wage - mStats.mealCost;
+                                        const remaining = mStats.closingBalance;
 
                                         return (
                                             <Box key={email} sx={{ p: 2, bgcolor: 'rgba(0,0,0,0.02)', borderRadius: 2, border: '1px solid', borderColor: 'divider' }}>
@@ -2143,45 +2004,51 @@ export default function Dashboard() {
                                                         </Box>
                                                     </Box>
                                                     <Box sx={{ textAlign: 'right' }}>
-                                                        <Typography variant="caption" color="text.secondary" display="block">Total Deposits</Typography>
-                                                        <Typography variant="subtitle1" sx={{ fontWeight: 'bold', color: 'success.main' }}>
-                                                            {displayCurrency}{mStats.deposits.toFixed(2)}
+                                                        <Typography variant="caption" color="text.secondary" display="block">Opening Balance</Typography>
+                                                        <Typography variant="subtitle1" sx={{ fontWeight: 'bold', color: mStats.openingBalance >= 0 ? 'success.main' : 'error.main' }}>
+                                                            {displayCurrency}{mStats.openingBalance.toFixed(2)}
                                                         </Typography>
                                                     </Box>
                                                 </Box>
 
                                                 <Box sx={{ pl: 1, display: 'flex', flexDirection: 'column', gap: 0.75 }}>
                                                     <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-                                                        <Typography variant="body2" color="text.secondary">Rent Portion</Typography>
-                                                        <Typography variant="body2" sx={{ fontWeight: 'medium', color: 'error.main' }}>
-                                                            - {displayCurrency}{mStats.rent.toFixed(2)}
+                                                        <Typography variant="body2" color="text.secondary">Deposits ({monthName})</Typography>
+                                                        <Typography variant="body2" sx={{ fontWeight: 'medium', color: 'success.main' }}>
+                                                            + {displayCurrency}{mStats.periodicDeposits.toFixed(2)}
                                                         </Typography>
                                                     </Box>
                                                     <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-                                                        <Typography variant="body2" color="text.secondary">Utilities (Portion)</Typography>
+                                                        <Typography variant="body2" color="text.secondary">Rent ({monthName})</Typography>
                                                         <Typography variant="body2" sx={{ fontWeight: 'medium', color: 'error.main' }}>
-                                                            - {displayCurrency}{mStats.utilities.toFixed(2)}
+                                                            - {displayCurrency}{mStats.periodicRent.toFixed(2)}
                                                         </Typography>
                                                     </Box>
                                                     <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-                                                        <Typography variant="body2" color="text.secondary">Worker Wage (Portion)</Typography>
+                                                        <Typography variant="body2" color="text.secondary">Utilities ({monthName})</Typography>
                                                         <Typography variant="body2" sx={{ fontWeight: 'medium', color: 'error.main' }}>
-                                                            - {displayCurrency}{mStats.wage.toFixed(2)}
+                                                            - {displayCurrency}{mStats.periodicUtilities.toFixed(2)}
+                                                        </Typography>
+                                                    </Box>
+                                                    <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                                                        <Typography variant="body2" color="text.secondary">Worker Wage ({monthName})</Typography>
+                                                        <Typography variant="body2" sx={{ fontWeight: 'medium', color: 'error.main' }}>
+                                                            - {displayCurrency}{mStats.periodicWage.toFixed(2)}
                                                         </Typography>
                                                     </Box>
                                                     <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
                                                         <Typography variant="body2" color="text.secondary">
-                                                            Total Meals ({mStats.mealCount}): Cost
+                                                            Meals in {monthName} ({mStats.periodicMealCount}): Cost
                                                         </Typography>
                                                         <Typography variant="body2" sx={{ fontWeight: 'medium', color: 'error.main' }}>
-                                                            - {displayCurrency}{mStats.mealCost.toFixed(2)}
+                                                            - {displayCurrency}{mStats.periodicMealCost.toFixed(2)}
                                                         </Typography>
                                                     </Box>
 
                                                     <Divider sx={{ my: 1, opacity: 0.6 }} />
 
                                                     <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-                                                        <Typography variant="body2" sx={{ fontWeight: 'bold' }}>Net Balance</Typography>
+                                                        <Typography variant="body2" sx={{ fontWeight: 'bold' }}>Closing Balance ({monthName})</Typography>
                                                         <Typography variant="body2" sx={{ fontWeight: 'bold', color: remaining >= 0 ? 'success.main' : 'error.main' }}>
                                                             {remaining >= 0 ? '' : '-'}{displayCurrency}{Math.abs(remaining).toFixed(2)}
                                                         </Typography>
@@ -2202,46 +2069,52 @@ export default function Dashboard() {
                                             </Typography>
                                         </Box>
                                         <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.5 }}>
-                                            <Typography variant="body2">Total Fund Collected</Typography>
+                                            <Typography variant="body2">Fund Collected ({monthName})</Typography>
                                             <Typography variant="body2" sx={{ fontWeight: 'bold', color: 'success.main' }}>
-                                                {displayCurrency}{houseFundStatsResult.totalDeposits.toFixed(2)}
+                                                {displayCurrency}{houseFundStatsResult.periodicTotalDeposits.toFixed(2)}
                                             </Typography>
                                         </Box>
                                         <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.5 }}>
-                                            <Typography variant="body2">Total Rent Deducted</Typography>
+                                            <Typography variant="body2">Rent Deducted ({monthName})</Typography>
                                             <Typography variant="body2" sx={{ fontWeight: 'bold', color: 'error.main' }}>
-                                                - {displayCurrency}{houseFundStatsResult.totalRent.toFixed(2)}
+                                                - {displayCurrency}{houseFundStatsResult.periodicTotalRent.toFixed(2)}
                                             </Typography>
                                         </Box>
                                         <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.5 }}>
-                                            <Typography variant="body2">Total Utilities</Typography>
+                                            <Typography variant="body2">Utilities ({monthName})</Typography>
                                             <Typography variant="body2" sx={{ fontWeight: 'bold', color: 'error.main' }}>
-                                                - {displayCurrency}{houseFundStatsResult.totalUtilities.toFixed(2)}
+                                                - {displayCurrency}{houseFundStatsResult.periodicTotalUtilities.toFixed(2)}
                                             </Typography>
                                         </Box>
                                         <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.5 }}>
-                                            <Typography variant="body2">Total Worker Wage</Typography>
+                                            <Typography variant="body2">Worker Wage ({monthName})</Typography>
                                             <Typography variant="body2" sx={{ fontWeight: 'bold', color: 'error.main' }}>
-                                                - {displayCurrency}{houseFundStatsResult.totalWages.toFixed(2)}
+                                                - {displayCurrency}{houseFundStatsResult.periodicTotalWages.toFixed(2)}
                                             </Typography>
                                         </Box>
-                                        <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.5 }}>
-                                            <Typography variant="body2">Total Grocery Cost</Typography>
+                                        <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1, pb: 1, borderBottom: '1px solid', borderColor: 'divider' }}>
+                                            <Typography variant="body2">Groceries ({monthName})</Typography>
                                             <Typography variant="body2" sx={{ fontWeight: 'bold', color: 'error.main' }}>
-                                                - {displayCurrency}{houseFundStatsResult.totalGroceries.toFixed(2)}
+                                                - {displayCurrency}{houseFundStatsResult.periodicTotalGroceries.toFixed(2)}
+                                            </Typography>
+                                        </Box>
+                                        <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 1 }}>
+                                            <Typography variant="subtitle2" sx={{ fontWeight: 'bold' }}>Closing Balance ({monthName})</Typography>
+                                            <Typography variant="subtitle2" sx={{ fontWeight: 'bold', color: houseFundStatsResult.remainingFund >= 0 ? 'success.main' : 'error.main' }}>
+                                                {displayCurrency}{houseFundStatsResult.remainingFund.toFixed(2)}
                                             </Typography>
                                         </Box>
 
                                         <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.5, mt: 1 }}>
-                                            <Typography variant="body2" color="text.secondary">Total Meals (Accumulated)</Typography>
+                                            <Typography variant="body2" color="text.secondary">Total Meals ({monthName})</Typography>
                                             <Typography variant="body2" sx={{ fontWeight: 'bold' }}>
-                                                {houseFundStatsResult.totalMeals}
+                                                {houseFundStatsResult.periodicTotalMeals}
                                             </Typography>
                                         </Box>
                                         <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.5 }}>
-                                            <Typography variant="body2" color="text.secondary">Cost per Meal</Typography>
+                                            <Typography variant="body2" color="text.secondary">Cost per Meal ({monthName})</Typography>
                                             <Typography variant="body2" sx={{ fontWeight: 'bold', color: 'primary.main' }}>
-                                                {displayCurrency}{houseFundStatsResult.costPerMeal.toFixed(2)}
+                                                {displayCurrency}{houseFundStatsResult.periodicCostPerMeal.toFixed(2)}
                                             </Typography>
                                         </Box>
                                         <Typography variant="caption" color="text.secondary" sx={{ fontStyle: 'italic', display: 'block', mt: 0.5 }}>

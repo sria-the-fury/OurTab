@@ -696,7 +696,11 @@ export default function ExpensePage() {
 
             // --- HOUSE FUND - MEMBER BREAKDOWN SECTION (For Meals and Expenses Houses) ---
             if (currentHouseData?.typeOfHouse === 'meals_and_expenses') {
-                const accountingResult = calculateMemberFundAccounting(currentHouseData, allExpenses, fundDeposits, meals);
+                const getYYYYMM = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+                const parsedDate = new Date(`${month} 1`);
+                const targetMonth = getYYYYMM(parsedDate);
+
+                const accountingResult = calculateMemberFundAccounting(currentHouseData, allExpenses, fundDeposits, meals, targetMonth);
                 const accounting = accountingResult.members;
                 const summary = accountingResult.summary;
                 const finalY = (doc as any).lastAutoTable?.finalY || titleY + 20;
@@ -721,7 +725,7 @@ export default function ExpensePage() {
                             `- ${stats.utilities.toFixed(2)}`,
                             `- ${stats.wage.toFixed(2)}`,
                             {
-                                content: `(${stats.mealCount}) - ${stats.mealCost.toFixed(2)}`,
+                                content: `(${stats.periodicMealCount}) - ${stats.periodicMealCost.toFixed(2)}`,
                                 styles: { halign: 'right' }
                             },
                             {
@@ -768,8 +772,8 @@ export default function ExpensePage() {
                     { label: "Total Utilities", value: `- ${summary.totalUtilities.toFixed(2)}`, color: [150, 0, 0] },
                     { label: "Total Worker Wage", value: `- ${summary.totalWages.toFixed(2)}`, color: [150, 0, 0] },
                     { label: "Total Grocery Cost", value: `- ${summary.totalGroceries.toFixed(2)}`, color: [150, 0, 0] },
-                    { label: "Total Meals (Accumulated)", value: `${summary.totalMeals}`, color: [0, 0, 0] },
-                    { label: "Cost per Meal", value: `${summary.costPerMeal.toFixed(2)}`, color: [0, 0, 150] },
+                    { label: "Meals in this Month", value: `${summary.periodicTotalMeals}`, color: [0, 0, 0] },
+                    { label: "Cost per Meal", value: `${summary.periodicCostPerMeal.toFixed(2)}`, color: [0, 0, 150] },
                 ];
 
                 summaryItems.forEach(item => {
