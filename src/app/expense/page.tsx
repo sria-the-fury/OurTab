@@ -790,7 +790,8 @@ export default function ExpensePage() {
 
                 doc.setFontSize(12);
                 doc.setFont('abril', 'bold');
-                doc.setTextColor(0, 100, 0);
+                const fundColor = summary.remainingFund >= 0 ? [0, 100, 0] : [150, 0, 0];
+                doc.setTextColor(fundColor[0], fundColor[1], fundColor[2]);
                 doc.text("Remaining House Fund", 14, summaryY);
                 doc.text(`${summary.remainingFund.toFixed(2)}`, pageWidth - 14, summaryY, { align: 'right' });
             }

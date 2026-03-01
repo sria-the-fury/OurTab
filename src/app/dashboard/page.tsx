@@ -644,7 +644,13 @@ export default function Dashboard() {
                                     </Box>
 
                                     <Box sx={{ flexGrow: 1 }}>
-                                        <Typography variant="h3" sx={{ fontWeight: 900, mb: 2, display: 'flex', alignItems: 'baseline' }}>
+                                        <Typography variant="h3" sx={{
+                                            fontWeight: 900,
+                                            mb: 2,
+                                            display: 'flex',
+                                            alignItems: 'baseline',
+                                            color: houseFundStats.remaining < 0 ? 'error.main' : 'success.main'
+                                        }}>
                                             <Box component="span" sx={{ fontSize: '0.6em', opacity: 0.7, mr: 0.5 }}>{displayCurrency}</Box>
                                             {houseFundStats.remaining.toFixed(0)}
                                             <Box component="span" sx={{ fontSize: '0.4em', opacity: 0.5, ml: 0.5 }}>.{houseFundStats.remaining.toFixed(2).split('.')[1]}</Box>
@@ -1393,7 +1399,7 @@ export default function Dashboard() {
                                         <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
                                             <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
                                                 <Typography variant="body2">Current Remaining Fund</Typography>
-                                                <Typography variant="body2" sx={{ fontWeight: 800, color: 'success.main' }}>{displayCurrency}{houseFundStatsResult.remainingFund.toFixed(2)}</Typography>
+                                                <Typography variant="body2" sx={{ fontWeight: 800, color: houseFundStatsResult.remainingFund >= 0 ? 'success.main' : 'error.main' }}>{displayCurrency}{houseFundStatsResult.remainingFund.toFixed(2)}</Typography>
                                             </Box>
                                             <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
                                                 <Typography variant="body2" color="text.secondary">Prev. Months Remaining</Typography>
