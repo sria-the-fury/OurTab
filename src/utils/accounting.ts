@@ -7,6 +7,7 @@ export interface MemberAccounting {
     rent: number;
     utilities: number;
     wage: number;
+    misc: number;
     mealCount: number;
     mealCost: number;
     // Periodic stats (for the target month only)
@@ -14,6 +15,7 @@ export interface MemberAccounting {
     periodicRent: number;
     periodicUtilities: number;
     periodicWage: number;
+    periodicMisc: number;
     periodicMealCount: number;
     periodicMealCost: number;
     openingBalance: number;
@@ -28,6 +30,7 @@ export interface HouseAccountingSummary {
     totalUtilities: number;
     totalWages: number;
     totalGroceries: number;
+    totalMisc: number;
     totalMeals: number;
     costPerMeal: number;
     previousMonthsRemaining: number;
@@ -37,8 +40,9 @@ export interface HouseAccountingSummary {
     periodicTotalRent: number;
     periodicTotalUtilities: number;
     periodicTotalWages: number;
-    periodicTotalMeals: number;
     periodicTotalGroceries: number;
+    periodicTotalMisc: number;
+    periodicTotalMeals: number;
     periodicCostPerMeal: number;
 }
 
@@ -62,6 +66,7 @@ export function calculateMemberFundAccounting(
             totalUtilities: 0,
             totalWages: 0,
             totalGroceries: 0,
+            totalMisc: 0,
             totalMeals: 0,
             costPerMeal: 0,
             previousMonthsRemaining: 0,
@@ -70,8 +75,9 @@ export function calculateMemberFundAccounting(
             periodicTotalRent: 0,
             periodicTotalUtilities: 0,
             periodicTotalWages: 0,
-            periodicTotalMeals: 0,
             periodicTotalGroceries: 0,
+            periodicTotalMisc: 0,
+            periodicTotalMeals: 0,
             periodicCostPerMeal: 0
         }
     };
@@ -84,9 +90,9 @@ export function calculateMemberFundAccounting(
     const getEmail = (m: any) => typeof m === 'string' ? m : m.email;
     members.forEach(m => {
         stats[getEmail(m)] = {
-            deposits: 0, rent: 0, utilities: 0, wage: 0,
+            deposits: 0, rent: 0, utilities: 0, wage: 0, misc: 0,
             mealCount: 0, mealCost: 0,
-            periodicDeposits: 0, periodicRent: 0, periodicUtilities: 0, periodicWage: 0,
+            periodicDeposits: 0, periodicRent: 0, periodicUtilities: 0, periodicWage: 0, periodicMisc: 0,
             periodicMealCount: 0, periodicMealCost: 0,
             openingBalance: 0, closingBalance: 0
         };
@@ -114,6 +120,7 @@ export function calculateMemberFundAccounting(
     let houseTotalUtilities = 0;
     let houseTotalWages = 0;
     let houseTotalGroceries = 0;
+    let houseTotalMisc = 0;
     let houseTotalMeals = 0;
     let previousMonthsRemaining = 0;
 
@@ -124,6 +131,7 @@ export function calculateMemberFundAccounting(
     let periodicTotalWages = 0;
     let periodicTotalMeals = 0;
     let periodicTotalGroceries = 0;
+    let periodicTotalMisc = 0;
 
     for (const monthStr of sortedMonths) {
         if (monthStr > targetMonth) break;
@@ -195,12 +203,14 @@ export function calculateMemberFundAccounting(
             });
 
         houseTotalGroceries += monthlyGroceries;
-        houseTotalUtilities += (monthlyUtilities + monthlyMisc);
+        houseTotalUtilities += monthlyUtilities;
+        houseTotalMisc += monthlyMisc;
         houseTotalWages += monthlyWage;
 
         if (isTargetMonth) {
             periodicTotalGroceries = monthlyGroceries;
-            periodicTotalUtilities = (monthlyUtilities + monthlyMisc);
+            periodicTotalUtilities = monthlyUtilities;
+            periodicTotalMisc = monthlyMisc;
             periodicTotalWages = monthlyWage;
         }
 
@@ -220,9 +230,12 @@ export function calculateMemberFundAccounting(
                 const prevClosing = stats[mEmail].closingBalance || 0;
                 if (isTargetMonth) stats[mEmail].openingBalance = prevClosing;
 
-                const monthlyUtilCost = utilShare + miscShare;
+                const monthlyUtilCost = utilShare;
+                const monthlyMiscCost = miscShare;
                 stats[mEmail].utilities += monthlyUtilCost;
                 stats[mEmail].wage += wageShare;
+                stats[mEmail].misc += monthlyMiscCost;
+
                 stats[mEmail].mealCount += monthlyMemberMeals[mEmail];
                 const monthlyMealCost = monthlyMemberMeals[mEmail] * mealUnitPrice;
                 stats[mEmail].mealCost += monthlyMealCost;
@@ -230,12 +243,13 @@ export function calculateMemberFundAccounting(
                 if (isTargetMonth) {
                     stats[mEmail].periodicUtilities = monthlyUtilCost;
                     stats[mEmail].periodicWage = wageShare;
+                    stats[mEmail].periodicMisc = monthlyMiscCost;
                     stats[mEmail].periodicMealCount = monthlyMemberMeals[mEmail];
                     stats[mEmail].periodicMealCost = monthlyMealCost;
                 }
 
                 // Update closing balance for each month to carry over
-                stats[mEmail].closingBalance = stats[mEmail].deposits - (stats[mEmail].rent + stats[mEmail].utilities + stats[mEmail].wage + stats[mEmail].mealCost);
+                stats[mEmail].closingBalance = stats[mEmail].deposits - (stats[mEmail].rent + stats[mEmail].utilities + stats[mEmail].wage + stats[mEmail].misc + stats[mEmail].mealCost);
             }
         });
     }
@@ -248,10 +262,11 @@ export function calculateMemberFundAccounting(
             totalUtilities: houseTotalUtilities,
             totalWages: houseTotalWages,
             totalGroceries: houseTotalGroceries,
+            totalMisc: houseTotalMisc,
             totalMeals: houseTotalMeals,
             costPerMeal: houseTotalMeals > 0 ? (houseTotalGroceries / houseTotalMeals) : 0,
             previousMonthsRemaining: previousMonthsRemaining,
-            remainingFund: houseTotalDeposits - (houseTotalRent + houseTotalUtilities + houseTotalWages + houseTotalGroceries),
+            remainingFund: houseTotalDeposits - (houseTotalRent + houseTotalUtilities + houseTotalWages + houseTotalGroceries + houseTotalMisc),
             // Periodic
             periodicTotalDeposits,
             periodicTotalRent,
@@ -259,6 +274,7 @@ export function calculateMemberFundAccounting(
             periodicTotalWages,
             periodicTotalMeals,
             periodicTotalGroceries,
+            periodicTotalMisc,
             periodicCostPerMeal: periodicTotalMeals > 0 ? (periodicTotalGroceries / periodicTotalMeals) : 0
         }
     };

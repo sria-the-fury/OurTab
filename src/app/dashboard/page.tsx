@@ -2176,6 +2176,26 @@ export default function Dashboard() {
                                                         - {displayCurrency}{houseFundStatsResult.periodicTotalGroceries.toFixed(2)}
                                                     </Typography>
                                                 </Box>
+                                                {houseFundStatsResult.periodicTotalMisc > 0 && (
+                                                    <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.5 }}>
+                                                        <Typography variant="body2">Other/Misc ({monthName})</Typography>
+                                                        <Typography variant="body2" sx={{ fontWeight: 'bold', color: 'error.main' }}>
+                                                            - {displayCurrency}{houseFundStatsResult.periodicTotalMisc.toFixed(2)}
+                                                        </Typography>
+                                                    </Box>
+                                                )}
+                                                <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.5 }}>
+                                                    <Typography variant="body2">Total Meals ({monthName})</Typography>
+                                                    <Typography variant="body2" sx={{ fontWeight: 'bold' }}>
+                                                        {houseFundStatsResult.periodicTotalMeals}
+                                                    </Typography>
+                                                </Box>
+                                                <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.5 }}>
+                                                    <Typography variant="body2">Avg Meal Cost ({monthName})</Typography>
+                                                    <Typography variant="body2" sx={{ fontWeight: 'bold' }}>
+                                                        {displayCurrency}{houseFundStatsResult.periodicCostPerMeal.toFixed(2)}
+                                                    </Typography>
+                                                </Box>
                                                 <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 1, pt: 1, borderTop: '1px solid', borderColor: 'divider' }}>
                                                     <Typography variant="subtitle1" sx={{ fontWeight: 'bold' }}>Remaining Fund</Typography>
                                                     <Typography variant="subtitle1" sx={{ fontWeight: 'bold', color: houseFundStatsResult.remainingFund >= 0 ? 'success.main' : 'error.main' }}>
