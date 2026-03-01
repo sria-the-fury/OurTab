@@ -167,6 +167,19 @@ export async function PATCH(request: Request) {
 
         const houseData = houseSnap.data()!;
 
+        // 1. Check if updater is manager or creator
+        if (!updatedBy) {
+            return NextResponse.json({ error: 'updatedBy (user email) is required' }, { status: 400 });
+        }
+
+        const memberDetail = houseData.memberDetails?.[updatedBy];
+        const isManager = memberDetail?.role === 'manager';
+        const isCreator = houseData.createdBy === updatedBy;
+
+        if (!isManager && !isCreator) {
+            return NextResponse.json({ error: 'Only managers can update house settings' }, { status: 403 });
+        }
+
         // Whitelist allowed update fields
         const allowedFields = ['mealUpdateWindowStart', 'mealUpdateWindowEnd', 'mealsPerDay', 'currency', 'name'];
         const safeUpdates: Record<string, any> = {};

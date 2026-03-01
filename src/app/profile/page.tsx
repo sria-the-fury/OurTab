@@ -57,6 +57,11 @@ export default function Profile() {
     const [editingIban, setEditingIban] = useState(false);
     const [savingIban, setSavingIban] = useState(false);
 
+    // House Name Editing State
+    const [editingHouseName, setEditingHouseName] = useState(false);
+    const [tempHouseName, setTempHouseName] = useState('');
+    const [savingHouseName, setSavingHouseName] = useState(false);
+
     // New Fields State
     const [professionValue, setProfessionValue] = useState('');
     const [whatsappValue, setWhatsappValue] = useState('');
@@ -352,6 +357,34 @@ export default function Profile() {
         setLoading(false);
     };
 
+    const handleUpdateHouseName = async () => {
+        if (!houseDetails?.id || !user?.email || !tempHouseName.trim()) return;
+        setSavingHouseName(true);
+        try {
+            const res = await fetch('/api/houses', {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    houseId: houseDetails.id,
+                    name: tempHouseName.trim(),
+                    updatedBy: user.email
+                })
+            });
+            if (res.ok) {
+                showToast('House name updated!', 'success');
+                mutateHouse();
+                setEditingHouseName(false);
+            } else {
+                const data = await res.json();
+                showToast(data.error || 'Failed to update house name', 'error');
+            }
+        } catch {
+            showToast('Error updating house name', 'error');
+        } finally {
+            setSavingHouseName(false);
+        }
+    };
+
     const handleSaveFields = async (fields: Partial<UserData>) => {
         if (!user?.email) return;
         setSavingFields(true);
@@ -606,12 +639,35 @@ export default function Profile() {
                                                 opacity: 0.8
                                             }}>
                                                 <HomeIcon sx={{ fontSize: 16, color: 'primary.main' }} />
-                                                <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                                                    <Box component="span" sx={{ color: 'primary.main', fontFamily: 'var(--font-abril)', letterSpacing: '0.05em' }}>
-                                                        {houseDetails.name}
+                                                {editingHouseName ? (
+                                                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                                        <TextField
+                                                            size="small"
+                                                            value={tempHouseName}
+                                                            onChange={(e) => setTempHouseName(e.target.value)}
+                                                            sx={{ '& .MuiInputBase-root': { borderRadius: '12px', background: 'rgba(255,255,255,0.05)', fontSize: '0.8rem' } }}
+                                                            autoFocus
+                                                        />
+                                                        <IconButton size="small" color="success" disabled={savingHouseName} onClick={handleUpdateHouseName}>
+                                                            <CheckIcon fontSize="small" />
+                                                        </IconButton>
+                                                        <IconButton size="small" onClick={() => setEditingHouseName(false)}>
+                                                            <CloseIcon fontSize="small" />
+                                                        </IconButton>
                                                     </Box>
-                                                    {' '}<Box component="span" sx={{ opacity: 0.5 }}>[{houseDetails.currency === 'EUR' ? '€' : houseDetails.currency === 'BDT' ? '৳' : '$'}]</Box>
-                                                </Typography>
+                                                ) : (
+                                                    <Typography variant="body2" sx={{ fontWeight: 600, display: 'flex', alignItems: 'center', gap: 1 }}>
+                                                        <Box component="span" sx={{ color: 'primary.main', fontFamily: 'var(--font-abril)', letterSpacing: '0.05em' }}>
+                                                            {houseDetails.name}
+                                                        </Box>
+                                                        {' '}<Box component="span" sx={{ opacity: 0.5 }}>[{houseDetails.currency === 'EUR' ? '€' : houseDetails.currency === 'BDT' ? '৳' : '$'}]</Box>
+                                                        {isManager && (
+                                                            <IconButton size="small" onClick={() => { setTempHouseName(houseDetails.name || ''); setEditingHouseName(true); }} sx={{ ml: 0.5, p: 0.5 }}>
+                                                                <EditIcon sx={{ fontSize: 14, opacity: 0.6 }} />
+                                                            </IconButton>
+                                                        )}
+                                                    </Typography>
+                                                )}
                                             </Box>
                                         )}
                                     </Box>
