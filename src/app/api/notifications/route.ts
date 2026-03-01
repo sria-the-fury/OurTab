@@ -61,17 +61,20 @@ export async function GET(request: Request) {
         }
 
         // --- 2. Fetch Notifications ---
-        const notificationsSnap = await adminDb
+        const snapshot = await adminDb
             .collection('notifications')
             .where('userId', '==', userId)
-            .orderBy('createdAt', 'desc')
-            .limit(50)
             .get();
 
-        const notifications = notificationsSnap.docs.map(doc => ({
+        let notifications = snapshot.docs.map(doc => ({
             id: doc.id,
             ...doc.data()
         })) as AppNotification[];
+
+        // Sort by createdAt desc in memory to avoid needing a Firebase composite index
+        notifications.sort((a, b) => new Date(b.createdAt!).getTime() - new Date(a.createdAt!).getTime());
+        // Limit to 50
+        notifications = notifications.slice(0, 50);
 
         // --- 3. Cleanup Old Notifications (Optional/Background) ---
         // Cleanup notifications older than 30 days
@@ -104,20 +107,39 @@ export async function GET(request: Request) {
 export async function PATCH(request: Request) {
     try {
         const body = await request.json();
-        const { ids, read } = body;
+        const { notificationIds, ids, markAllRead, userId, read } = body;
 
-        if (!ids || !Array.isArray(ids)) {
-            return NextResponse.json({ error: 'Notification IDs are required' }, { status: 400 });
+        // Use notificationIds if ids is not provided (for compatibility with useNotifications.ts)
+        const targetIds = notificationIds || ids;
+
+        if (markAllRead && userId) {
+            const batch = adminDb.batch();
+            const unreadSnap = await adminDb
+                .collection('notifications')
+                .where('userId', '==', userId)
+                .where('read', '==', false)
+                .get();
+
+            unreadSnap.docs.forEach((doc) => {
+                batch.update(doc.ref, { read: true });
+            });
+
+            await batch.commit();
+            return NextResponse.json({ success: true, count: unreadSnap.size });
         }
 
-        const batch = adminDb.batch();
-        ids.forEach(id => {
-            const ref = adminDb.collection('notifications').doc(id);
-            batch.update(ref, { read });
-        });
+        if (targetIds && Array.isArray(targetIds)) {
+            const batch = adminDb.batch();
+            targetIds.forEach((id: string) => {
+                const ref = adminDb.collection('notifications').doc(id);
+                // Default to true if read is not provided
+                batch.update(ref, { read: read !== undefined ? read : true });
+            });
+            await batch.commit();
+            return NextResponse.json({ success: true, count: targetIds.length });
+        }
 
-        await batch.commit();
-        return NextResponse.json({ success: true });
+        return NextResponse.json({ error: 'Invalid payload' }, { status: 400 });
     } catch (error) {
         console.error('Error updating notifications:', error);
         return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
